@@ -25,7 +25,11 @@ profiles/p3p/
 
 No commercial executables, decrypted EBOOTs, disc images, or copyrighted assets are stored in this repository. Executables must be supplied by the user from their legally owned copy.
 
-Place the decrypted `EBOOT.BIN` as `profiles/p3p/game/eboot.elf`.
+Prepare game data automatically from your retail ISO:
+```bash
+python tools/prepare_game.py "/path/to/Persona 3 Portable.iso"
+```
+Or place a pre-decrypted ELF at `profiles/p3p/game/eboot.elf`.
 
 ## Canonical Build & Execution Workflow
 

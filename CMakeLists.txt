@@ -95,4 +95,12 @@ if(Python3_FOUND)
     set_tests_properties(p3p_analysis_comparison PROPERTIES
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
+
+    add_test(
+        NAME p3p_prepare_game_tests
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_prepare_game.py"
+    )
+    set_tests_properties(p3p_prepare_game_tests PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
 endif()

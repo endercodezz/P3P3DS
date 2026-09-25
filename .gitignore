@@ -72,6 +72,11 @@ experiments/**/build/
 experiments/**/out/
 experiments/**/logs/
 
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
 # IDE and OS files
 .vscode/
 .idea/

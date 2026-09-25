@@ -173,21 +173,32 @@ During initial analysis, `psp_analyze` reported:
 4. Because `.rodata` sits inside Segment 0, any data pointer pointing to an ASCII string in `.rodata` (e.g. `"INSTALL_ERROR_ABORT_BY_SLEEP"` at `0x08B96374`) was mistakenly treated as a "function entry point".
 5. When `psp_analyze` attempted to disassemble ASCII strings as MIPS opcodes, it flagged random ASCII byte sequences as "unsupported instructions".
 
-**Empirical Decoder Compatibility Verification (`[VERIFIED]`):**
-A dedicated compatibility test was performed by running all 913,059 4-byte instruction words in the relocated `.text` section through the actual `psprecomp::decode_allegrex` engine:
-- **Decoder recognized & supported:** `912,337` instructions (**99.92%** of `.text`).
-- **Decoder unsupported in baseline:** `722` instructions (**0.08%** of `.text`).
-  All 722 unsupported instructions reside in the SPECIAL opcode family (`op = 0`):
-  - `468` occurrences: `madd` / `maddu` multiply-accumulate function codes (SPECIAL fn=0x1C).
-  - `251` occurrences: `break` software breakpoints (SPECIAL fn=0x0D).
-  - `3` occurrences: trap instructions (SPECIAL fn=0x2E, e.g. `tne`).
-  - *Sum of subcategories:* 468 + 251 + 3 = **722** (exact, mutually exclusive breakdown validated by automated test `verify_p3p_decoder`). Note: `clz` (fn=0x16, 20 occurrences) is supported by the baseline decoder and is part of the 912,337 supported instructions.
+**Empirical Decoder & Codegen Lowering Audit (`[VERIFIED]`):**
+A dedicated compatibility test was performed by running all 913,059 4-byte instruction words in the relocated `.text` section through `psprecomp::decode_allegrex` and the PSPRecomp codegen pipeline rules (`verify_p3p_decoder`):
 
-*Important Verification Note:* The earlier claim of "zero unsupported instructions" was an overclaim caused by top-level opcode family grouping (which only checked `op == 0` without verifying sub-opcodes). Distinguishing between:
-1. *Opcode family recognized* (89.2% MIPS ALU, 8.7% COP1, 0.3% VFPU);
-2. *Decoder supported* (912,337 instructions);
-3. *Decoder unsupported* (722 instructions requiring lowering rules before reaching those blocks);
-4. *Actually executed in runtime* (`module_start` executed 100% cleanly).
+1. **Decoder Coverage:**
+   - **Decoder recognized & supported:** `912,337` instructions (**99.9209%** of `.text`).
+   - **Decoder unsupported in baseline:** `722` instructions (**0.0791%** of `.text`).
+     All 722 unsupported instructions reside in the SPECIAL opcode family (`op = 0`):
+     - `468` occurrences: `madd` (Signed Multiply-Accumulate, SPECIAL fn=0x1C). Note: `maddu` is a distinct function code (fn=0x1D) and has 0 occurrences in `.text`.
+     - `251` occurrences: `break` (Software Breakpoint, SPECIAL fn=0x0D).
+     - `3` occurrences: `msub` (Signed Multiply-Subtract, SPECIAL fn=0x2E). Note: traps (`teq`, `tne`, etc.) use function codes fn=0x30–0x36.
+     - *Sum of subcategories:* 468 + 251 + 3 = **722** (exact, mutually exclusive breakdown validated by automated test `verify_p3p_decoder`). Note: `clz` (fn=0x16, 20 occurrences) is supported by the baseline decoder and is part of the 912,337 supported instructions.
+
+2. **Codegen Lowering Coverage:**
+   - **Directly lowerable in codegen:** `912,275` instructions (**99.9141%** of `.text`).
+   - **Decoded but NOT lowerable in codegen:** `62` instructions (**0.0068%** of `.text`).
+     These instructions are recognized by the decoder as generic VFPU (`OpcodeKind::Vfpu`), but hit `rt.unsupported(..., "not lowered yet")` in the code generator:
+     - `10` occurrences: `vfpu1`
+     - `52` occurrences: `vfpu4`
+
+*Important Verification Note:* The earlier claim of "zero unsupported instructions" was an overclaim caused by top-level opcode family grouping (which only checked `op == 0` without verifying sub-opcodes). Four distinct categories are now quantitatively measured:
+1. *Opcode family recognized:* 89.2% MIPS ALU, 8.7% COP1, 0.3% VFPU.
+2. *Decoder supported:* 912,337 instructions.
+3. *Codegen lowerable:* 912,275 instructions.
+4. *Decoder recognized but not lowered:* 62 instructions (`vfpu1`, `vfpu4`).
+5. *Decoder unsupported:* 722 instructions (`madd`, `break`, `msub`).
+6. *Actually executed in runtime:* `module_start` executed 100% cleanly through verified lowerings.
 
 ---
 

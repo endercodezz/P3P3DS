@@ -11,7 +11,7 @@ Verifies:
 - PSP module name, version, $gp, and stub table range
 - Total import stub count and library count
 - Exact library names and per-library stub counts
-- Complete (library, NID, stub_address) tuples for all 221 import stubs
+- Exact multiset & canonical sorted list match for all 221 import tuples (library, NID, stub_address)
 
 Exits with code 0 on complete agreement, code 1 on mismatch.
 """
@@ -19,6 +19,7 @@ Exits with code 0 on complete agreement, code 1 on mismatch.
 import sys
 import json
 import csv
+from collections import Counter
 from pathlib import Path
 
 def normalize_hex(val):
@@ -151,7 +152,7 @@ def compare_reports(recomp_json_path, independent_json_path, recomp_imports_csv_
     if not any("Library" in e for e in errors):
         print(f"All {len(all_libs)} library names & counts match exactly [MATCH]")
 
-    # 5. Exact (Library, NID, stub_address) Comparison
+    # 5. Exact Multiset & Canonical List (Library, NID, stub_address) Comparison
     recomp_stubs = []
     if Path(recomp_imports_csv_path).exists():
         with open(recomp_imports_csv_path, "r", encoding="utf-8") as f:
@@ -175,19 +176,25 @@ def compare_reports(recomp_json_path, independent_json_path, recomp_imports_csv_
                 normalize_hex(fn["stub_address"])
             ))
 
-    recomp_stubs_set = set(recomp_stubs)
-    indep_stubs_set = set(indep_stubs)
+    recomp_counter = Counter(recomp_stubs)
+    indep_counter = Counter(indep_stubs)
 
-    diff_recomp = recomp_stubs_set - indep_stubs_set
-    diff_indep = indep_stubs_set - recomp_stubs_set
+    diff_counter_r = recomp_counter - indep_counter
+    diff_counter_i = indep_counter - recomp_counter
 
-    if diff_recomp:
-        errors.append(f"Stubs in PSPRecomp not found in Independent analysis ({len(diff_recomp)}): {sorted(diff_recomp)[:5]}")
-    if diff_indep:
-        errors.append(f"Stubs in Independent not found in PSPRecomp analysis ({len(diff_indep)}): {sorted(diff_indep)[:5]}")
+    if diff_counter_r:
+        errors.append(f"Excess tuples in PSPRecomp analysis ({len(diff_counter_r)}): {list(diff_counter_r.items())[:5]}")
+    if diff_counter_i:
+        errors.append(f"Excess tuples in Independent analysis ({len(diff_counter_i)}): {list(diff_counter_i.items())[:5]}")
 
-    if not diff_recomp and not diff_indep and recomp_stubs:
-        print(f"All {len(recomp_stubs)} (Library, NID, stub_address) tuples: 100% BIT-EXACT MATCH")
+    recomp_sorted = sorted(recomp_stubs)
+    indep_sorted = sorted(indep_stubs)
+
+    if recomp_sorted != indep_sorted:
+        errors.append(f"Canonical sorted order mismatch between import stub lists ({len(recomp_sorted)} vs {len(indep_sorted)})")
+
+    if not errors and len(recomp_stubs) == 221:
+        print(f"Exact multiset match of all {len(recomp_stubs)} import tuples across both analyzers [MATCH]")
 
     print("====================================================")
     if errors:

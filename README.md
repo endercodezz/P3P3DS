@@ -148,21 +148,25 @@ To build the PC bootstrap harness and development tools:
 
 ---
 
-## How Local Game Files Are Supplied
+## Game Setup (One-Command Preparation)
 
-This repository contains **no copyrighted game assets or proprietary executables**. You must supply files from your own legally owned copy of *Shin Megami Tensei: Persona 3 Portable* (`ULUS-10512`):
+This repository contains **no copyrighted game assets or proprietary executables**. You must supply files from your own legally owned copy of *Shin Megami Tensei: Persona 3 Portable* (`ULUS-10512`).
 
-1. Decrypt `PSP_GAME/SYSDIR/EBOOT.BIN` from your retail UMD/ISO.
-2. Place the decrypted ELF file at:
-   ```text
-   profiles/p3p/game/eboot.elf
-   ```
-3. Extract `PSP_GAME/USRDIR/` (containing `data.cpk`) to:
-   ```text
-   profiles/p3p/game/USRDIR/
-   ```
+Run the automated game preparation tool pointing to your retail ISO image:
 
-*(These paths are gitignored.)*
+```bash
+python tools/prepare_game.py "/path/to/Persona 3 Portable.iso"
+```
+
+The tool automatically:
+1. Verifies ISO9660 disc integrity and `PARAM.SFO` metadata (`ULUS10512`).
+2. Decrypts the Allegrex executable (`EBOOT.BIN` -> `profiles/p3p/game/eboot.elf`) via the PSP AES-128 engine.
+3. Validates the decrypted binary against the verified reference SHA-256 (`be2abbd4...`).
+4. Extracts game assets (`USRDIR/` containing CPK archives) into `profiles/p3p/game/USRDIR/`.
+
+*(All extracted files in `profiles/p3p/game/` are strictly local and gitignored.)*
+
+*(Optional fallback: If you already have a pre-decrypted ELF, pass `--decrypted-eboot /path/to/eboot.elf`.)*
 
 ---
 
