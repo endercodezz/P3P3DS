@@ -1,0 +1,26 @@
+[game]
+name = "Grand Theft Auto: Vice City Stories"
+disc_id = "ULUS-10160"
+region = "NTSC-U"
+module = "GTA3"
+ram_mb = 32
+load_base = "0x08804000"
+expected_sha256 = "85c5e172fa0207086b72a37649e9a10d47845f0866b0dee179c48d930e43d17f"
+
+[input]
+# Decrypted dump made from PSP_GAME/SYSDIR/EBOOT.BIN. The executable is
+# intentionally not distributed with PSPRecomp.
+executable = "original/ULUS10160_EBOOT.BIN"
+game_root = "original/PSP_GAME/USRDIR"
+functions_csv = "analysis/vcs_bootstrap_functions.csv"
+nids_csv = "configs/nids.csv"
+
+[output]
+report_json = "analysis/ULUS10160_report.json"
+generated_cpp = "generated/generated_manifest.cpp"
+
+[policy]
+missing_function = "stop"
+unsupported_instruction = "stop"
+allow_interpreter_fallback = false
+allow_jit_fallback = false

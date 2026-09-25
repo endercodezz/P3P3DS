@@ -1,0 +1,97 @@
+// Copyright (c) 2014- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <functional>
+
+#include "Common/UI/UIScreen.h"
+#include "Common/UI/ViewGroup.h"
+#include "Common/File/Path.h"
+#include "UI/BaseScreens.h"
+#include "UI/SimpleDialogScreen.h"
+
+enum class ReportingOverallScore : int {
+	PERFECT = 0,
+	PLAYABLE = 1,
+	INGAME = 2,
+	MENU = 3,
+	NONE = 4,
+	INVALID = -1,
+};
+
+class ReportScreen : public UITwoPaneBaseDialogScreen {
+public:
+	ReportScreen(const Path &gamePath);
+
+	const char *tag() const override { return "Report"; }
+
+protected:
+	ScreenRenderFlags PreRender(ScreenRenderMode mode) override;
+	void update() override;
+	void resized() override;
+	void CreateSettingsViews(UI::ViewGroup *parent) override;
+	void CreateContentViews(UI::ViewGroup *parent) override;
+	void UpdateSubmit();
+	void UpdateCRCInfo();
+	void UpdateOverallDescription();
+	std::string_view GetTitle() const override;
+
+	void HandleChoice(UI::EventParams &e);
+	void HandleSubmit(UI::EventParams &e);
+	void HandleBrowser(UI::EventParams &e);
+	void HandleReportingChange(UI::EventParams &e);
+
+	UI::Choice *submit_ = nullptr;
+	UI::View *screenshot_ = nullptr;
+	UI::TextView *reportingNotice_ = nullptr;
+	UI::TextView *overallDescription_ = nullptr;
+	UI::TextView *crcInfo_ = nullptr;
+	Path screenshotFilename_;
+
+	ReportingOverallScore overall_ = ReportingOverallScore::INVALID;
+	int graphics_ = -1;
+	int speed_ = -1;
+	int gameplay_ = -1;
+	bool enableReporting_;
+	bool ratingEnabled_;
+	bool tookScreenshot_ = false;
+	bool includeScreenshot_ = true;
+	mutable std::string titleCache_;
+};
+
+class ReportFinishScreen : public UISimpleBaseDialogScreen {
+public:
+	ReportFinishScreen(const Path &gamePath, ReportingOverallScore score);
+
+	const char *tag() const override { return "ReportFinish"; }
+
+protected:
+	std::string_view GetTitle() const override;
+
+	void update() override;
+	void CreateDialogViews(UI::ViewGroup *parent) override;
+	void ShowSuggestions();
+
+	void HandleViewFeedback(UI::EventParams &e);
+
+	UI::TextView *resultNotice_ = nullptr;
+	UI::LinearLayout *resultItems_ = nullptr;
+	Path gamePath_;
+	ReportingOverallScore score_{};
+	bool setStatus_ = false;
+};

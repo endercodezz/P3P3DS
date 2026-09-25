@@ -1,0 +1,206 @@
+// Copyright (C) 2003 Dolphin Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official SVN repository and contact information can be found at
+// http://code.google.com/p/dolphin-emu/
+
+#pragma once
+
+#include <cstring>
+#include "Common/MemoryUtil.h"
+#include "Common/Serialize/Serializer.h"
+
+// STL-look-a-like interface, but name is mixed case to distinguish it clearly from the
+// real STL classes.
+
+// Not fully featured, no safety checking yet. Add features as needed.
+
+template <class T, int N>
+class FixedSizeQueue {
+public:
+	FixedSizeQueue() {
+		storage_ = new T[N];
+		clear();
+	}
+
+	~FixedSizeQueue() {
+		delete [] storage_;
+	}
+
+	// Disallow copies.
+	FixedSizeQueue(FixedSizeQueue &other) = delete;
+	FixedSizeQueue& operator=(const FixedSizeQueue &other) = delete;
+
+	void clear() {
+		head_ = 0;
+		tail_ = 0;
+		count_ = 0;
+		// Not entirely necessary, but keeps things clean.
+		memset(storage_, 0, sizeof(T) * N);
+	}
+
+	void push(T t) {
+		storage_[tail_] = t;
+		tail_++;
+		if (tail_ == N)
+			tail_ = 0;
+		count_++;
+	}
+
+	// Gets pointers to write to directly.
+	void pushPointers(size_t size, T **dest1, size_t *sz1, T **dest2, size_t *sz2) {
+		if (tail_ + (int)size < N) {
+			*dest1 = &storage_[tail_];
+			*sz1 = size;
+			tail_ += (int)size;
+			if (tail_ == N) tail_ = 0;
+			*dest2 = 0;
+			*sz2 = 0;
+		} else {
+			*dest1 = &storage_[tail_];
+			*sz1 = N - tail_;
+			tail_ = (int)(size - *sz1);
+			*dest2 = &storage_[0];
+			*sz2 = tail_;
+		}
+		count_ += (int)size;
+	}
+
+	void popPointers(size_t size, const T **src1, size_t *sz1, const T **src2, size_t *sz2) {
+		if ((int)size > count_) size = count_;
+
+		if (head_ + size < N) {
+			*src1 = &storage_[head_];
+			*sz1 = size;
+			head_ += (int)size;
+			if (head_ == N) head_ = 0;
+			*src2 = 0;
+			*sz2 = 0;
+		} else {
+			*src1 = &storage_[head_];
+			*sz1 = N - head_;
+			head_ = (int)(size - *sz1);
+			*src2 = &storage_[0];
+			*sz2 = head_;
+		}
+		count_ -= (int)size;
+	}
+
+	void pop() {
+		head_++;
+		if (head_ == N)
+			head_ = 0;
+		count_--;
+	}
+
+	/*
+	void push_array(const T *ptr, size_t num) {
+		// TODO: memcpy
+		for (size_t i = 0; i < num; i++) {
+			push(ptr[i]);
+		}
+	}
+
+	void pop_array(T *outptr, size_t num) {
+		for (size_t i = 0; i < num; i++) {
+			outptr[i] = front();
+			pop();
+		}
+	}*/
+
+	T pop_front() {
+		const T &temp = storage_[head_];
+		pop();
+		return temp;
+	}
+
+	T &front() { return storage_[head_]; }
+
+	const T &front() const { return storage_[head_]; }
+
+	size_t size() const {
+		return count_;
+	}
+
+	size_t capacity() const {
+		return N;
+	}
+
+	int room() const {
+		return N - count_;
+	}
+
+	bool empty() {
+		return count_ == 0;
+	}
+
+	void DoState(PointerWrap &p) {
+		int size = N;
+		Do(p, size);
+		if (size != N)
+		{
+			ERROR_LOG(Log::Common, "Savestate failure: Incompatible queue size.");
+			return;
+		}
+		// TODO: This is quite wasteful, could just store the actual data. Would be slightly more complex though.
+		DoArray<T>(p, storage_, N);
+		Do(p, head_);
+		Do(p, tail_);
+		Do(p, count_);
+		p.DoMarker("FixedSizeQueue");
+	}
+
+	// Compact serialization: stores only the live [head_, head_+count_) region
+	// instead of the whole fixed storage. NOT format-compatible with DoState();
+	// callers must gate on their own section version.
+	void DoStateCompact(PointerWrap &p) {
+		int size = N;
+		Do(p, size);
+		if (size != N) {
+			ERROR_LOG(Log::Common, "Savestate failure: Incompatible queue size.");
+			p.SetError(p.ERROR_FAILURE);
+			return;
+		}
+		Do(p, count_);
+		if (count_ < 0 || count_ > N) {
+			ERROR_LOG(Log::Common, "Savestate failure: Bad compact queue count.");
+			p.SetError(p.ERROR_FAILURE);
+			return;
+		}
+		if (p.mode == PointerWrap::MODE_READ) {
+			// Restore linearized: live data starts at the front of storage.
+			head_ = 0;
+			tail_ = count_ == N ? 0 : count_;
+			DoArray<T>(p, storage_, count_);
+		} else {
+			if (head_ + count_ <= N) {
+				DoArray<T>(p, storage_ + head_, count_);
+			} else {
+				// Live region wraps; write the two pieces in pop order. Raw
+				// bytes only (POD DoArray has no per-call header), so the
+				// single linear read above consumes them identically.
+				const int firstPart = N - head_;
+				DoArray<T>(p, storage_ + head_, firstPart);
+				DoArray<T>(p, storage_, count_ - firstPart);
+			}
+		}
+		p.DoMarker("FixedSizeQueue");
+	}
+
+private:
+	T *storage_;
+	int head_;
+	int tail_;
+	int count_;  // sacrifice 4 bytes for a simpler implementation. may optimize away in the future.
+};

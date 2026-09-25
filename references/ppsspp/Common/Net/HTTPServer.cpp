@@ -1,0 +1,405 @@
+#include "Common/TimeUtil.h"
+#include "ppsspp_config.h"
+
+#ifdef _WIN32
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <io.h>
+
+#else
+
+#include <sys/socket.h>       /*  socket definitions        */
+#include <sys/types.h>        /*  socket types              */
+#include <sys/wait.h>         /*  for waitpid()             */
+#include <netinet/in.h>       /*  struct sockaddr_in        */
+#include <arpa/inet.h>        /*  inet (3) funtions         */
+#include <unistd.h>           /*  misc. UNIX functions      */
+
+#define closesocket close
+
+#endif
+
+#if PPSSPP_PLATFORM(UWP)
+#define in6addr_any IN6ADDR_ANY_INIT
+#endif
+
+#include <functional>
+
+#include <cstdio>
+#include <cstdlib>
+#include <thread>
+
+#include "Common/Net/HTTPServer.h"
+#include "Common/Net/NetBuffer.h"
+#include "Common/Net/Sinks.h"
+#include "Common/File/FileDescriptor.h"
+
+#include "Common/Buffer.h"
+#include "Common/Log.h"
+
+
+void NewThreadExecutor::Run(std::function<void()> func) {
+	// Every connection gets a thread, and we only ever joined them at shutdown - so a server that
+	// had served N connections was still holding N joinable std::threads. Reap the finished ones.
+	Prune();
+
+	auto done = std::make_shared<std::atomic<bool>>(false);
+	Worker worker;
+	worker.done = done;
+	worker.thread = std::thread([func, done]() {
+		func();
+		done->store(true, std::memory_order_release);
+	});
+	workers_.push_back(std::move(worker));
+}
+
+void NewThreadExecutor::Prune() {
+	for (size_t i = 0; i < workers_.size(); ) {
+		if (workers_[i].done->load(std::memory_order_acquire)) {
+			// Set right at the end of the thread body, so this join returns essentially at once.
+			workers_[i].thread.join();
+			workers_.erase(workers_.begin() + i);
+		} else {
+			++i;
+		}
+	}
+}
+
+NewThreadExecutor::~NewThreadExecutor() {
+	// If Run was ever called...
+	for (auto &worker : workers_)
+		worker.thread.join();
+	workers_.clear();
+}
+
+namespace http {
+
+// Note: charset here helps prevent XSS.
+const char *const DEFAULT_MIME_TYPE = "text/html; charset=utf-8";
+
+ServerRequest::ServerRequest(int fd)
+	: fd_(fd) {
+	in_ = new net::InputSink(fd);
+	out_ = new net::OutputSink(fd);
+	header_.ParseHeaders(in_);
+
+	if (header_.ok) {
+		VERBOSE_LOG(Log::HTTP, "The request carried with it %i bytes", (int)header_.content_length);
+	} else {
+	    Close();
+	}
+}
+
+ServerRequest::~ServerRequest() {
+	Close();
+
+	if (!in_->Empty()) {
+		ERROR_LOG(Log::HTTP, "Input not empty - invalid request?");
+	}
+	delete in_;
+	if (!out_->Empty()) {
+		WARN_LOG(Log::HTTP, "Output not empty - connection abort? (%s) (%d bytes)", this->header_.resource, (int)out_->BytesRemaining());
+	}
+	delete out_;
+}
+
+void ServerRequest::WriteHttpResponseHeader(const char *ver, int status, int64_t size, const char *mimeType, const char *otherHeaders) const {
+	const char *statusStr;
+	switch (status) {
+	case 200: statusStr = "OK"; break;
+	case 206: statusStr = "Partial Content"; break;
+	case 301: statusStr = "Moved Permanently"; break;
+	case 302: statusStr = "Found"; break;
+	case 304: statusStr = "Not Modified"; break;
+	case 400: statusStr = "Bad Request"; break;
+	case 403: statusStr = "Forbidden"; break;
+	case 404: statusStr = "Not Found"; break;
+	case 405: statusStr = "Method Not Allowed"; break;
+	case 406: statusStr = "Not Acceptable"; break;
+	case 410: statusStr = "Gone"; break;
+	case 416: statusStr = "Range Not Satisfiable"; break;
+	case 418: statusStr = "I'm a teapot"; break;
+	case 500: statusStr = "Internal Server Error"; break;
+	case 503: statusStr = "Service Unavailable"; break;
+	default: statusStr = "OK"; break;
+	}
+
+	net::OutputSink *buffer = Out();
+	buffer->Printf("HTTP/%s %03d %s\r\n", ver, status, statusStr);
+	buffer->Push("Server: PPSSPPServer v0.1\r\n");
+	if (!mimeType || strcmp(mimeType, "websocket") != 0) {
+		buffer->Printf("Content-Type: %s\r\n", mimeType ? mimeType : DEFAULT_MIME_TYPE);
+		buffer->Push("Connection: close\r\n");
+	}
+	if (size >= 0) {
+		buffer->Printf("Content-Length: %llu\r\n", (unsigned long long)size);
+	}
+	if (otherHeaders) {
+		buffer->Push(otherHeaders, strlen(otherHeaders));
+	}
+	buffer->Push("\r\n");
+}
+
+void ServerRequest::WritePartial() const {
+	_assert_(fd_);
+	out_->Flush();
+}
+
+void ServerRequest::Write() {
+	_assert_(fd_);
+	WritePartial();
+	Close();
+}
+
+void ServerRequest::Close() {
+	if (fd_) {
+		closesocket(fd_);
+		fd_ = 0;
+	}
+}
+
+Server::Server(NewThreadExecutor *executor)
+	: port_(0), executor_(executor) {
+	RegisterHandler("/", std::bind(&Server::HandleListing, this, std::placeholders::_1));
+	SetFallbackHandler(std::bind(&Server::Handle404, this, std::placeholders::_1));
+}
+
+Server::~Server() {
+	delete executor_;
+}
+
+void Server::RegisterHandler(const char *url_path, UrlHandlerFunc handler) {
+	handlers_[std::string(url_path)] = handler;
+}
+
+void Server::SetFallbackHandler(UrlHandlerFunc handler) {
+	fallback_ = handler;
+}
+
+// SO_REUSEADDR means two very different things depending on the platform, and only one of them is
+// what we want here ("don't make me wait out TIME_WAIT when restarting the server quickly").
+//
+// On Windows it *also* lets a socket bind a port another socket is already actively listening on -
+// both binds succeed, and which one receives any given connection is undefined. That's a real
+// hazard (it's how port hijacking works), and it bit us concretely: two PPSSPP instances launched
+// with the same --debugger=PORT would both report "Listening on port N", and a debugger client
+// could silently end up attached to the wrong process. SO_EXCLUSIVEADDRUSE is the Windows way to
+// ask for the POSIX behavior, so use that there and plain SO_REUSEADDR everywhere else.
+static void SetPortReusePolicy(int sock) {
+	int opt = 1;
+#if PPSSPP_PLATFORM(WINDOWS)
+	setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (const char *)&opt, sizeof(opt));
+#else
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+#endif
+}
+
+bool Server::Listen(int port, const char *reason, net::DNSType type) {
+	bool success = false;
+	if (type == net::DNSType::ANY || type == net::DNSType::IPV6) {
+		success = Listen6(port, type == net::DNSType::IPV6, reason);
+	}
+	if (!success && (type == net::DNSType::ANY || type == net::DNSType::IPV4)) {
+		success = Listen4(port, reason);
+	}
+	return success;
+}
+
+bool Server::Listen4(int port, const char *reason) {
+	listenerSock_ = socket(AF_INET, SOCK_STREAM, 0);
+	if (listenerSock_ < 0)
+		return false;
+
+	struct sockaddr_in server_addr;
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	server_addr.sin_port = htons(port);
+
+	SetPortReusePolicy(listenerSock_);
+
+	if (bind(listenerSock_, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+#if PPSSPP_PLATFORM(WINDOWS)
+		int err = WSAGetLastError();
+#else
+		int err = errno;
+#endif
+		ERROR_LOG(Log::HTTP, "%s: Failed to bind to port %d, error=%d - Bailing (ipv4)", reason, port, err);
+		closesocket(listenerSock_);
+		return false;
+	}
+
+	fd_util::SetNonBlocking(listenerSock_, true);
+
+	// 1024 is the max number of queued requests.
+	if (listen(listenerSock_, 1024) < 0) {
+		closesocket(listenerSock_);
+		return false;
+	}
+
+	socklen_t len = sizeof(server_addr);
+	if (getsockname(listenerSock_, (struct sockaddr *)&server_addr, &len) == 0) {
+		port = ntohs(server_addr.sin_port);
+	}
+
+	localAddress_ = fd_util::GetLocalIP(listenerSock_);
+	INFO_LOG(Log::HTTP, "HTTP IPv4 server started on port %d: %s (ip: %s)", port, reason, localAddress_.c_str());
+
+	port_ = port;
+	return true;
+}
+
+bool Server::Listen6(int port, bool ipv6_only, const char *reason) {
+#if !PPSSPP_PLATFORM(SWITCH)
+	listenerSock_ = socket(AF_INET6, SOCK_STREAM, 0);
+	if (listenerSock_ < 0)
+		return false;
+
+	struct sockaddr_in6 server_addr;
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin6_family = AF_INET6;
+	server_addr.sin6_addr = in6addr_any;
+	server_addr.sin6_port = htons(port);
+
+	SetPortReusePolicy(listenerSock_);
+
+	// Enable listening on IPv6 and IPv4?
+	int opt = ipv6_only ? 1 : 0;
+	setsockopt(listenerSock_, IPPROTO_IPV6, IPV6_V6ONLY, (const char *)&opt, sizeof(opt));
+
+	if (bind(listenerSock_, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+#if PPSSPP_PLATFORM(WINDOWS)
+		int err = WSAGetLastError();
+#else
+		int err = errno;
+#endif
+		ERROR_LOG(Log::HTTP, "%s: Failed to bind to port %d, error=%d - Bailing (ipv6)", reason, port, err);
+		closesocket(listenerSock_);
+		return false;
+	}
+
+	fd_util::SetNonBlocking(listenerSock_, true);
+
+	// 1024 is the max number of queued requests.
+	if (listen(listenerSock_, 1024) < 0) {
+		closesocket(listenerSock_);
+		return false;
+	}
+
+	socklen_t len = sizeof(server_addr);
+	if (getsockname(listenerSock_, (struct sockaddr *)&server_addr, &len) == 0) {
+		port = ntohs(server_addr.sin6_port);
+	}
+
+	localAddress_ = fd_util::GetLocalIP(listenerSock_);
+	INFO_LOG(Log::HTTP, "HTTP IPv6 server started on port %d: %s (ip: %s)", port, reason, localAddress_.c_str());
+	port_ = port;
+	return true;
+#else
+	ERROR_LOG(Log::HTTP, "IPv6 not supported on this platform.");
+	return false;
+#endif
+}
+
+bool Server::RunSlice(double timeout) {
+	if (listenerSock_ < 0 || port_ == 0) {
+		return false;
+	}
+
+	if (timeout <= 0.0) {
+		timeout = 86400.0;
+	}
+	if (!fd_util::WaitUntilReady(listenerSock_, timeout, false)) {
+		return false;
+	}
+
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in ipv4;
+#if !PPSSPP_PLATFORM(SWITCH)
+		struct sockaddr_in6 ipv6;
+#endif
+	} client_addr;
+	socklen_t client_addr_size = sizeof(client_addr);
+	int conn_fd = accept(listenerSock_, &client_addr.sa, &client_addr_size);
+	if (conn_fd >= 0) {
+		executor_->Run(std::bind(&Server::HandleConnection, this, conn_fd));
+		return true;
+	}
+	else {
+		ERROR_LOG(Log::HTTP, "socket accept failed: %i", conn_fd);
+		return false;
+	}
+}
+
+bool Server::Run(int port) {
+	if (!Listen(port, "websocket")) {
+		return false;
+	}
+
+	while (true) {
+		RunSlice(0.0);
+	}
+
+	// We'll never get here. Ever.
+	return true;
+}
+
+void Server::Stop() {
+	closesocket(listenerSock_);
+}
+
+void Server::HandleConnection(int conn_fd) {
+	ServerRequest request(conn_fd);
+	if (!request.IsOK()) {
+		WARN_LOG(Log::HTTP, "Bad request, ignoring.");
+		return;
+	}
+	HandleRequest(request);
+
+	// TODO: Way to mark the content body as read, read it here if never read.
+	// This allows the handler to stream if need be.
+
+	// TODO: Could handle keep alive here.
+	request.Write();
+}
+
+void Server::HandleRequest(const ServerRequest &request) {
+	HandleRequestDefault(request);
+}
+
+void Server::HandleRequestDefault(const ServerRequest &request) {
+	if (request.resource().empty()) {
+		fallback_(request);
+		return;
+	}
+	// First, look through all handlers. If we got one, use it.
+	auto handler = handlers_.find(request.resource());
+	if (handler != handlers_.end()) {
+		(handler->second)(request);
+	} else {
+		// Let's hit the 404 handler instead.
+		fallback_(request);
+	}
+}
+
+void Server::Handle404(const ServerRequest &request) {
+	INFO_LOG(Log::HTTP, "No handler for '%.*s', falling back to 404.", STR_VIEW(request.resource()));
+	const char *payload = "<html><body>404 not found</body></html>\r\n";
+	request.WriteHttpResponseHeader("1.0", 404, strlen(payload));
+	request.Out()->Push(payload);
+}
+
+void Server::HandleListing(const ServerRequest &request) {
+	request.WriteHttpResponseHeader("1.0", 200, -1, "text/plain");
+	for (auto &handler : handlers_) {
+		request.Out()->Printf("%s\n", handler.first.c_str());
+	}
+}
+
+}  // namespace http

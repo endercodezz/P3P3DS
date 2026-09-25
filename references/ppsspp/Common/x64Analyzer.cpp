@@ -1,0 +1,273 @@
+// Copyright (C) 2003 Dolphin Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official SVN repository and contact information can be found at
+// http://code.google.com/p/dolphin-emu/
+
+#include "Common/Log.h"
+#include "Common/x64Analyzer.h"
+
+bool X86AnalyzeMOV(const unsigned char *codePtr, LSInstructionInfo &info)
+{
+	int accessType = 0;
+
+	unsigned const char *startCodePtr = codePtr;
+	u8 rex = 0;
+	u8 codeByte = 0;
+	u8 codeByte2 = 0;
+	
+	//Check for regular prefix
+	info.operandSizeInBytes = 4;
+	info.zeroExtend = false;
+	info.signExtend = false;
+	info.hasImmediate = false;
+	info.isMemoryWrite = false;
+	info.instructionClass = InstructionClass::GPR;
+
+	int addressSize = 8;
+	u8 modRMbyte = 0;
+	u8 sibByte = 0;
+    bool hasModRM = false;
+	bool hasSIBbyte = false;
+	bool hasDisplacement = false;
+	bool hasF3Prefix = false;
+
+	int displacementSize = 0;
+
+	if (*codePtr == 0x66)
+	{
+		info.operandSizeInBytes = 2;
+		codePtr++;
+	}
+	else if (*codePtr == 0x67)
+	{
+		addressSize = 4;
+		codePtr++;
+	}
+	else if (*codePtr == 0xF3)
+	{
+		// Mandatory prefix, distinguishes MOVSS (scalar) from MOVUPS (full xmm) on the same opcode.
+		hasF3Prefix = true;
+		codePtr++;
+	}
+
+	//Check for REX prefix
+	if ((*codePtr & 0xF0) == 0x40)
+	{
+		rex = *codePtr;
+		if (rex & 8) //REX.W
+		{
+			info.operandSizeInBytes = 8;
+		}
+		codePtr++;
+	}
+
+	codeByte = *codePtr++;
+
+    // Skip two-byte opcode byte 
+    bool twoByte = false; 
+    if(codeByte == 0x0F) 
+    { 
+        twoByte = true; 
+		codeByte2 = *codePtr++;
+    } 
+
+	if (!twoByte)
+	{
+        if ((codeByte & 0xF0) == 0x80 || 
+            ((codeByte & 0xF8) == 0xC0 && (codeByte & 0x0E) != 0x02))
+		{
+			modRMbyte = *codePtr++;
+			hasModRM = true;
+		}
+
+		// TODO: Add more cases.
+		if ((codeByte & 0xF0) == 0x80)
+			accessType = 1;
+		if ((codeByte & 0xF0) == 0xC0)
+			accessType = 1;
+	}
+	else
+	{
+        if (((codeByte2 & 0xF0) == 0x00 && (codeByte2 & 0x0F) >= 0x04 && (codeByte2 & 0x0D) != 0x0D) || 
+            (codeByte2 & 0xF0) == 0x30 || 
+            codeByte2 == 0x77 || 
+            (codeByte2 & 0xF0) == 0x80 || 
+            ((codeByte2 & 0xF0) == 0xA0 && (codeByte2 & 0x07) <= 0x02) || 
+            (codeByte2 & 0xF8) == 0xC8) 
+        { 
+            // No mod R/M byte 
+        } 
+        else 
+        { 
+			modRMbyte = *codePtr++;
+			hasModRM = true;
+        } 
+	}
+
+	if (hasModRM)
+	{
+		ModRM mrm(modRMbyte, rex);
+		info.regOperandReg = mrm.reg;
+		if (mrm.mod < 3)
+		{
+			if (mrm.rm == 4)
+			{
+				//SIB byte
+				sibByte = *codePtr++;
+				info.scaledReg = (sibByte >> 3) & 7;
+				info.otherReg = (sibByte & 7);
+				if (rex & 2) info.scaledReg += 8;
+				if (rex & 1) info.otherReg += 8;
+				hasSIBbyte = true;
+			}
+			else
+			{
+				//info.scaledReg = 
+			}
+		}
+		if (mrm.mod == 1 || mrm.mod == 2)
+		{
+			hasDisplacement = true;
+			if (mrm.mod == 1)
+				displacementSize = 1;
+			else
+				displacementSize = 4;
+		}
+	}
+
+	if (displacementSize == 1)
+		info.displacement = (s32)(s8)*codePtr;
+	else
+		info.displacement = *((s32 *)codePtr);
+	codePtr += displacementSize;
+	
+	if (accessType == 1)  // reg/mem
+	{
+		switch (codeByte)
+		{
+		case MOVE_8BIT: //move 8-bit immediate
+			{
+				info.hasImmediate = true;
+				info.immediate = *codePtr;
+				codePtr++; //move past immediate
+			}
+			break;
+
+		case MOVE_16_32BIT: //move 16 or 32-bit immediate, easiest case for writes
+			{
+				if (info.operandSizeInBytes == 2)
+				{
+					info.hasImmediate = true;
+					info.immediate = *(u16*)codePtr;
+					codePtr += 2;
+				}
+				else if (info.operandSizeInBytes == 4)
+				{
+					info.hasImmediate = true;
+					info.immediate = *(u32*)codePtr;
+					codePtr += 4;
+				}
+				else if (info.operandSizeInBytes == 8)
+				{
+					info.zeroExtend = true;
+					info.immediate = *(u32*)codePtr;
+					codePtr += 4;
+				}
+			}
+			break;
+		case MOVE_REG_TO_MEM: //move reg to memory
+			info.isMemoryWrite = true;
+			break;
+
+		case MOVE_MEM_TO_REG:
+			info.isMemoryWrite = false;
+			break;
+
+		// The 8-bit forms land here too - (codeByte & 0xF0) == 0x80 covers 0x88..0x8B - and
+		// without them a guest sb, which the x64 JIT emits as 0x88, hit the default below and
+		// failed to decode. That left MemFault unable to skip or ignore a bad byte store the way
+		// it can a word one.
+		case MOVE_REG_TO_MEM8:
+			info.isMemoryWrite = true;
+			info.operandSizeInBytes = 1;
+			break;
+
+		case MOVE_MEM_TO_REG8:
+			info.isMemoryWrite = false;
+			info.operandSizeInBytes = 1;
+			break;
+
+		default:
+			ERROR_LOG(Log::CPU, "Unhandled disasm case in write handler!\n\nPlease implement or avoid.");
+			return false;
+		}
+	}
+	else
+	{
+		// Memory read
+		info.isMemoryWrite = false;
+
+		//mov eax, dword ptr [rax]   == 8b 00
+		switch (codeByte)
+		{
+		case 0x0F:
+			switch (codeByte2)
+			{
+			case MOVZX_BYTE: //movzx on byte
+				info.zeroExtend = true;
+				info.operandSizeInBytes = 1;
+				break;
+			case MOVZX_SHORT: //movzx on short
+				info.zeroExtend = true;
+				info.operandSizeInBytes = 2;
+				break;
+			case MOVSX_BYTE: //movsx on byte
+				info.signExtend = true;
+				info.operandSizeInBytes = 1;
+				break;
+			case MOVSX_SHORT: //movsx on short
+				info.signExtend = true;
+				info.operandSizeInBytes = 2;
+				break;
+			case MOVUPS_MOVSS_FROM_RM: //movups/movss xmm, xmm/m (load)
+				info.instructionClass = hasF3Prefix ? InstructionClass::FP : InstructionClass::FP_SIMD;
+				info.operandSizeInBytes = hasF3Prefix ? 4 : 16;
+				break;
+			case MOVUPS_MOVSS_TO_RM: //movups/movss xmm/m, xmm (store)
+				info.instructionClass = hasF3Prefix ? InstructionClass::FP : InstructionClass::FP_SIMD;
+				info.operandSizeInBytes = hasF3Prefix ? 4 : 16;
+				info.isMemoryWrite = true;
+				break;
+			case MOVAPS_FROM_RM: //movaps xmm, xmm/m (load)
+				info.instructionClass = InstructionClass::FP_SIMD;
+				info.operandSizeInBytes = 16;
+				break;
+			case MOVAPS_TO_RM: //movaps xmm/m, xmm (store)
+				info.instructionClass = InstructionClass::FP_SIMD;
+				info.operandSizeInBytes = 16;
+				info.isMemoryWrite = true;
+				break;
+			default:
+				return false;
+			}
+			break;
+		// NOTE: 0x88..0x8B never reach here - they're all accessType 1, handled above.
+		default:
+			return false;
+		}
+	}
+	info.instructionSize = (int)(codePtr - startCodePtr);
+	return true;
+}

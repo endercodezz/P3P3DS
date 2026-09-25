@@ -1,0 +1,702 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>AemulusPackageManager</AssemblyName>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Assets\Aemulus.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <LangVersion>8.0</LangVersion>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <LangVersion>8.0</LangVersion>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
+    <Title>Aemulus Package Manager</Title>
+    <Description>Manage modding packages for Persona games</Description>
+    <Copyright>Copyright © 2020-2021</Copyright>
+    <FileVersion>6.6.0.0</FileVersion>
+    <Authors>Tekka</Authors>
+    <Version>6.6.0.0</Version>
+    <AssemblyVersion>6.6.0.0</AssemblyVersion>
+    <Company></Company>
+    <Product>Aemulus Package Manager</Product>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <LangVersion>8.0</LangVersion>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <LangVersion>8.0</LangVersion>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Jost-Regular.ttf" />
+    <Resource Include="Assets\pq.png">
+      <CopyToOutputDirectory></CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\pqicon.png">
+      <CopyToOutputDirectory></CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\RobotoMono-Regular.ttf" />
+    <Resource Include="Assets\Jost-SemiBold.ttf" />
+    <Content Include="Dependencies\SonicAudioTools\AcbEditor.exe.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Update="Dependencies\AwbTools\AWB_repacker.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\AwbTools\AWB_unpacker.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_data_pq.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\SpdPatcher\SPD Patcher.deps.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\SpdPatcher\SPD Patcher.runtimeconfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Libraries\Persona5Royal\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Libraries\Persona5\Modules\Custom\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Libraries\Persona5\Modules\Custom\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_data.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_dataR.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_dataR_Localized.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_data_pq2.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_p4gdata.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_patch2R.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_patch2R_F.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_patch2R_G.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_patch2R_I.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_patch2R_S.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_ps3.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_ps4R.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\FilteredCpkCsv\filtered_umd0.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\Preappfile\Amicitia.IO.deps.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\Preappfile\preappfile.deps.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\Preappfile\preappfile.runtimeconfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Dependencies\Preappfile\PreappPartnersLib.deps.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ContentWithTargetPath Include="Charsets\P3.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P3.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Charsets\P4.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P4.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Charsets\P4_Spanish.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P4_Spanish.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Charsets\P5.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P5.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Charsets\P5R_EFIGS.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P5R_EFIGS.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Charsets\P5_Chinese.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Charsets\\P5_Chinese.tsv</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\DigitalDevilSaga.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\DigitalDevilSaga.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\DigitalDevilSaga\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\DigitalDevilSaga\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\DigitalDevilSaga\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\DigitalDevilSaga\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\DigitalDevilSaga\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\DigitalDevilSaga\Modules\Common\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\DigitalDevilSaga\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\DigitalDevilSaga\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Nocturne.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Nocturne.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Nocturne\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Nocturne\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Nocturne\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Nocturne\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Nocturne\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Nocturne\Modules\Common\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Nocturne\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Nocturne\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona3.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3FES.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona3FES.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3FES\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3FES\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3FES\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3FES\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3FES\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3FES\Modules\Common\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3FES\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3FES\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona3Portable.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\AI\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\AI\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\Event\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\Event\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\Facility\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\Facility\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\Field\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\Field\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3Portable\Modules\Shared\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3Portable\Modules\Shared\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona3\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona3\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona4.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona4Golden.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\AI\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\AI\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\AI\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\AI\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Common\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Event\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Event\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Facility\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Facility\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Field\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Field\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4Golden\Modules\Net\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4Golden\Modules\Net\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\Modules\AI\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\Modules\AI\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\Modules\AI\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\Modules\AI\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\Modules\Event\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\Modules\Event\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona4\Modules\Field\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona4\Modules\Field\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona5.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\Persona5Royal.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\AI\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\AI\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\Facility\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\Facility\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\Field\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\Field\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\Net\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\Net\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5Royal\Modules\Social\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5Royal\Modules\Social\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\AI\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\AI\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\AI\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\AI\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Common\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Common\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Facility\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Facility\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Field\Enums.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Field\\Enums.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Field\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Field\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Net\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Net\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\Persona5\Modules\Social\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\Persona5\Modules\Social\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\\PersonaQ2.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\FlowScriptModules.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\\FlowScriptModules.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\\MessageScriptLibrary.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Battle\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Battle\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Camp\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Camp\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Common\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Common\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Dungeon\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Dungeon\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Event\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Event\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Facility\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Facility\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Map\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Map\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Script\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Script\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="Libraries\PersonaQ2\Modules\Window\Functions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Libraries\PersonaQ2\Modules\Window\\Functions.json</TargetPath>
+    </ContentWithTargetPath>
+  </ItemGroup>
+  <ItemGroup>
+    <ContentWithTargetPath Include="Dependencies\PM1MessageScriptEditor\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Dependencies\PM1MessageScriptEditor\%(RecursiveDir)\%(Filename)%(Extension)</TargetPath>
+    </ContentWithTargetPath>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Assets\pq.png" />
+    <None Remove="Assets\pqicon.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Remove="Windows\App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="Windows\App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Dependencies\SonicAudioTools\AcbEditor.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SonicAudioTools\at3plusdecoder.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SonicAudioTools\NAudio.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SonicAudioTools\NAudio.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SonicAudioTools\SonicAudioLib.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SonicAudioTools\vgmstream.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SpdPatcher\Amicitia.IO.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SpdPatcher\SPD Patcher.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\SpdPatcher\SPD Patcher.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Update="aemulus_overlay.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Resource Include="Assets\general.png" />
+    <Resource Include="Assets\p3f.png" />
+    <Resource Include="Assets\p5.png" />
+    <Resource Include="Assets\p3ficon.png" />
+    <Resource Include="Assets\p4gicon.png" />
+    <Resource Include="Assets\p5icon.png" />
+    <Resource Include="Assets\p5sicon.png" />
+    <Resource Include="Assets\GameBanana.png" />
+    <Resource Include="Assets\loading.gif" />
+    <Resource Include="Assets\p3picon.png" />
+    <Resource Include="Assets\p5ricon.png" />
+    <Resource Include="Assets\pq2icon.png" />
+    <Resource Include="Assets\p4g_vita.png" />
+    <Resource Include="Assets\p3p.png" />
+    <Resource Include="Assets\p4g_pc.png" />
+    <Resource Include="Assets\p5r.png" />
+    <Resource Include="Assets\p5s.png" />
+    <Resource Include="Assets\pq2.png" />
+    <None Update="Antlr4.Runtime.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Antlr4.Runtime.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Resource Include="Assets\p1psp.png" />
+    <Resource Include="Assets\p1pspicon.png" />
+    <Content Include="AtlusScriptLibrary.dll" />
+    <Content Include="Dependencies\CpkMakeC\CpkBinder.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\CpkMakeC\cpkmakec.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\CpkMakeC\CpkMaker.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\DecEboot\deceboot.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\DecEboot\LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\mkisofs\mkisofs.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\PM1MessageScriptEditor\Antlr4.Runtime.dll" />
+    <Content Include="Dependencies\PM1MessageScriptEditor\AtlusScriptLibrary.dll" />
+    <Content Include="Dependencies\PM1MessageScriptEditor\Newtonsoft.Json.dll" />
+    <Content Include="Dependencies\PM1MessageScriptEditor\PM1MessageScriptEditor.exe" />
+    <Content Include="Dependencies\rdb_tool.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Assets\Aemulus.ico" />
+    <Content Include="Dependencies\7z\7z.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\7z\7z.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Dependencies\7z\License.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Content Include="Dependencies\Preappfile\Amicitia.IO.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\Preappfile\CommandLine.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\Preappfile\Glob.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\Preappfile\preappfile.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\Preappfile\preappfile.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Dependencies\Preappfile\PreappPartnersLib.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Assets\HHH.png" />
+    <Resource Include="Assets\Inaba.png" />
+    <Content Include="Dependencies\PAKPack\AtlusFileSystemLibrary.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Assets\Preview.png" />
+    <Content Include="Dependencies\PAKPack\PAKPack.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include=".NETFramework,Version=v4.8">
+      <Visible>False</Visible>
+      <ProductName>Microsoft .NET Framework 4.8 %28x86 and x64%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CriFsV2Lib" Version="2.1.0" />
+    <PackageReference Include="FontAwesome5" Version="2.0.8" />
+    <PackageReference Include="gong-wpf-dragdrop" Version="2.3.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
+    <PackageReference Include="NVorbis" Version="0.10.3" />
+    <PackageReference Include="Octokit" Version="0.49.0" />
+    <PackageReference Include="Onova" Version="2.6.2" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.14" />
+    <PackageReference Include="Vlc.DotNet.Core" Version="3.1.0" />
+    <PackageReference Include="Vlc.DotNet.Core.Interops" Version="3.1.0" />
+    <PackageReference Include="Vlc.DotNet.Wpf" Version="3.1.0" />
+    <PackageReference Include="WindowsAPICodePack-Core" Version="1.1.1" />
+    <PackageReference Include="WindowsAPICodePack-Shell" Version="1.1.1" />
+    <PackageReference Include="WpfAnimatedGif" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="7.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+    <PackageReference Include="System.Security.AccessControl" Version="6.0.0" />
+    <PackageReference Include="System.Text.Encodings.Web" Version="7.0.0" />
+    <PackageReference Include="System.Text.Json" Version="7.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="AtlusScriptLibrary">
+      <HintPath>AtlusScriptLibrary.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ProjectExtensions />
+</Project>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android's Auto Backup keeps the saves and the settings, nothing else:
+     not the copy of the disc image, not the executable prepared from it,
+     texture packs, logs or copies made while moving saves. The game's install
+     data (ULJM05800DAT) is a cache it rebuilds, and saves an import replaced
+     stay on the device. Android 10 and 11 read this file. -->
+<full-backup-content>
+    <include domain="file" path="ms0/PSP/SAVEDATA/" />
+    <include domain="file" path="settings.ini" />
+    <exclude domain="file" path="ms0/PSP/SAVEDATA/ULJM05800DAT/" />
+    <exclude domain="file" path="ms0/PSP/SAVEDATA/.backup/" />
+</full-backup-content>

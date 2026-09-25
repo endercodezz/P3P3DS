@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Description>Library for parsing Atlus game formats.</Description>
+    <Copyright></Copyright>
+    <Version>1.9.6.0</Version>
+    <RepositoryUrl>https://github.com/tge-was-taken/Amicitia</RepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>../../Build/Release/</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>../../Build/Debug/</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Graphics\MD\**" />
+    <EmbeddedResource Remove="Graphics\MD\**" />
+    <None Remove="Graphics\MD\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="FileSystems\CVM\CVMFileRewrite.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AssimpNet" Version="4.1.0" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0-preview3.19551.4" />
+    <PackageReference Include="System.Drawing.Common" Version="4.6.1" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.7.0-preview3.19551.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Dependencies\NvTriStrip.Net\NvTriStripDotNet\NvTriStripDotNet.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="OpenTK">
+      <HintPath>..\..\Dependencies\Managed\OpenTK.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
+</Project>

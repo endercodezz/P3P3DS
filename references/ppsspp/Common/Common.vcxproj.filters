@@ -1,0 +1,1686 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="ABI.h" />
+    <ClInclude Include="Common.h" />
+    <ClInclude Include="CommonFuncs.h" />
+    <ClInclude Include="CommonTypes.h" />
+    <ClInclude Include="CPUDetect.h" />
+    <ClInclude Include="GhidraClient.h" />
+    <ClInclude Include="Log.h" />
+    <ClInclude Include="MemArena.h" />
+    <ClInclude Include="MemoryUtil.h" />
+    <ClInclude Include="StringUtils.h" />
+    <ClInclude Include="Thunk.h" />
+    <ClInclude Include="x64Analyzer.h" />
+    <ClInclude Include="x64Emitter.h" />
+    <ClInclude Include="ArmEmitter.h" />
+    <ClInclude Include="Crypto\md5.h">
+      <Filter>Crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="Swap.h" />
+    <ClInclude Include="CommonWindows.h" />
+    <ClInclude Include="Crypto\sha1.h">
+      <Filter>Crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="Crypto\sha256.h">
+      <Filter>Crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="Arm64Emitter.h" />
+    <ClInclude Include="ArmCommon.h" />
+    <ClInclude Include="BitSet.h" />
+    <ClInclude Include="CodeBlock.h" />
+    <ClInclude Include="DbgNew.h" />
+    <ClInclude Include="OSVersion.h" />
+    <ClInclude Include="BitScan.h" />
+    <ClInclude Include="ExceptionHandlerSetup.h" />
+    <ClInclude Include="MachineContext.h" />
+    <ClInclude Include="Serialize\Serializer.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize\SerializeFuncs.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize\SerializeMap.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize\SerializeList.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize\SerializeDeque.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize\SerializeSet.h">
+      <Filter>Serialize</Filter>
+    </ClInclude>
+    <ClInclude Include="TimeUtil.h" />
+    <ClInclude Include="FakeEmitter.h" />
+    <ClInclude Include="SysError.h" />
+    <ClInclude Include="..\ext\libpng17\png.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pngconf.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pngdebug.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pnginfo.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pnglibconf.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pngpriv.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libpng17\pngstruct.h">
+      <Filter>ext\libpng17</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\ThreadUtil.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\GestureDetector.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\InputState.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\KeyCodes.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Random\Rng.h">
+      <Filter>Data\Random</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Text\Demangle.h">
+      <Filter>Data\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Text\I18n.h">
+      <Filter>Data\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Text\Parsers.h">
+      <Filter>Data\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Text\WrapText.h">
+      <Filter>Data\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Encoding\Base64.h">
+      <Filter>Data\Encoding</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Encoding\Compression.h">
+      <Filter>Data\Encoding</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Encoding\Shiftjis.h">
+      <Filter>Data\Encoding</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Encoding\Utf8.h">
+      <Filter>Data\Encoding</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Encoding\Utf16.h">
+      <Filter>Data\Encoding</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Hash\Hash.h">
+      <Filter>Data\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\ConstMap.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\TinySet.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Color\RGBAUtil.h">
+      <Filter>Data\Color</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Convert\SmallDataConvert.h">
+      <Filter>Data\Convert</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\curves.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\expression_parser.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\geom2d.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\math_util.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\lin\matrix4x4.h">
+      <Filter>Math\lin</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\lin\vec3.h">
+      <Filter>Math\lin</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\fast\fast_matrix.h">
+      <Filter>Math\fast</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\RIFF.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="File\DiskFree.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="File\PathBrowser.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="File\VFS\VFS.h">
+      <Filter>File\VFS</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\IniFile.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\JSONReader.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\JSONWriter.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="Profiler\Profiler.h">
+      <Filter>Profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Display.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\System.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\NativeApp.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="File\FileUtil.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="File\DirListing.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="File\FileDescriptor.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\HTTPServer.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\HTTPHeaders.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\HTTPClient.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\Resolve.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\Sinks.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\URL.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\WebsocketServer.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\ZIMLoad.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\ZIMSave.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\PNGLoad.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Context.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Root.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Screen.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Tween.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\UI.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\UIScreen.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\View.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\ViewGroup.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\D3D11\D3D11Loader.h">
+      <Filter>GPU\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\DataFormatGL.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\gl3stub.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLQueueRunner.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLProfiler.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLRenderManager.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\DataFormat.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\thin3d.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\thin3d_create.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanQueueRunner.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanRenderManager.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLCommon.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLDebugLog.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLSLProgram.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\DrawBuffer.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\TextureAtlas.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLFeatures.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanContext.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanDebug.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanImage.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanLoader.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanMemory.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanPresentation.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text_android.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text_uwp.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text_win.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\FixedSizeQueue.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\Hashmaps.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Shader.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\ShaderWriter.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\Slice.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\ShaderTranslation.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Convert\ColorConv.h">
+      <Filter>Data\Convert</Filter>
+    </ClInclude>
+    <ClInclude Include="Buffer.h" />
+    <ClInclude Include="Net\NetBuffer.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="File\Path.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="LogReporting.h" />
+    <ClInclude Include="File\AndroidStorage.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\ThreadManager.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\Channel.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\Promise.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\ParallelLoop.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\Event.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\vma\vk_mem_alloc.h">
+      <Filter>ext\vma</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanAlloc.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanProfiler.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\Barrier.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\Waitable.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanBarrier.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RiscVEmitter.h" />
+    <ClInclude Include="GPU\Vulkan\VulkanFrameData.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\Statistics.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\PPSSPPVR.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\VRBase.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\VRFramebuffer.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\VRInput.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\VRMath.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\VRRenderer.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="VR\OpenXRLoader.h">
+      <Filter>VR</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\AsyncImageFileView.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\ManagedTexture.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanFramebuffer.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\ScrollView.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\PopupScreens.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLFrameData.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="File\VFS\DirectoryReader.h">
+      <Filter>File\VFS</Filter>
+    </ClInclude>
+    <ClInclude Include="File\VFS\ZipFileReader.h">
+      <Filter>File\VFS</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Format\DDSLoad.h">
+      <Filter>Data\Format</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_containers.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_containers_impl.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_file_headers.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_transcoder.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_transcoder_internal.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\basis_universal\basisu_transcoder_uastc.h">
+      <Filter>ext\basis_universal</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Request.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="File\AndroidContentURI.h">
+      <Filter>File</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\GLMemory.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\GPUBackendCommon.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\MiscTypes.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\IconCache.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="System\OSD.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\HTTPRequest.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\naett-lib\src\naett_internal.h">
+      <Filter>ext\naett-lib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\naett-lib\naett.h">
+      <Filter>ext\naett-lib</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\HTTPNaettRequest.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text_sdl.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanDescSet.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\CrossSIMD.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\minimp3\minimp3.h">
+      <Filter>ext\minimp3</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\atrac3data.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\atrac3plus.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\atrac3plus_data.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\atrac.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\get_bits.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\compat.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\fft.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\float_dsp.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\intreadwrite.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\at3_decoders.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\at3_standalone\mem.h">
+      <Filter>ext\at3_standalone</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\draw_text_cocoa.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Log\ConsoleListener.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Log\LogManager.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imstb_rectpack.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imstb_textedit.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imstb_truetype.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imconfig.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imgui.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imgui_impl_thin3d.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imgui_internal.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imgui_impl_platform.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lapi.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lauxlib.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lcode.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lctype.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\ldebug.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\ldo.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lfunc.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lgc.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\ljumptab.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\llex.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\llimits.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lmem.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lobject.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lopcodes.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lopnames.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lparser.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lprefix.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lstate.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lstring.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\ltable.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\ltm.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lua.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\luaconf.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lualib.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lundump.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lvm.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lua\lzio.h">
+      <Filter>ext\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\CharQueue.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Collections\LinkedList.h">
+      <Filter>Data\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\SIMDHeaders.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Net\SocketCompat.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sol\config.hpp">
+      <Filter>ext\sol</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sol\forward.hpp">
+      <Filter>ext\sol</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sol\sol.hpp">
+      <Filter>ext\sol</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\imgui\imgui_extras.h">
+      <Filter>ext\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioBackend.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="LoongArch64Emitter.h" />
+    <ClInclude Include="Render\AtlasGen.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\nanosvg\src\nanosvg.h">
+      <Filter>ext\nanosvg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\nanosvg\src\nanosvgrast.h">
+      <Filter>ext\nanosvg</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\TabHolder.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Text\Font.h">
+      <Filter>Render\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\stb\stb_rect_pack.h">
+      <Filter>ext\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\delay_impl.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\log_impl.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\mutex_impl.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\postoffice_client.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\postoffice_mem.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\aemu_postoffice\client\sock_impl.h">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Notice.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7z.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7zBuf.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7zCrc.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7zFile.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7zTypes.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\7zWindows.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\Bcj2.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\Bra.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\CpuArch.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\Delta.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\Lzma2Dec.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\LzmaDec.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\Precomp.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\lzma-sdk\RotateDefs.h">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="File\VFS\SevenZipFileReader.h">
+      <Filter>File\VFS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\pugixml\pugiconfig.hpp">
+      <Filter>ext\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\pugixml\pugixml.hpp">
+      <Filter>ext\pugixml</Filter>
+    </ClInclude>
+    <ClInclude Include="Data\Text\StringWriter.h">
+      <Filter>Data\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Application.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\GraphicsContext.h">
+      <Filter>GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\Vulkan\VulkanGraphicsContext.h">
+      <Filter>GPU\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\OpenGL\OpenGLGraphicsContext.h">
+      <Filter>GPU\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\ScreenManager.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ABI.cpp" />
+    <ClCompile Include="CPUDetect.cpp" />
+    <ClCompile Include="FakeCPUDetect.cpp" />
+    <ClCompile Include="MemoryUtil.cpp" />
+    <ClCompile Include="StringUtils.cpp" />
+    <ClCompile Include="Thunk.cpp" />
+    <ClCompile Include="x64Analyzer.cpp" />
+    <ClCompile Include="x64Emitter.cpp" />
+    <ClCompile Include="ArmEmitter.cpp" />
+    <ClCompile Include="ArmCPUDetect.cpp" />
+    <ClCompile Include="Crypto\md5.cpp">
+      <Filter>Crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="Crypto\sha1.cpp">
+      <Filter>Crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="Crypto\sha256.cpp">
+      <Filter>Crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="Arm64Emitter.cpp" />
+    <ClCompile Include="MemArenaPosix.cpp" />
+    <ClCompile Include="MemArenaWin32.cpp" />
+    <ClCompile Include="MemArenaAndroid.cpp" />
+    <ClCompile Include="MemArenaDarwin.cpp" />
+    <ClCompile Include="OSVersion.cpp" />
+    <ClCompile Include="ExceptionHandlerSetup.cpp" />
+    <ClCompile Include="Serialize\Serializer.cpp">
+      <Filter>Serialize</Filter>
+    </ClCompile>
+    <ClCompile Include="TimeUtil.cpp" />
+    <ClCompile Include="GhidraClient.cpp" />
+    <ClCompile Include="Log.cpp" />
+    <ClCompile Include="SysError.cpp" />
+    <ClCompile Include="..\ext\libpng17\png.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngerror.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngget.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngmem.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngpread.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngread.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngrio.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngrtran.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngrutil.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngset.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngtest.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngtrans.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngwio.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngwrite.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngwtran.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libpng17\pngwutil.c">
+      <Filter>ext\libpng17</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\ThreadUtil.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="Input\GestureDetector.cpp">
+      <Filter>Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Input\InputState.cpp">
+      <Filter>Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Text\Demangle.cpp">
+      <Filter>Data\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Text\I18n.cpp">
+      <Filter>Data\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Text\Parsers.cpp">
+      <Filter>Data\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Text\WrapText.cpp">
+      <Filter>Data\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Encoding\Base64.cpp">
+      <Filter>Data\Encoding</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Encoding\Compression.cpp">
+      <Filter>Data\Encoding</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Encoding\Utf8.cpp">
+      <Filter>Data\Encoding</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Hash\Hash.cpp">
+      <Filter>Data\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Color\RGBAUtil.cpp">
+      <Filter>Data\Color</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Convert\SmallDataConvert.cpp">
+      <Filter>Data\Convert</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\curves.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\expression_parser.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\math_util.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\lin\matrix4x4.cpp">
+      <Filter>Math\lin</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\lin\vec3.cpp">
+      <Filter>Math\lin</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\RIFF.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="File\DiskFree.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="File\PathBrowser.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="File\VFS\VFS.cpp">
+      <Filter>File\VFS</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\IniFile.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\JSONReader.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\JSONWriter.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="Profiler\Profiler.cpp">
+      <Filter>Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="System\Display.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="File\FileUtil.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="File\DirListing.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="File\FileDescriptor.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\HTTPServer.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\HTTPHeaders.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\HTTPClient.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\Resolve.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\Sinks.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\URL.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\WebsocketServer.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\ZIMLoad.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\ZIMSave.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\PNGLoad.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Context.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Root.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Screen.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Tween.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\UI.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\UIScreen.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\View.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\ViewGroup.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\D3D11\thin3d_d3d11.cpp">
+      <Filter>GPU\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\D3D11\D3D11Loader.cpp">
+      <Filter>GPU\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\DataFormatGL.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\gl3stub.c">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLQueueRunner.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLProfiler.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLRenderManager.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\thin3d_gl.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\thin3d.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\thin3d_vulkan.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanQueueRunner.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanRenderManager.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLDebugLog.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLSLProgram.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\DrawBuffer.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\TextureAtlas.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLFeatures.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanContext.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanDebug.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanImage.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanLoader.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanMemory.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Text\draw_text.cpp">
+      <Filter>Render\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Text\draw_text_android.cpp">
+      <Filter>Render\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Text\draw_text_uwp.cpp">
+      <Filter>Render\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Text\draw_text_win.cpp">
+      <Filter>Render\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\ShaderWriter.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Shader.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\ShaderTranslation.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Convert\ColorConv.cpp">
+      <Filter>Data\Convert</Filter>
+    </ClCompile>
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="Net\NetBuffer.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="File\Path.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="LogReporting.cpp" />
+    <ClCompile Include="File\AndroidStorage.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\ThreadManager.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\ParallelLoop.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="RiscVCPUDetect.cpp" />
+    <ClCompile Include="..\ext\vma\vk_mem_alloc.cpp">
+      <Filter>ext\vma</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanProfiler.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanBarrier.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RiscVEmitter.cpp" />
+    <ClCompile Include="LoongArchCPUDetect.cpp" />
+    <ClCompile Include="GPU\Vulkan\VulkanFrameData.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Statistics.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\PPSSPPVR.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\VRBase.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\VRFramebuffer.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\VRInput.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\VRMath.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\VRRenderer.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="VR\OpenXRLoader.cpp">
+      <Filter>VR</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\AsyncImageFileView.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\ManagedTexture.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanFramebuffer.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\ScrollView.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\PopupScreens.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLFrameData.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="File\VFS\DirectoryReader.cpp">
+      <Filter>File\VFS</Filter>
+    </ClCompile>
+    <ClCompile Include="File\VFS\ZipFileReader.cpp">
+      <Filter>File\VFS</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Format\DDSLoad.cpp">
+      <Filter>Data\Format</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\basis_universal\basisu_transcoder.cpp">
+      <Filter>ext\basis_universal</Filter>
+    </ClCompile>
+    <ClCompile Include="System\Request.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="File\AndroidContentURI.cpp">
+      <Filter>File</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\GLMemory.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Collections\FastVec.h">
+      <Filter>Data\Collections</Filter>
+    </ClCompile>
+    <ClCompile Include="Data\Collections\CyclicBuffer.h">
+      <Filter>Data\Collections</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\GPUBackendCommon.cpp">
+      <Filter>GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\IconCache.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="System\OSD.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\HTTPRequest.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\naett-lib\src\naett_core.c">
+      <Filter>ext\naett-lib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\naett-lib\src\naett_win.c">
+      <Filter>ext\naett-lib</Filter>
+    </ClCompile>
+    <ClCompile Include="Net\HTTPNaettRequest.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\Text\draw_text_sdl.cpp">
+      <Filter>Render\Text</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanDescSet.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\minimp3\minimp3.cpp">
+      <Filter>ext\minimp3</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\atrac3.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\atrac3plus.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\atrac3plusdec.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\atrac3plusdsp.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\mem.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\atrac.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\fft.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\get_bits.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\at3_standalone\compat.cpp">
+      <Filter>ext\at3_standalone</Filter>
+    </ClCompile>
+    <ClCompile Include="Log\ConsoleListener.cpp">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="Log\LogManager.cpp">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_widgets.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_demo.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_draw.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_impl_thin3d.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_tables.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_impl_platform.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lapi.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lauxlib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lbaselib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lcode.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lcorolib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lctype.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ldblib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ldebug.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ldo.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ldump.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lfunc.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lgc.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\linit.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\liolib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\llex.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lmathlib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lmem.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\loadlib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lobject.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lopcodes.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\loslib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lparser.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lstate.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lstring.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lstrlib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ltable.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ltablib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\ltm.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lundump.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lutf8lib.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lvm.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lua\lzio.c">
+      <Filter>ext\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\imgui\imgui_extras.cpp">
+      <Filter>ext\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="LoongArch64Emitter.cpp" />
+    <ClCompile Include="Render\AtlasGen.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\TabHolder.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\delay_impl_cpp.cpp">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\log_impl_ppsspp.cpp">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\mutex_impl_cpp.cpp">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\postoffice.c">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\postoffice_mem_stdc.c">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\aemu_postoffice\client\sock_impl_windows.c">
+      <Filter>ext\aemu_postoffice</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Notice.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zArcIn.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zBuf.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zCrc.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zCrcOpt.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zDec.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zFile.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\7zStream.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\Bcj2.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\CpuArch.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\Delta.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\Lzma2Dec.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\lzma-sdk\LzmaDec.c">
+      <Filter>ext\lzma-sdk</Filter>
+    </ClCompile>
+    <ClCompile Include="File\VFS\SevenZipFileReader.cpp">
+      <Filter>File\VFS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\pugixml\pugixml.cpp">
+      <Filter>ext\pugixml</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\Vulkan\VulkanGraphicsContext.cpp">
+      <Filter>GPU\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\OpenGL\OpenGLGraphicsContext.cpp">
+      <Filter>GPU\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\ScreenManager.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Crypto">
+      <UniqueIdentifier>{1b593f03-7b28-4707-9228-4981796f5589}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Serialize">
+      <UniqueIdentifier>{7be79ad5-3520-46a1-a370-dce2a943978c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext">
+      <UniqueIdentifier>{b2685193-5954-4ab6-af7c-d6064f63e278}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\libpng17">
+      <UniqueIdentifier>{1d04f87f-73a2-4027-a6ff-e998e92e7d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Thread">
+      <UniqueIdentifier>{41bcd391-8641-432c-ae4a-ab03812df762}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Input">
+      <UniqueIdentifier>{fd0bac4f-e3e2-4201-8902-2d19b50d5bf7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data">
+      <UniqueIdentifier>{072c36eb-a283-40b2-b8b1-02ec57d3bbae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Collections">
+      <UniqueIdentifier>{a162915f-e53a-4f42-a222-e863235a2d37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Hash">
+      <UniqueIdentifier>{891eae07-622d-46d5-9fc6-a4c320649eb9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Encoding">
+      <UniqueIdentifier>{0bd9bfae-7d4e-4f54-9aae-8fb11ab8c999}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Random">
+      <UniqueIdentifier>{16fc7858-b6db-4eb2-bd4c-1354ffacda5f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Text">
+      <UniqueIdentifier>{c2d25b54-23fc-4e80-8d9b-5d7e94fe557e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Color">
+      <UniqueIdentifier>{1ada1f0f-6f1c-4bf2-8450-1fc63d77da17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{9f70c234-1671-49db-aa45-1a6a75698a40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Convert">
+      <UniqueIdentifier>{98967255-542c-490d-9183-a4b21c074703}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math\lin">
+      <UniqueIdentifier>{aa083b68-34ed-4679-a8de-1797a00a1772}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math\fast">
+      <UniqueIdentifier>{ffa5052d-e78f-4c47-a43e-e3537c5e7ad0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data\Format">
+      <UniqueIdentifier>{3eebbd6c-0c35-4dac-9869-5d38419432a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="File">
+      <UniqueIdentifier>{d9e60709-9bf4-4bc7-b902-742219df7ffb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="File\VFS">
+      <UniqueIdentifier>{b10822cf-4cc0-4bc3-91a9-b20cb66e5cbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Profiler">
+      <UniqueIdentifier>{8321632b-8fc5-4a67-adb7-126a328d50eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{89ddf0bd-3fc4-4a69-87a7-b82cfc412e0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Net">
+      <UniqueIdentifier>{b338dd13-cdae-4ef4-b122-b22967ae9bcb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI">
+      <UniqueIdentifier>{6a61d762-e71c-4428-8cef-c7ddda405ba5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GPU">
+      <UniqueIdentifier>{3b448d70-d5c6-4732-96f0-29f3e101bfe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GPU\D3D11">
+      <UniqueIdentifier>{8241d0c2-78c8-4fc6-9543-69042ec5eb54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GPU\Vulkan">
+      <UniqueIdentifier>{e9d7bdf2-c412-4030-a423-671066c4ea51}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GPU\OpenGL">
+      <UniqueIdentifier>{19ad2070-4f85-48d3-abab-add446ea3a77}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render">
+      <UniqueIdentifier>{c9aba118-5c31-4607-9a69-18eca9f92b44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\Text">
+      <UniqueIdentifier>{9da96cce-c74a-4669-b755-c95defbe1e93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\vma">
+      <UniqueIdentifier>{7b17065c-729c-47c3-a02d-66dc383529dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="VR">
+      <UniqueIdentifier>{9d1c29fd-8ac7-4475-8ea6-c8c759b695fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\basis_universal">
+      <UniqueIdentifier>{d6d5f6e0-1c72-496b-af11-6d52d5123033}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\naett-lib">
+      <UniqueIdentifier>{34f45db9-5c08-49cb-b349-b9e760ce3213}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\libchdr">
+      <UniqueIdentifier>{b681797d-7747-487f-b448-5ef5b2d2805b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\minimp3">
+      <UniqueIdentifier>{83cd76d0-d1ac-4ed1-9bdc-11fb5a20e5d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\at3_standalone">
+      <UniqueIdentifier>{586da66e-922a-4479-9dac-9d608a1b9183}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Log">
+      <UniqueIdentifier>{cb2c7c09-1177-4a1e-962c-5cc7bcb56789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\imgui">
+      <UniqueIdentifier>{87c4af9c-07fd-458e-8009-8b9f8b0e9b70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\lua">
+      <UniqueIdentifier>{71e2e5df-5cfb-41e6-97da-f71584a7394e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\sol">
+      <UniqueIdentifier>{ec7d8691-bb7f-4689-b66a-cb60c1f48afd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Audio">
+      <UniqueIdentifier>{92746a51-33a9-4a00-af10-3538322f04f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\nanosvg">
+      <UniqueIdentifier>{da5bd3c2-d1d9-4e8f-972f-9e53e2a34049}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\stb">
+      <UniqueIdentifier>{8e8641a4-f1db-4609-acc4-66aec9ed8440}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\aemu_postoffice">
+      <UniqueIdentifier>{9352e975-d162-4110-b6a0-e8a4639d5b90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\lzma-sdk">
+      <UniqueIdentifier>{00053099-bdf5-4638-9bf5-45e44dca79d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ext\pugixml">
+      <UniqueIdentifier>{32c8149f-f6e1-45e4-b0a5-79093450ac82}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\ext\libpng17\CMakeLists.txt">
+      <Filter>ext\libpng17</Filter>
+    </Text>
+    <Text Include="..\ext\at3_standalone\README.txt">
+      <Filter>ext\at3_standalone</Filter>
+    </Text>
+    <Text Include="..\ext\at3_standalone\CMakeLists.txt">
+      <Filter>ext\at3_standalone</Filter>
+    </Text>
+    <Text Include="..\ext\imgui\CMakeLists.txt">
+      <Filter>ext\imgui</Filter>
+    </Text>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_astc.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_astc_0_255.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_atc_55.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_atc_56.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_bc7_m5_alpha.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_bc7_m5_color.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_dxt1_5.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_dxt1_6.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_pvrtc2_45.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="..\ext\basis_universal\basisu_transcoder_tables_pvrtc2_alpha_33.inc">
+      <Filter>ext\basis_universal</Filter>
+    </None>
+    <None Include="Render\Text\draw_text_cocoa.mm">
+      <Filter>Render\Text</Filter>
+    </None>
+    <None Include="..\ext\lua\README.md">
+      <Filter>ext\lua</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="Data\Collections\FastVec.natvis">
+      <Filter>Data\Collections</Filter>
+    </Natvis>
+  </ItemGroup>
+</Project>

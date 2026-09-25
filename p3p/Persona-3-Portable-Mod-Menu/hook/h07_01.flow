@@ -1,0 +1,21 @@
+import( "../original/h07_01.bf" );
+import( "../ModMenu.flow" );
+
+global bool isFieldBf;
+
+void dormitory_shortcut_hook()
+{
+    isFieldBf = false;
+    ModMenuInit();
+}
+
+void myroom_mybed_hook()
+{
+    isFieldBf = false;
+    ModMenuInit();
+}
+
+void CallOriginalSquareMenu()
+{
+    dormitory_shortcut_unhooked();
+} 

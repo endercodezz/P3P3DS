@@ -1,0 +1,542 @@
+// IniFile
+// Taken from Dolphin but relicensed by me, Henrik Rydgard, under the MIT
+// license as I wrote the whole thing originally and it has barely changed.
+
+#include <cstdlib>
+#include <cstdio>
+#include <algorithm>  // for sort
+
+#include <inttypes.h>
+
+// Hm, what's this for?
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "Common/Data/Format/IniFile.h"
+#include "Common/Data/Text/Parsers.h"
+#include "Common/File/VFS/VFS.h"
+#include "Common/File/FileUtil.h"
+#include "Common/Log.h"
+#include "Common/Math/math_util.h"
+
+#include "Common/StringUtils.h"
+
+// This unescapes # signs.
+// NOTE: These parse functions can make better use of the string_view - the pos argument should not be needed, for example.
+static bool ParseLineKey(std::string_view line, size_t &pos, std::string *keyOut) {
+	std::string key;
+
+	while (pos < line.size()) {
+		size_t next = line.find_first_of("=#", pos);
+		if (next == std::string::npos || next == 0) {
+			// Key never ended or empty, invalid.
+			return false;
+		} else if (line[next] == '#') {
+			if (line[next - 1] != '\\') {
+				// Value commented out before =, so not valid.
+				return false;
+			}
+
+			// Escaped.
+			key += line.substr(pos, next - pos - 1);
+			key.push_back('#');
+			pos = next + 1;
+		} else if (line[next] == '=') {
+			// Hurray, done.
+			key += line.substr(pos, next - pos);
+			pos = next + 1;
+			break;
+		}
+	}
+
+	if (keyOut) {
+		*keyOut = StripSpaces(key);
+	}
+	return true;
+}
+
+static bool ParseLineValue(std::string_view line, size_t &pos, std::string *valueOut) {
+	std::string value;
+
+	std::string_view strippedLine = StripSpaces(line.substr(pos));
+	if (strippedLine.size() >= 2 && strippedLine[0] == '"' && strippedLine[strippedLine.size() - 1] == '"') {
+		// Don't remove comment if is surrounded by " "
+		value += line.substr(pos);
+		pos = std::string_view::npos; // Won't enter the while below
+	}
+
+	while (pos < line.size()) {
+		size_t next = line.find('#', pos);
+		if (next == std::string_view::npos) {
+			value += line.substr(pos);
+			pos = std::string_view::npos;
+			break;
+		} else if (line[next - 1] != '\\') {
+			// It wasn't escaped, so finish before the #.
+			value += line.substr(pos, next - pos);
+			// Include the comment's # in pos.
+			pos = next;
+			break;
+		} else {
+			// Escaped.
+			value += line.substr(pos, next - pos - 1);
+			value.push_back('#');
+			pos = next + 1;
+		}
+	}
+
+	if (valueOut) {
+		*valueOut = StripQuotes(StripSpaces(value));
+	}
+
+	return true;
+}
+
+static bool ParseLineComment(std::string_view line, size_t &pos, std::string *commentOut) {
+	// Don't bother with anything if we don't need the comment data.
+	if (commentOut) {
+		// Include any whitespace/formatting in the comment.
+		size_t commentStartPos = pos;
+		if (commentStartPos != line.npos) {
+			while (commentStartPos > 0 && line[commentStartPos - 1] <= ' ') {
+				--commentStartPos;
+			}
+
+			*commentOut = line.substr(commentStartPos);
+		} else {
+			// There was no comment.
+			commentOut->clear();
+		}
+	}
+
+	pos = line.npos;
+	return true;
+}
+
+static bool ParseLine(std::string_view line, std::string* keyOut, std::string* valueOut, std::string* commentOut)
+{
+	// Rules:
+	// 1. A line starting with ; is commented out.
+	// 2. A # in a line (and all the space before it) is the comment.
+	// 3. A \# in a line is not part of a comment and becomes # in the value.
+	// 4. Whitespace around values is removed.
+	// 5. Double quotes around values is removed.
+	// 6. Value surrounded by double quotes don't parsed to strip comment.
+
+	if (line.size() < 2 || line[0] == ';')
+		return false;
+
+	size_t pos = 0;
+	if (!ParseLineKey(line, pos, keyOut))
+		return false;
+	if (!ParseLineValue(line, pos, valueOut))
+		return false;
+	if (!ParseLineComment(line, pos, commentOut))
+		return false;
+
+	return true;
+}
+
+static std::string EscapeHash(std::string_view value) {
+	std::string result = "";
+
+	for (size_t pos = 0; pos < value.size(); ) {
+		size_t next = value.find('#', pos);
+		if (next == std::string_view::npos) {
+			result += value.substr(pos);
+			pos = std::string_view::npos;
+		} else {
+			result += value.substr(pos, next - pos);
+			result += "\\#";
+			pos = next + 1;
+		}
+	}
+
+	return result;
+}
+
+ParsedIniLine::ParsedIniLine(std::string_view line) {
+	line = StripSpaces(line);
+	if (line.empty()) {
+		key.clear();
+		value.clear();
+		comment.clear();
+	} else if (line[0] == '#') {
+		key.clear();
+		value.clear();
+		comment = line;
+	} else {
+		if (!ParseLine(line, &key, &value, &comment)) {
+			// Preserve bogus input but turn it into comments.
+			comment = "# " + std::string(line);
+		}
+	}
+}
+
+void ParsedIniLine::Reconstruct(std::string *output) const {
+	if (!key.empty()) {
+		*output = EscapeHash(key) + " = " + EscapeHash(value) + comment;
+	} else {
+		*output = comment;
+	}
+}
+
+void Section::Clear() {
+	lines_.clear();
+}
+
+bool Section::GetKeys(std::vector<std::string> *keys) const {
+	keys->clear();
+	keys->reserve(lines_.size());
+	for (const auto &line : lines_) {
+		if (!line.Key().empty())
+			keys->emplace_back(line.Key());
+	}
+	return true;
+}
+
+ParsedIniLine *Section::GetLine(std::string_view key) {
+	for (auto &line : lines_) {
+		if (equalsNoCase(line.Key(), key))
+			return &line;
+	}
+	return nullptr;
+}
+
+const ParsedIniLine *Section::GetLine(std::string_view key) const {
+	for (auto &line : lines_) {
+		if (equalsNoCase(line.Key(), key))
+			return &line;
+	}
+	return nullptr;
+}
+
+void Section::Set(std::string_view key, uint32_t newValue) {
+	char temp[128];
+	snprintf(temp, sizeof(temp), "0x%08x", newValue);
+	Set(key, std::string_view(temp));
+}
+
+void Section::Set(std::string_view key, uint64_t newValue) {
+	char temp[128];
+	snprintf(temp, sizeof(temp), "0x%016" PRIx64, newValue);
+	Set(key, std::string_view(temp));
+}
+
+void Section::Set(std::string_view key, float newValue) {
+	_dbg_assert_(!my_isnanorinf(newValue));
+	char temp[64];
+	snprintf(temp, sizeof(temp), "%f", newValue);
+	Set(key, std::string_view(temp));
+}
+
+void Section::Set(std::string_view key, double newValue) {
+	char temp[64];
+	snprintf(temp, sizeof(temp), "%f", newValue);
+	Set(key, std::string_view(temp));
+}
+
+void Section::Set(std::string_view key, int newValue) {
+	char temp[32];
+	snprintf(temp, sizeof(temp), "%d", newValue);
+	Set(key, std::string_view(temp));
+}
+
+void Section::Set(std::string_view key, std::string_view newValue) {
+	ParsedIniLine *line = GetLine(key);
+	if (line) {
+		line->SetValue(newValue);
+	} else {
+		// The key did not already exist in this section - let's add it.
+		lines_.emplace_back(ParsedIniLine(key, newValue));
+	}
+}
+
+void Section::Set(std::string_view key, std::string_view  newValue, std::string_view defaultValue) {
+	if (newValue != defaultValue)
+		Set(key, newValue);
+	else
+		Delete(key);
+}
+
+bool Section::Get(std::string_view key, std::string *value) const {
+	const ParsedIniLine *line = GetLine(key);
+	if (!line) {
+		return false;
+	}
+	*value = line->Value();
+	return true;
+}
+
+void Section::Set(std::string_view key, const float newValue, const float defaultValue)
+{
+	if (newValue != defaultValue)
+		Set(key, newValue);
+	else
+		Delete(key);
+}
+
+void Section::Set(std::string_view key, int newValue, int defaultValue)
+{
+	if (newValue != defaultValue)
+		Set(key, newValue);
+	else
+		Delete(key);
+}
+
+void Section::Set(std::string_view key, bool newValue, bool defaultValue)
+{
+	if (newValue != defaultValue)
+		Set(key, newValue);
+	else
+		Delete(key);
+}
+
+void Section::Set(std::string_view key, const std::vector<std::string> &newValues) {
+	std::string temp;
+	// Join the strings with ,
+	for (const auto &value : newValues) {
+		temp += value;
+		temp.push_back(',');
+	}
+	// remove last ,
+	if (!temp.empty())
+		temp.pop_back();
+	Set(key, temp.c_str());
+}
+
+bool Section::Get(std::string_view key, std::vector<std::string> *values) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (!retval) {
+		return false;
+	}
+	SplitString(temp, ',', *values, true);
+	return true;
+}
+
+bool Section::Get(std::string_view key, int *value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::Get(std::string_view key, uint32_t *value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::Get(std::string_view key, uint64_t *value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::Get(std::string_view key, bool *value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::Get(std::string_view key, float *value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::Get(std::string_view key, double* value) const {
+	std::string temp;
+	bool retval = Get(key, &temp);
+	if (retval && TryParse(temp, value))
+		return true;
+	return false;
+}
+
+bool Section::HasKey(std::string_view key) const {
+	for (auto &line : lines_) {
+		if (equalsNoCase(key, line.Key()))
+			return true;
+	}
+	return false;
+}
+
+void Section::AddComment(std::string_view comment) {
+	lines_.emplace_back(ParsedIniLine::CommentOnly("# " + std::string(comment)));
+}
+
+std::map<std::string, std::string> Section::ToMap() const {
+	std::map<std::string, std::string> outMap;
+	for (auto &line : lines_) {
+		if (!line.Key().empty()) {
+			outMap.emplace(line.Key(), line.Value());
+		}
+	}
+	return outMap;
+}
+
+bool Section::Delete(std::string_view key) {
+	ParsedIniLine *line = GetLine(key);
+	for (auto liter = lines_.begin(); liter != lines_.end(); ++liter) {
+		if (line == &*liter) {
+			lines_.erase(liter);
+			return true;
+		}
+	}
+	return false;
+}
+
+// IniFile
+
+const Section *IniFile::GetSection(std::string_view sectionName) const {
+	for (const auto &iter : sections)
+		if (equalsNoCase(iter->name(), sectionName))
+			return iter.get();
+	return nullptr;
+}
+
+Section* IniFile::GetSection(std::string_view sectionName) {
+	for (const auto &iter : sections)
+		if (equalsNoCase(iter->name(), sectionName))
+			return iter.get();
+	return nullptr;
+}
+
+Section* IniFile::GetOrCreateSection(std::string_view sectionName) {
+	Section *section = GetSection(sectionName);
+	if (!section) {
+		sections.push_back(std::make_unique<Section>(sectionName));
+		section = sections.back().get();
+	}
+	return section;
+}
+
+bool IniFile::DeleteSection(std::string_view sectionName) {
+	Section* s = GetSection(sectionName);
+	if (!s)
+		return false;
+
+	for (auto iter = sections.begin(); iter != sections.end(); ++iter) {
+		if (iter->get() == s) {
+			sections.erase(iter);
+			return true;
+		}
+	}
+	return false;
+}
+
+void IniFile::SortSections() {
+	std::sort(sections.begin(), sections.end());
+}
+
+bool IniFile::Load(const Path &path) {
+	sections.clear();
+	sections.push_back(std::make_unique<Section>(""));
+	// first section consists of the comments before the first real section
+
+	// Open file
+	std::string data;
+	if (!File::ReadTextFileToString(path, &data)) {
+		return false;
+	}
+	std::stringstream sstream(data);
+	bool success = Load(sstream);
+	return success;
+}
+
+bool IniFile::LoadFromVFS(VFSInterface &vfs, const std::string &filename) {
+	size_t size;
+	uint8_t *data = vfs.ReadFile(filename.c_str(), &size);
+	if (!data)
+		return false;
+	std::string str((const char*)data, size);
+	delete [] data;
+
+	std::stringstream sstream(str);
+	return Load(sstream);
+}
+
+bool IniFile::Load(std::istream &in) {
+	std::string linebuf;
+
+	while (std::getline(in, linebuf)) {
+		std::string_view line = std::string_view(linebuf);
+		// Remove UTF-8 byte order marks.
+		if (line.substr(0, 3) == "\xEF\xBB\xBF") {
+			line = line.substr(3);
+		}
+		 
+#ifndef _WIN32
+		// Check for CRLF eol and convert it to LF
+		if (!line.empty() && line.at(line.size() - 1) == '\r') {
+			line = line.substr(0, line.size() - 1);
+		}
+#endif
+
+		if (!line.empty()) {
+			size_t sectionNameEnd = std::string::npos;
+			if (line[0] == '[') {
+				sectionNameEnd = line.find(']');
+			}
+
+			if (sectionNameEnd != std::string::npos) {
+				// New section!
+				std::string_view sub = line.substr(1, sectionNameEnd - 1);
+				sections.push_back(std::make_unique<Section>(sub));
+
+				if (sectionNameEnd + 1 < line.size()) {
+					sections.back()->comment = line.substr(sectionNameEnd + 1);
+				}
+			} else {
+				if (sections.empty()) {
+					sections.push_back(std::make_unique<Section>(""));
+				}
+				sections.back()->lines_.emplace_back(line);
+			}
+		}
+	}
+
+	return true;
+}
+
+bool IniFile::Save(const Path &filename)
+{
+	FILE *file = File::OpenCFile(filename, "w");
+	if (!file) {
+		return false;
+	}
+
+	// UTF-8 byte order mark. To make sure notepad doesn't go nuts.
+	// TODO: Do we still need this? It's annoying.
+	fprintf(file, "\xEF\xBB\xBF");
+
+	for (const auto &section : sections) {
+		if (!section->name().empty() && (!section->lines_.empty() || !section->comment.empty())) {
+			fprintf(file, "[%s]%s\n", section->name().c_str(), section->comment.c_str());
+		}
+		for (const auto &line : section->lines_) {
+			std::string buffer;
+			line.Reconstruct(&buffer);
+			fprintf(file, "%s\n", buffer.c_str());
+		}
+	}
+
+	fclose(file);
+	return true;
+}

@@ -1,0 +1,128 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include "Common/CommonWindows.h"
+
+#include <d3d11.h>
+#include <d3d11_1.h>
+#include <wrl/client.h>
+
+#include "Common/Data/Collections/Hashmaps.h"
+#include "GPU/Common/VertexDecoderCommon.h"
+#include "GPU/Common/DrawEngineCommon.h"
+#include "GPU/D3D11/StateMappingD3D11.h"
+#include "GPU/D3D11/D3D11Util.h"
+
+struct DecVtxFormat;
+struct UVScale;
+
+class D3D11VertexShader;
+class ShaderManagerD3D11;
+class TextureCacheD3D11;
+class FramebufferManagerD3D11;
+
+// Handles transform, lighting and drawing.
+class DrawEngineD3D11 : public DrawEngineCommon {
+public:
+	DrawEngineD3D11(Draw::DrawContext *draw, ID3D11Device *device, ID3D11DeviceContext *context);
+	~DrawEngineD3D11();
+
+	void DeviceLost() override;
+	void DeviceRestore(Draw::DrawContext *draw) override;
+
+	void SetShaderManager(ShaderManagerD3D11 *shaderManager) {
+		shaderManager_ = shaderManager;
+	}
+	void SetTextureCache(TextureCacheD3D11 *textureCache) {
+		textureCache_ = textureCache;
+	}
+	void SetFramebufferManager(FramebufferManagerD3D11 *fbManager) {
+		framebufferManager_ = fbManager;
+	}
+	void InitDeviceObjects();
+	void DestroyDeviceObjects();
+
+	void BeginFrame() override;
+
+	void Flush() override;
+
+	void FinishDeferred() {
+		DecodeVerts(dec_, decoded_);
+	}
+
+	void NotifyConfigChanged() override;
+
+	void ClearInputLayoutMap();
+
+private:
+	void Invalidate(InvalidationCallbackFlags flags);
+
+	void ApplyDrawState(int prim);
+	void ApplyDrawStateLate(bool applyStencilRef, uint8_t stencilRef);
+
+	HRESULT SetupDecFmtForDraw(D3D11VertexShader *vshader, const DecVtxFormat &decFmt, u32 pspFmt, ID3D11InputLayout **);
+
+	Draw::DrawContext *draw_;  // Used for framebuffer related things exclusively.
+	ID3D11Device *device_;
+	ID3D11Device1 *device1_;
+	ID3D11DeviceContext *context_;
+	ID3D11DeviceContext1 *context1_;
+
+	struct InputLayoutKey {
+		D3D11VertexShader *vshader;
+		u32 decFmtId;
+		bool operator <(const InputLayoutKey &other) const {
+			if (decFmtId < other.decFmtId)
+				return true;
+			if (decFmtId > other.decFmtId)
+				return false;
+			return vshader < other.vshader;
+		}
+	};
+
+	DenseHashMap<InputLayoutKey, ID3D11InputLayout *> inputLayoutMap_;
+
+	// Other
+	ShaderManagerD3D11 *shaderManager_ = nullptr;
+	TextureCacheD3D11 *textureCache_ = nullptr;
+	FramebufferManagerD3D11 *framebufferManager_ = nullptr;
+
+	// Pushbuffers
+	PushBufferD3D11 *pushVerts_ = nullptr;
+	PushBufferD3D11 *pushInds_ = nullptr;
+
+	// D3D11 state object caches. Previously had smart pointers but they were harder to deal with.
+	DenseHashMap<uint64_t, ID3D11BlendState *> blendCache_;
+	DenseHashMap<uint64_t, ID3D11BlendState1 *> blendCache1_;
+	DenseHashMap<uint64_t, ID3D11DepthStencilState *> depthStencilCache_;
+	DenseHashMap<uint32_t, ID3D11RasterizerState *> rasterCache_;
+
+	// Keep the depth state between ApplyDrawState and ApplyDrawStateLate
+	// These do not hold ownership.
+	ID3D11BlendState *blendState_ = nullptr;
+	ID3D11BlendState1 *blendState1_ = nullptr;
+	ID3D11DepthStencilState *depthStencilState_ = nullptr;
+	ID3D11RasterizerState *rasterState_ = nullptr;
+
+	// State keys
+	D3D11StateKeys keys_{};
+	D3D11DynamicState dynState_{};
+
+	int lastRenderStepId_ = -1;
+};

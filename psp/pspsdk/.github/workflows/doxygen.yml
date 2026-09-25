@@ -1,0 +1,29 @@
+name: doxygen on github pages
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Prepare Doxyfile
+      run: |
+        sed -e 's/\$(VERSION)/'`date +"%Y-%m-%d" | xargs echo -n`'/' \
+            -e 's/Helvetica/FreeSans/' \
+            -i Doxyfile
+
+    - name: Doxygen documentation generation
+      uses: mattnotmitt/doxygen-action@v1
+
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./doc/build/html
+        force_orphan: true

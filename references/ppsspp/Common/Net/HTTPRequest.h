@@ -1,0 +1,163 @@
+#pragma once
+
+#include <string>
+#include <functional>
+#include <memory>
+
+#include "Common/File/Path.h"
+#include "Common/Net/NetBuffer.h"
+
+namespace http {
+
+enum class RequestMethod {
+	GET,
+	POST,
+};
+
+enum class RequestFlags {
+	Default = 0,
+	ProgressBar = 1,
+	ProgressBarDelayed = 2,
+	Cached24H = 4,
+	KeepInMemory = 8,
+};
+ENUM_CLASS_BITOPS(RequestFlags);
+
+class Request;
+
+// Note that these are executed both on success and failure, so need to handle both by inspecting the Request.
+using RequestCompletionCallback = std::function<void(Request &)>;
+
+// Abstract request.
+class Request {
+public:
+	Request(RequestMethod method, std::string_view url, std::string_view name, const Path &outFile, bool *cancelled, RequestFlags mode);
+	virtual ~Request() {}
+
+	void SetAccept(const char *mime) {
+		acceptMime_ = mime;
+	}
+
+	void SetUserAgent(std::string_view userAgent) {
+		userAgent_ = userAgent;
+	}
+
+	// NOTE: Completion callbacks (which these are) are deferred until RunCallback is called. This is so that
+	// the call will end up on the thread that calls g_DownloadManager.Update().
+	void SetCallback(RequestCompletionCallback callback) {
+		callback_ = callback;
+	}
+	void RunCallback() {
+		if (callback_) {
+			callback_(*this);
+		}
+		hasRunCallback_ = true;
+	}
+
+	virtual void Start() = 0;
+	virtual void Join() = 0;
+
+	virtual bool Done() = 0;
+	virtual bool Failed() const = 0;
+
+	virtual bool HasRunCallback() { return Done() && hasRunCallback_; }
+
+	// Returns 1.0 when done. That one value can be compared exactly - or just use Done().
+	float Progress() const { return progress_.progress; }
+	float SpeedKBps() const { return progress_.kBps; }
+	std::string url() const { return url_; }
+
+	const Path &OutFile() const { return outfile_; }
+	void OverrideOutFile(const Path &path) {
+		outfile_ = path;
+	}
+	void AddFlag(RequestFlags flag) {
+		flags_ |= flag;
+	}
+
+	// Virtual so a backend can act on it. The HTTPS one has to tell naett, which is what actually
+	// stops a transfer in progress - see HTTPSRequest::Cancel.
+	virtual void Cancel() { cancelled_ = true; }
+	bool IsCancelled() const { return cancelled_; }
+
+	// If not downloading to a file, access this to get the result.
+	Buffer &buffer() { return buffer_; }
+	const Buffer &buffer() const { return buffer_; }
+
+	// NOTE! The value of ResultCode is INVALID until Done() returns true.
+	int ResultCode() const { return resultCode_; }
+
+protected:
+	RequestMethod method_;
+	std::string url_;
+	std::string name_;
+	const char *acceptMime_ = "*/*";
+	std::string userAgent_;
+	Path outfile_;
+	Buffer buffer_;
+	bool cancelled_ = false;
+	int resultCode_ = 0;
+	bool hasRunCallback_ = false;
+	std::vector<std::string> responseHeaders_;
+
+	net::RequestProgress progress_;
+	RequestFlags flags_;
+
+private:
+	RequestCompletionCallback callback_;
+};
+
+class RequestManager {
+public:
+	~RequestManager() {
+		CancelAll();
+	}
+
+	// NOTE: This is the only version that supports the cache flag (for now).
+	std::shared_ptr<Request> StartDownload(std::string_view url, const Path &outfile, RequestFlags flags, const char *acceptMime = nullptr, std::string_view name = "", RequestCompletionCallback completionCallback = {});
+
+	std::shared_ptr<Request> AsyncPostWithCallback(
+		std::string_view url,
+		std::string_view postData,
+		std::string_view postMime, // Use postMime = "application/x-www-form-urlencoded" for standard form-style posts, such as used by retroachievements. For encoding form data manually we have MultipartFormDataEncoder.
+		RequestFlags flags,
+		RequestCompletionCallback completionCallback,
+		std::string_view name = "");
+
+	// Drops finished downloads from the list.
+	void Update();
+	void CancelAll();
+
+	void SetUserAgent(std::string_view userAgent) {
+		userAgent_ = userAgent;
+	}
+
+	void SetCacheDir(const Path &path) {
+		cacheDir_ = path;
+	}
+
+	// Just computes the path, doesn't check availability.
+	Path UrlToCachePath(const std::string_view url) const;
+
+	// Does the file read. Returns false if file missing or other error.
+	bool ReadFileFromCache(std::string_view url, std::string *data);
+
+private:
+	std::vector<std::shared_ptr<Request>> downloads_;
+	// These get copied to downloads_ in Update(). It's so that callbacks can add new downloads
+	// while running.
+	std::vector<std::shared_ptr<Request>> newDownloads_;
+
+	std::string userAgent_;
+	Path cacheDir_;
+};
+
+inline const char *RequestMethodToString(RequestMethod method) {
+	switch (method) {
+	case RequestMethod::GET: return "GET";
+	case RequestMethod::POST: return "POST";
+	default: return "N/A";
+	}
+}
+
+}  // namespace net

@@ -1,0 +1,45 @@
+name: Generate Source Tarball
+
+# Trigger whenever a release is created
+on:
+  release:
+    types:
+      - created
+  push:
+    tags:
+      - "v*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        submodules: recursive
+
+    - name: Archive
+      id: archive
+      run: |
+        VERSION=$GITHUB_REF_NAME
+        test -z "$VERSION" && VERSION=${{ github.event.release.tag_name }}
+        VERSION=$(printf "%s\n" "$VERSION" | sed 's/^v//')
+        PKGNAME=ppsspp-$VERSION
+        mkdir -p /tmp/$PKGNAME
+        mv * /tmp/$PKGNAME
+        mv /tmp/$PKGNAME .
+        find $PKGNAME/ffmpeg -name '*.a' -delete || true
+        find $PKGNAME/ffmpeg -name '*.lib' -delete || true
+        find $PKGNAME/ext -name '*.dylib' -delete || true
+        find $PKGNAME/ext -name '*.lib' -delete || true
+        find $PKGNAME/ext -name '*.so.*' -delete || true
+        rm -rf $PKGNAME/ext/rapidjson/thirdparty/gtest || true
+        sed -i "s;unknown;${VERSION};" $PKGNAME/git-version.cmake || true
+        TARBALL=$PKGNAME.tar.xz
+        tar cJf $TARBALL $PKGNAME
+        echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
+
+    - name: Upload tarball
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+      with:
+        files: ${{ steps.archive.outputs.tarball }}
+        token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,80 @@
+# Flatpak manifest for a Yakumo release bundle, built by
+# profiles/mhp3rd/scripts/release_linux.sh.
+#
+# The program is not compiled here: its recompiled code is made from the
+# maintainer's own copy of the game, so it is built beforehand in the Steam
+# Runtime SDK (packaging/linux/build_in_sdk.sh) together with the SDL3 and
+# FFmpeg it ships, and this manifest packs that staged tree. The same tree
+# is the portable tarball. For the same reason the bundle cannot come from
+# Flathub, whose builders compile everything from source.
+#
+# Vulkan drivers come from the runtime's GL extension (Mesa).
+app-id: io.github.teamgdb.Yakumo
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: yakumo
+
+finish-args:
+  # The game window: Wayland, and X11 only where Wayland is missing (for
+  # example under older desktops).
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Shared memory for X11 clients; without it X11 rendering is much slower.
+  - --share=ipc
+  # The GPU, for Vulkan.
+  - --device=dri
+  # Gamepads: the Steam Deck's built-in controls, Steam Input's virtual
+  # gamepad in Game Mode, and other controllers (evdev, Flatpak 1.15.6+).
+  - --device=input
+  # Music, sound effects and movie audio.
+  - --socket=pulseaudio
+  # Ad hoc multiplayer: connecting to a PSP ad hoc server (TCP), hosting a
+  # session with the built-in server (listening on TCP 27312 and 27313, and
+  # answering address checks on UDP 27312), and finding and announcing
+  # sessions on the local network (UDP 27314, broadcast and multicast
+  # 239.255.27.14). The sandbox then shares the host's network, so all of
+  # this works as it does outside it; only the host's firewall applies.
+  - --share=network
+  # Picking the disc image. The system file dialog (the file chooser portal)
+  # needs no permission, but it is missing under Game Mode's gamescope, where
+  # the built-in gamepad file browser is the only way; that browser can only
+  # show what the sandbox can read. Read-only: nothing outside the app's own
+  # data directory is ever written.
+  #   Home: disc images live in many places there (Downloads, ~/Games,
+  #   emulation folders).
+  - --filesystem=home:ro
+  #   SD cards and USB drives: /run/media on SteamOS and most desktops.
+  - --filesystem=/run/media:ro
+  #   Removable drives on Debian and Ubuntu.
+  - --filesystem=/media:ro
+  #   Downloads, writable: the menu's Export save and Back up saves write
+  #   there, so saves can leave the sandbox without file managers or a terminal.
+  - --filesystem=xdg-download
+
+modules:
+  - name: yakumo
+    buildsystem: simple
+    build-options:
+      # Staged binaries are already stripped and carry no debug information.
+      no-debuginfo: true
+      strip: false
+    build-commands:
+      # The staged program: Yakumo, overlays/, lib/ (SDL3, FFmpeg),
+      # fonts/ and licenses/.
+      - mkdir -p /app/lib/yakumo /app/bin
+      - cp -a yakumo/. /app/lib/yakumo/
+      - install -m 755 files/yakumo /app/lib/yakumo/yakumo
+      - ln -s ../lib/yakumo/yakumo /app/bin/yakumo
+      - install -Dm644 files/io.github.teamgdb.Yakumo.desktop -t /app/share/applications
+      - install -Dm644 files/io.github.teamgdb.Yakumo.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 files/io.github.teamgdb.Yakumo.svg -t /app/share/icons/hicolor/scalable/apps
+      - mkdir -p /app/share/licenses/io.github.teamgdb.Yakumo
+      - cp -a yakumo/licenses/. /app/share/licenses/io.github.teamgdb.Yakumo/
+    sources:
+      - type: dir
+        path: yakumo
+        dest: yakumo
+      - type: dir
+        path: files
+        dest: files

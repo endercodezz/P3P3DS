@@ -1,0 +1,41 @@
+/*
+ * PSP Software Development Kit - https://github.com/pspdev
+ * -----------------------------------------------------------------------
+ * Licensed under the BSD license, see LICENSE in PSPSDK root for details.
+ *
+ * pspiofilemgr_dirent.h - File attributes and directory entries.
+ *
+ * Copyright (c) 2005 Marcus R. Brown <mrbrown@ocgnet.org>
+ * Copyright (c) 2005 James Forshaw <tyranid@gmail.com>
+ * Copyright (c) 2005 John Kelley <ps2dev@kelley.ca>
+ *
+ */
+
+/* Note: Some of the structures, types, and definitions in this file were
+   extrapolated from symbolic debugging information found in the Japanese
+   version of Puzzle Bobble. */
+
+#ifndef PSPIOFILEMGR_DIRENT_H
+#define PSPIOFILEMGR_DIRENT_H
+
+#include <pspiofilemgr_stat.h>
+
+typedef struct SceIoFatDirentPrivate {
+	SceSize size;
+	char s_name[13];
+	char __padding__[3];
+	char l_name[1024];
+} SceIoFatDirentPrivate;
+
+/** Describes a single directory entry */
+typedef struct SceIoDirent {
+	/** File status. */
+	SceIoStat 	                 d_stat;
+	/** File name. */
+	char 		                 d_name[256];
+	/** Device-specific data. */
+	SceIoFatDirentPrivate*       d_private;
+	int 		                 dummy;
+} SceIoDirent;
+
+#endif /* PSPIOFILEMGR_DIRENT_H */

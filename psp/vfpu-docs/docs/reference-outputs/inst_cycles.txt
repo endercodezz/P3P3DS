@@ -1,0 +1,277 @@
+# This is the output of the instruction perf test
+# (run by davidgfnet on a PSP-3000)
+
+>>>>>>> Compare/Branch instruction performance tests <<<<<<
+bvt latency: 4.069626
+bvf latency: 4.067561
+bvtl latency: 4.066847
+bvfl latency: 4.066053
+j latency: 3.054025
+jr latency: 3.062282
+beq latency: 4.067164
+vcmp latency: 8.115432
+
+>>>>>>> FPU instruction performance tests <<<<<<
+add.s throughput: 1.031241
+mul.s throughput: 1.031003
+div.s throughput: 30.264521
+sqrt.s throughput: 29.262577
+add.s latency: 5.046085
+mul.s latency: 5.051007
+div.s latency: 31.268133
+sqrt.s latency: 30.259201
+
+>>>>>>> ALU instruction performance tests <<<<<<
+mult throughput: 1.028541
+div throughput: 20.247774
+mult latency: 7.082684
+div latency: 21.254801
+
+>>>>>>> VFPU instruction performance tests <<<<<<
+vadd.s: 1.027430 cycles/inst 5.061050 latency
+vadd.p: 1.031479 cycles/inst 5.055413 latency
+vadd.t: 1.031638 cycles/inst 5.057874 latency
+vadd.q: 1.024810 cycles/inst 5.060653 latency
+vsub.s: 1.031479 cycles/inst 5.054461 latency
+vsub.p: 1.031241 cycles/inst 5.059780 latency
+vsub.t: 1.024889 cycles/inst 5.062558 latency
+vsub.q: 1.031320 cycles/inst 5.053746 latency
+vmul.s: 1.031638 cycles/inst 5.058907 latency
+vmul.p: 1.031955 cycles/inst 5.057954 latency
+vmul.t: 1.031320 cycles/inst 5.057954 latency
+vmul.q: 1.027589 cycles/inst 5.061765 latency
+vdiv.s: 14.118923 cycles/inst 17.152346 latency
+vdiv.p: 28.245150 cycles/inst 31.274128 latency
+vdiv.t: 42.359707 cycles/inst 45.392971 latency
+vdiv.q: 56.474106 cycles/inst 59.512768 latency
+vmin.s: 1.031320 cycles/inst 5.060891 latency
+vmin.p: 1.024889 cycles/inst 5.060256 latency
+vmin.t: 1.031638 cycles/inst 5.054540 latency
+vmin.q: 1.031558 cycles/inst 5.057477 latency
+vmax.s: 1.031320 cycles/inst 5.054540 latency
+vmax.p: 1.032273 cycles/inst 5.057954 latency
+vmax.t: 1.027589 cycles/inst 5.060891 latency
+vmax.q: 1.031479 cycles/inst 5.055572 latency
+vscmp.s: 1.031717 cycles/inst 5.058033 latency
+vscmp.p: 1.024810 cycles/inst 5.060335 latency
+vscmp.t: 1.031558 cycles/inst 5.053587 latency
+vscmp.q: 1.034972 cycles/inst 5.060494 latency
+vsge.s: 1.024889 cycles/inst 5.062479 latency
+vsge.p: 1.031003 cycles/inst 5.053666 latency
+vsge.t: 1.031876 cycles/inst 5.058747 latency
+vsge.q: 1.031717 cycles/inst 5.053508 latency
+vslt.s: 1.031320 cycles/inst 5.058112 latency
+vslt.p: 1.027589 cycles/inst 5.061685 latency
+vslt.t: 1.031161 cycles/inst 5.054222 latency
+vslt.q: 1.031399 cycles/inst 5.059144 latency
+vcrs.t: 1.024889 cycles/inst 5.059700 latency
+vcrsp.t: 3.037670 cycles/inst 9.102411 latency
+vqmul.q: 4.043902 cycles/inst 10.104753 latency
+vsbn.s: 1.031082 cycles/inst 5.059621 latency
+vscl.p: 1.029176 cycles/inst 5.057001 latency
+vscl.t: 1.031479 cycles/inst 5.053111 latency
+vscl.q: 1.031479 cycles/inst 5.059700 latency
+vdot.p: 1.195903 cycles/inst 7.070337 latency
+vdot.t: 1.196300 cycles/inst 7.070814 latency
+vdot.q: 1.196300 cycles/inst 7.071688 latency
+vdet.p: 1.196300 cycles/inst 7.073513 latency
+vhdp.p: 1.196300 cycles/inst 7.069067 latency
+vhdp.t: 1.196776 cycles/inst 7.068670 latency
+vhdp.q: 1.196220 cycles/inst 7.070735 latency
+vmov.s: 1.031479 cycles/inst 3.044696 latency
+vmov.p: 1.028938 cycles/inst 3.045569 latency
+vmov.t: 1.024889 cycles/inst 3.044775 latency
+vmov.q: 1.031717 cycles/inst 3.042790 latency
+vabs.s: 1.031399 cycles/inst 3.043902 latency
+vabs.p: 1.031399 cycles/inst 3.044617 latency
+vabs.t: 1.031161 cycles/inst 3.043346 latency
+vabs.q: 1.031479 cycles/inst 3.043505 latency
+vneg.s: 1.024810 cycles/inst 3.043664 latency
+vneg.p: 1.035290 cycles/inst 3.043982 latency
+vneg.t: 1.031717 cycles/inst 3.043902 latency
+vneg.q: 1.031399 cycles/inst 3.043426 latency
+vsat0.s: 1.031638 cycles/inst 3.043982 latency
+vsat0.p: 1.031717 cycles/inst 3.042394 latency
+vsat0.t: 1.024889 cycles/inst 3.050015 latency
+vsat0.q: 1.024889 cycles/inst 3.045252 latency
+vsat1.s: 1.031241 cycles/inst 3.044220 latency
+vsat1.p: 1.031479 cycles/inst 3.044458 latency
+vsat1.t: 1.031320 cycles/inst 3.043108 latency
+vsat1.q: 1.031558 cycles/inst 3.043346 latency
+vrcp.s: 1.031638 cycles/inst 7.068988 latency
+vrcp.p: 2.032312 cycles/inst 8.088797 latency
+vrcp.t: 3.037909 cycles/inst 9.104555 latency
+vrcp.q: 4.043029 cycles/inst 10.102371 latency
+vrsq.s: 1.031558 cycles/inst 7.069702 latency
+vrsq.p: 2.037472 cycles/inst 8.088637 latency
+vrsq.t: 3.038226 cycles/inst 9.098045 latency
+vrsq.q: 4.043585 cycles/inst 10.105389 latency
+vsin.s: 1.031320 cycles/inst 7.073593 latency
+vsin.p: 2.037314 cycles/inst 8.082762 latency
+vsin.t: 3.043625 cycles/inst 9.090424 latency
+vsin.q: 4.043346 cycles/inst 10.108008 latency
+vcos.s: 1.031320 cycles/inst 7.071370 latency
+vcos.p: 2.032391 cycles/inst 8.088399 latency
+vcos.t: 3.038147 cycles/inst 9.100348 latency
+vcos.q: 4.047554 cycles/inst 10.101339 latency
+vexp2.s: 1.031320 cycles/inst 7.069782 latency
+vexp2.p: 2.037393 cycles/inst 8.087446 latency
+vexp2.t: 3.037750 cycles/inst 9.098760 latency
+vexp2.q: 4.043585 cycles/inst 10.105309 latency
+vlog2.s: 1.031399 cycles/inst 7.069623 latency
+vlog2.p: 2.037155 cycles/inst 8.086493 latency
+vlog2.t: 3.043545 cycles/inst 9.091614 latency
+vlog2.q: 4.044538 cycles/inst 10.108723 latency
+vlgb.s: 1.031320 cycles/inst 5.055810 latency
+vsbz.s: 1.031399 cycles/inst 5.058907 latency
+vwbn.s: 1.024969 cycles/inst 5.060335 latency
+vsqrt.s: 1.031558 cycles/inst 7.068750 latency
+vsqrt.p: 2.032312 cycles/inst 8.088399 latency
+vsqrt.t: 3.041561 cycles/inst 9.100823 latency
+vsqrt.q: 4.043267 cycles/inst 10.107373 latency
+vasin.s: 1.024889 cycles/inst 7.071608 latency
+vasin.p: 2.033900 cycles/inst 8.085700 latency
+vasin.t: 3.038306 cycles/inst 9.097807 latency
+vasin.q: 4.043902 cycles/inst 10.103642 latency
+vnrcp.s: 1.031399 cycles/inst 7.070100 latency
+vnrcp.p: 2.041125 cycles/inst 8.090304 latency
+vnrcp.t: 3.038306 cycles/inst 9.094393 latency
+vnrcp.q: 4.046125 cycles/inst 10.101974 latency
+vnsin.s: 1.031638 cycles/inst 7.068830 latency
+vnsin.p: 2.032550 cycles/inst 8.088320 latency
+vnsin.t: 3.042593 cycles/inst 9.094949 latency
+vnsin.q: 4.043426 cycles/inst 10.110628 latency
+vrexp2.s: 1.024810 cycles/inst 7.074148 latency
+vrexp2.p: 2.031915 cycles/inst 8.086732 latency
+vrexp2.t: 3.037909 cycles/inst 9.098362 latency
+vrexp2.q: 4.043902 cycles/inst 10.105705 latency
+vsrt1.q: 1.031241 cycles/inst 5.058827 latency
+vsrt2.q: 1.024889 cycles/inst 5.060732 latency
+vsrt3.q: 1.031638 cycles/inst 5.053349 latency
+vsrt4.q: 1.031320 cycles/inst 5.063908 latency
+vbfy1.p: 1.031558 cycles/inst 5.055175 latency
+vbfy1.q: 1.031161 cycles/inst 5.057398 latency
+vbfy2.q: 1.027509 cycles/inst 5.060970 latency
+vsgn.s: 1.031717 cycles/inst 5.053031 latency
+vsgn.p: 1.031479 cycles/inst 5.059144 latency
+vsgn.t: 1.024889 cycles/inst 5.061050 latency
+vsgn.q: 1.031399 cycles/inst 5.054778 latency
+vocp.s: 1.031479 cycles/inst 5.311933 latency
+vocp.p: 1.031399 cycles/inst 5.304708 latency
+vocp.t: 1.539041 cycles/inst 5.305264 latency
+vocp.q: 1.539041 cycles/inst 5.308837 latency
+vi2f.s: 1.031479 cycles/inst 5.060018 latency
+vi2f.p: 1.024889 cycles/inst 5.062320 latency
+vi2f.t: 1.031241 cycles/inst 5.053825 latency
+vi2f.q: 1.031876 cycles/inst 5.058589 latency
+vf2in.s: 1.031717 cycles/inst 5.053349 latency
+vf2in.p: 1.031320 cycles/inst 5.054461 latency
+vf2in.t: 1.027589 cycles/inst 5.061765 latency
+vf2in.q: 1.031161 cycles/inst 5.053984 latency
+vf2iz.s: 1.031479 cycles/inst 5.059542 latency
+vf2iz.p: 1.024810 cycles/inst 5.061605 latency
+vf2iz.t: 1.031082 cycles/inst 5.059144 latency
+vf2iz.q: 1.031399 cycles/inst 5.060574 latency
+vf2iu.s: 1.024889 cycles/inst 5.061130 latency
+vf2iu.p: 1.031399 cycles/inst 5.055175 latency
+vf2iu.t: 1.031399 cycles/inst 5.058271 latency
+vf2iu.q: 1.032114 cycles/inst 5.054143 latency
+vf2id.s: 1.031161 cycles/inst 5.057636 latency
+vf2id.p: 1.027430 cycles/inst 5.061050 latency
+vf2id.t: 1.031558 cycles/inst 5.055731 latency
+vf2id.q: 1.031320 cycles/inst 5.058509 latency
+vrot.p: 2.032868 cycles/inst 7.077166 latency
+vrot.t: 2.041998 cycles/inst 7.076610 latency
+vrot.q: 2.032312 cycles/inst 8.088797 latency
+vsocp.s: 1.031399 cycles/inst 5.061288 latency
+vsocp.p: 1.024889 cycles/inst 5.060415 latency
+vavg.p: 1.031558 cycles/inst 7.069544 latency
+vavg.t: 1.031638 cycles/inst 7.068512 latency
+vavg.q: 1.031558 cycles/inst 7.069782 latency
+vfad.p: 1.024969 cycles/inst 7.078833 latency
+vfad.t: 1.024889 cycles/inst 7.073990 latency
+vfad.q: 1.031796 cycles/inst 7.070021 latency
+vcmp.s: 1.031717 cycles/inst 1.039696 latency
+vcmp.p: 1.024889 cycles/inst 1.041919 latency
+vcmp.t: 1.031717 cycles/inst 1.035488 latency
+vcmp.q: 1.031161 cycles/inst 1.040966 latency
+vidt.p: 1.282680 cycles/inst 3.295659 latency
+vidt.q: 1.282600 cycles/inst 3.293912 latency
+vzero.s: 1.282680 cycles/inst 3.294706 latency
+vzero.p: 1.282918 cycles/inst 3.299469 latency
+vzero.t: 1.282441 cycles/inst 3.295341 latency
+vzero.q: 1.282680 cycles/inst 3.295738 latency
+vone.s: 1.282521 cycles/inst 3.294388 latency
+vone.p: 1.282759 cycles/inst 3.294626 latency
+vone.t: 1.282838 cycles/inst 3.298914 latency
+vone.q: 1.282521 cycles/inst 3.295182 latency
+vrnds.s: 1.031399 cycles/inst 1.040092 latency
+vrndi.s: 3.033780 cycles/inst 5.054301 latency
+vrndi.p: 6.055969 cycles/inst 8.087288 latency
+vrndi.t: 9.076014 cycles/inst 11.111143 latency
+vrndi.q: 12.102728 cycles/inst 14.133015 latency
+vrndf1.s: 3.029969 cycles/inst 5.065258 latency
+vrndf1.p: 6.054143 cycles/inst 8.083000 latency
+vrndf1.t: 9.078634 cycles/inst 11.108762 latency
+vrndf1.q: 12.104792 cycles/inst 14.129918 latency
+vrndf2.s: 3.030366 cycles/inst 5.059303 latency
+vrndf2.p: 6.057874 cycles/inst 8.085700 latency
+vrndf2.t: 9.078157 cycles/inst 11.109556 latency
+vrndf2.q: 12.106380 cycles/inst 14.138652 latency
+vmmul.p: 4.043902 cycles/inst 10.100943 latency
+vmmul.t: 9.083715 cycles/inst 15.146471 latency
+vmmul.q: 16.141390 cycles/inst 22.202003 latency
+vmscl.p: 2.036758 cycles/inst 6.069108 latency
+vmscl.t: 3.037750 cycles/inst 7.088042 latency
+vmscl.q: 4.045093 cycles/inst 8.082047 latency
+vmmov.p: 2.037631 cycles/inst 4.057200 latency
+vmmov.t: 3.038464 cycles/inst 5.066211 latency
+vmmov.q: 4.043823 cycles/inst 6.072522 latency
+vmidt.p: 2.288356 cycles/inst 4.310147 latency
+vmidt.t: 3.288633 cycles/inst 5.318522 latency
+vmidt.q: 4.295182 cycles/inst 6.328486 latency
+vmzero.p: 2.288673 cycles/inst 4.307448 latency
+vmzero.t: 3.292841 cycles/inst 5.318682 latency
+vmzero.q: 4.295182 cycles/inst 6.329756 latency
+vmone.p: 2.283513 cycles/inst 4.308798 latency
+vmone.t: 3.293238 cycles/inst 5.319793 latency
+vmone.q: 4.295579 cycles/inst 6.325072 latency
+vtfm2.p: 2.034297 cycles/inst 8.088161 latency
+vtfm3.t: 3.038067 cycles/inst 9.098204 latency
+vtfm4.q: 4.043426 cycles/inst 10.107849 latency
+vhtfm2.p: 2.037155 cycles/inst 8.089590 latency
+vhtfm3.t: 3.038385 cycles/inst 9.096377 latency
+vhtfm4.q: 4.044299 cycles/inst 10.101815 latency
+vcmovf.s: 1.031638 cycles/inst 5.053508 latency
+vcmovf.t: 1.031320 cycles/inst 5.059700 latency
+vcmovf.p: 1.031717 cycles/inst 5.055651 latency
+vcmovf.q: 1.031320 cycles/inst 5.058589 latency
+vcmovt.s: 1.024810 cycles/inst 5.064861 latency
+vcmovt.t: 1.031796 cycles/inst 5.053666 latency
+vcmovt.p: 1.031320 cycles/inst 5.059621 latency
+vcmovt.q: 1.024889 cycles/inst 5.061923 latency
+vi2uc.q: 1.031399 cycles/inst 3.043188 latency
+vi2c.q: 1.031796 cycles/inst 3.043029 latency
+vi2us.p: 1.024889 cycles/inst 3.048824 latency
+vi2us.q: 1.024889 cycles/inst 3.044934 latency
+vi2s.p: 1.031399 cycles/inst 3.044538 latency
+vi2s.q: 1.031161 cycles/inst 3.043267 latency
+vf2h.p: 1.031479 cycles/inst 5.054461 latency
+vf2h.q: 1.032114 cycles/inst 5.057477 latency
+vs2i.s: 1.031320 cycles/inst 3.043743 latency
+vs2i.p: 1.024810 cycles/inst 3.053112 latency
+vus2i.s: 1.027589 cycles/inst 3.044775 latency
+vus2i.p: 1.031320 cycles/inst 3.044220 latency
+vc2i.s: 1.031479 cycles/inst 3.042711 latency
+vuc2ifs.s: 1.031479 cycles/inst 3.043505 latency
+vh2f.s: 1.031241 cycles/inst 5.054619 latency
+vh2f.p: 1.031161 cycles/inst 5.059938 latency
+vt4444.q: 1.024889 cycles/inst 3.045887 latency
+vt5551.q: 1.031320 cycles/inst 3.042950 latency
+vt5650.q: 1.031479 cycles/inst 3.043267 latency
+viim.s: 1.031638 cycles/inst 5.056604 latency
+vfim.s: 1.027668 cycles/inst 5.060732 latency
+vcst.s: 1.031399 cycles/inst 3.044458 latency
+vcst.p: 1.024810 cycles/inst 3.049222 latency
+vcst.t: 1.024889 cycles/inst 3.048904 latency
+vcst.q: 1.031638 cycles/inst 3.042870 latency

@@ -1,0 +1,69 @@
+#pragma once
+
+#include <mutex>
+
+#include "Common/GPU/thin3d.h"
+#include "Common/Input/InputState.h"
+
+#include "Common/GPU/GraphicsContext.h"
+#include "Common/DeviceResources.h"
+#include "Windows/InputDevice.h"
+
+// Renders Direct2D and 3D content on the screen.
+namespace UWP {
+
+struct App;
+
+class UWPGraphicsContext : public GraphicsContext {
+public:
+	UWPGraphicsContext(std::shared_ptr<DX::DeviceResources> resources);
+
+	void ShutdownAPI() override;
+	void Resize() override {}
+	Draw::DrawContext * GetDrawContext() override {
+		return draw_;
+	}
+
+private:
+	Draw::DrawContext *draw_;
+	std::shared_ptr<DX::DeviceResources> resources_;
+};
+
+class PPSSPP_UWPMain : public DX::IDeviceNotify {
+public:
+	PPSSPP_UWPMain(App *app, const std::shared_ptr<DX::DeviceResources>& deviceResources);
+	~PPSSPP_UWPMain();
+	void CreateWindowSizeDependentResources();
+	void UpdateScreenState();
+	bool Render();
+
+	// IDeviceNotify
+	virtual void OnDeviceLost();
+	virtual void OnDeviceRestored();
+
+	// Various forwards from App, in simplified format.
+	// Not sure whether this abstraction is worth it.
+	void OnKeyDown(int scanCode, winrt::Windows::System::VirtualKey virtualKey, int repeatCount);
+	void OnKeyUp(int scanCode, winrt::Windows::System::VirtualKey virtualKey);
+	void OnCharacterReceived(int scanCode,unsigned int keyCode);
+
+	void OnTouchEvent(TouchInputFlags flags, int touchId, float x, float y, double timestamp);
+
+	void OnMouseWheel(float delta);
+
+	bool OnBackRequested();
+
+	// Save state fast if we can!
+	void OnSuspend();
+	void Close();
+
+private:
+	App *app_;
+
+	// Cached pointer to device resources.
+	std::shared_ptr<DX::DeviceResources> m_deviceResources;
+
+	std::unique_ptr<UWPGraphicsContext> ctx_;
+};
+
+}

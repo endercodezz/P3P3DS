@@ -1,0 +1,689 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PSP VFPU documentation</title>
+    <meta name="description" content="PSP VFPU instruction set documentation">
+    <meta name="author" content="David Guillen Fandos">
+
+    <style type="text/css">
+
+      html {
+          scroll-behavior: smooth;
+      }
+
+      body {
+          font-family: 'Open Sans', sans-serif;
+          letter-spacing: 0.2px;
+          color: #333;
+          margin: 0;
+      }
+
+      h1 {
+          font-family: 'Noto Serif', serif;
+          font-size: 39px;
+          line-height: 42px;
+          margin-bottom: 50px;
+
+      }
+
+      h2 {
+          font-family: 'Noto Serif', serif;
+          font-size: 28px;
+          line-height: 30px;
+          text-align: center;
+          color: #333;
+          margin-block-start: 40px;
+          margin-block-end: 30px;
+          margin-inline-start: 0px;
+          margin-inline-end: 0px;
+      }
+
+      p {
+          font-size: 20px;
+          line-height: 26px;
+      }
+
+      a {
+          text-decoration: none;
+      }
+
+      a:hover {
+          text-decoration: underline;
+      }
+
+      table {
+        border: 1px solid #444;
+        border-collapse: collapse;
+        width: 50%;
+        margin-top: 15px;
+        margin-right: 15px;
+        font-size: 14px;
+      }
+      th {
+        border-bottom: 1px solid #ccc;
+        background-color: #eee;
+        text-align: center;
+        padding: 10px;
+      }
+      td {
+        border-bottom: 1px solid #ccc;
+        border-right: 1px solid #ccc;
+        text-align: center;
+        padding: 5px;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td:last-child {
+        border-right: none;
+      }
+
+      .matrixsvgdiv {
+          text-align: center;
+      }
+      .matrixsvg {
+          width: 30%;
+      }
+
+      .pcode {
+          white-space: pre-wrap;
+      }
+
+      .navbar {
+          overflow: hidden;
+          background-color: #0098f1;
+          color: #333;
+          top: 0;
+          width: 100%;
+          height: 70px;
+          font-size: 15px;
+          text-align: right;
+          padding: 12px 0 0 0;
+          position: fixed;
+          z-index: 1;
+      }
+
+      .navbar a {
+          margin-right: 40px;
+          color: #333;
+      }
+
+      .navbar a:active {
+          text-decoration: underline;
+      }
+
+      .right a {
+          float: right;
+      }
+
+      .container {
+          width: 100%;
+      }
+
+      .top {
+          background-color: #0098f1;
+          height: 650px;
+      }
+
+      .clear {
+          background-color: #fff;
+          height: auto;
+      }
+
+      .nav-top {
+          border-top: 8px solid #0098f1;
+      }
+
+      .row {
+          max-width: 63rem;
+          margin: auto;
+          display: block;
+      }
+
+      .content {
+          padding: 22px;
+      }
+
+      .wrapper {
+          display: flex;
+          padding: 22px;
+      }
+
+      .sidepanel {
+          width: 200px;
+          margin-top: 120px;
+          background-color: #fff;
+          overflow-x: hidden;
+          position: fixed;
+          height: 80%;
+
+      }
+
+      .sidepanel a.title {
+          font-family: 'Noto Serif', serif;
+          font-size: 18px;
+          font-weight: 600;
+          text-align: left;
+          text-decoration: none;
+          color: #333;
+          display: block;
+          padding-bottom: 12px;
+      }
+
+      .sidepanel a {
+          display: block;
+          text-decoration: none;
+          color: #333;
+      }
+
+      .sidepanel a.title:hover,
+      .sidepanel a:hover,
+      .sidepanel a:hover {
+          text-decoration: underline;
+      }
+
+      .main-col {
+          width: 70%;
+          margin: auto;
+          text-align: center;
+      }
+
+      .main-col p {
+          font-size: 15px;
+          line-height: 24px;
+          margin-bottom: 36px;
+      }
+
+      .right-col {
+          margin-top: 100px;
+          text-align: left;
+          width: 100%;
+          margin-left: 220px;
+      }
+
+      .right-col h1 {
+          font-size: 24px;
+          line-height: 28px;
+          margin-bottom: 24px;
+      }
+
+      .right-col h2 {
+          font-size: 21px;
+          line-height: 24px;
+          margin-bottom: 30px;
+          text-align: left;
+          margin-block-start: 20px;
+          margin-block-end: 10px;
+      }
+
+      .right-col p {
+          font-size: 16px;
+          line-height: 22px;
+          margin-bottom: 32px;
+      }
+
+      .right-col a {
+          color: #0098f1;
+          text-decoration: underline;
+      }
+
+      .right-col ol {
+          margin-block-start: 10px;
+      }
+
+      .logo {
+          width: 150px;
+          float: left;
+          margin: -10px 30px;
+      }
+
+      .col {
+          width: 50%;
+          float: left;
+      }
+
+      .top-info {
+          font-family: 'Open Sans', sans-serif;
+          font-size: 17px;
+          text-align: center;
+
+      }
+
+      .divider {
+          width: 40px;
+          height: 4px;
+          background: #0098f1;
+          border-radius: 30px;
+          margin: auto;
+          margin-top: 8px;
+          margin-bottom: 8px;
+      }
+
+      .left {
+          margin: 20px 0;
+      }
+
+
+      .footer {
+          float: left;
+          width: 100%;
+          padding: 90px 0 20px;
+          font-size: 15px;
+          text-align: center;
+          background-color: #fff;
+      }
+
+      .footer a {
+          color: #333;
+      }
+
+      .resp-break {
+          display: none;
+      }
+
+      .break {
+          display: block;
+      }
+
+      .space {
+          height: 30px;
+          width: 100%;
+          float: left;
+      }
+
+      .double {
+          height: 60px;
+      }
+
+      .links {
+          float: left;
+          padding-bottom: 8px;
+      }
+
+      .toc li {
+          font-family: 'Noto Serif', serif;
+          font-size: 18px;
+          text-align: left;
+          line-height: 32px;
+          display: block;
+          text-decoration: none;
+          color: #333;
+          font-weight: bold;
+      }
+      .toc ul {
+          padding-left: 0px;
+      }
+      .toc ul > li > ul > li {
+          font-size: 15px;
+          font-weight: normal;
+          padding-left: 10px;
+          line-height: 26px;
+      }
+      .toc ul > li > ul > li > ul > li {
+          font-style: italic;
+          font-weight: lighter;
+          font-size: 13px;
+          line-height: 22px;
+      }
+
+      div.note-card {
+        border: solid #333;
+        border-width: 0.5px;
+        border-radius: 5px;
+        padding: 0px;
+      }
+      p.card-header {
+        font-size: 16px;
+        font-weight: bold;
+        margin: 0px;
+        padding: 10px;
+        background-color: #eee;
+        border-radius: 5px 5px 0px 0px;
+      }
+      .card-content {
+        padding: 10px;
+        margin: 0px;      
+      }
+
+      p.inst-title {
+        font-style: italic;
+        margin-bottom: 25px;
+      }
+
+      p.inst-header {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 12px;
+      }
+      p.inst-accur {
+        margin-bottom: 8px;      
+      }
+
+      p.inst-desc {
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+      p.inst-regcompat {
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+      li.inst-pref {
+        font-size: 14px;
+      }
+      p.inst-syntax {
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+
+      /* Break Points */
+      /* Extra small-small devices (phones, 420px and down) */
+      @media only screen and (max-width: 420px) {
+          .logo {
+              width: 100px;
+          }
+          .navbar {
+              height: auto;
+          }
+          h2 {
+              font-size: 24px;
+          }
+          .links {
+              float: none;
+          }
+      }
+
+      /* Extra small devices (phones, 650px and down) */
+      @media only screen and (max-width: 650px) {
+
+          .logo {
+              width: 115px;
+              margin: -10px 0px;
+          }
+
+          .navbar a {
+              padding-bottom: 5px;
+              margin-left: 40px;
+              margin-right: 0;
+          }
+
+          .resp-break {
+              display: block;
+              margin: 17px;
+          }
+
+          .main-col {
+              width: 100%;
+          }
+
+
+          .wrapper {
+              display: block;
+          }
+
+          .sidepanel {
+              width: 100%;
+              text-align: center;
+              position: relative;
+              height: auto;
+          }
+
+          .sidepanel a.title,
+          .sidepanel a.section,
+          .sidepanel a.sub-section {
+              text-align: center;
+          }
+
+          .left {
+              margin: 20px auto;
+          }
+
+          .right-col {
+              position: relative;
+              margin-top: 20px;
+              margin-left: 0px;
+          }
+      }
+
+      /* Small devices (portrait tablets and large phones, 650px and up) */
+      @media only screen and (min-width: 650px) {
+          .logo {
+              margin: -10px 0px;
+          }
+          .right a {
+              float: right;
+              padding-bottom: 5px;
+          }
+      }
+
+      /* Medium devices (landscape tablets, 768px and up) */
+      @media only screen and (min-width: 768px) .logo {
+          margin: -10px 0px;
+      }
+      }
+
+      /* Large devices (laptops/desktops, 992px and up) */
+      @media only screen and (min-width: 992px) {}
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&family=Open+Sans:ital,wght@0,400;0,700;1,600&display=swap" rel="stylesheet">
+    
+    <script defer src="https://use.fontawesome.com/releases/v5.7.2/js/all.js" integrity="sha384-0pzryjIRos8mFBWMzSSZApWtPl/5++eIfzYmTgBBmXYdhvxPc+XcFEk+zJwDgWbP" crossorigin="anonymous"></script>
+
+
+</head>
+
+<body>
+
+    <div class="navbar clear nav-top">
+        <div class="row content">
+            <a class="right" style="text-decoration: underline;" href="docs.pdf"><i class="fas fa-book"></i>&nbsp; PDF Documentation</a>
+            <a class="right" href="https://github.com/pspdev/vfpu-docs"><i class="fab fa-github"></i>&nbsp; pspdev/vfpu-docs</a>
+        </div>
+    </div>
+
+    <div class="container clear">
+        <div class="row wrapper">
+
+            <div class="sidepanel">
+
+                ${pretoc}
+
+                <div class="toc">
+                  <ul>
+                    <li>
+                      <a href="#vfpu-instr">VFPU Instructions</a>
+                      <ul>
+                        % for instr in instr_list:
+                        <li>
+                          <a href="#${instr["name"]}">${instr["name"]}</a>
+                        </li>
+                        % endfor
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+
+                ${posttoc}
+            
+             <div class="space double"></div>
+
+            </div>
+
+            <div class="right-col">
+
+                % for page in prepages:
+                  ${page}
+                  <div class="pagebreak"></div>
+                % endfor
+
+                <h1 id="vfpu-instr">VFPU Instructions</h1>
+                % for instr in instr_list:
+                    <h2 id="${instr["name"]}">${instr["name"]}</h2>
+                    <p class="inst-title">${instr["title"]}</p>
+
+
+
+                    <div class="svg-container">
+                    <svg class="inst-enc-graph" viewbox="0 0 800 100" width="100%" height="100%" role="img">
+                      <g transform="translate(15,0)">
+                        <rect y="25" x="0px" width="2px" height="50px"></rect>
+                        <rect y="25" x="768px" width="2px" height="50px"></rect>
+                        <rect y="50" x="0px" width="770px" height="2px"></rect>
+                        <rect y="75" x="0px" width="770px" height="2px"></rect>
+                        <rect y="32" x="192px" width="2px" height="18px"></rect>
+                        <rect y="32" x="384px" width="2px" height="18px"></rect>
+                        <rect y="32" x="576px" width="2px" height="18px"></rect>
+                        <rect y="47" x="96px" width="1px" height="3px"></rect>
+                        <rect y="47" x="288px" width="1px" height="3px"></rect>
+                        <rect y="47" x="480px" width="1px" height="3px"></rect>
+                        <rect y="47" x="672px" width="1px" height="3px"></rect>
+                        % for i in range(0, 768, 24):
+                          <rect y="49" x="${i}px" width="1px" height="1px"></rect>
+                        % endfor
+                        % for i in range(32):
+                          <text x="${(31 - i) * 24 + 12}" text-anchor="middle" y="43" font-size="0.8em" letter-spacing="-1">${i}</text>
+                        % endfor
+
+                        % for bn in range(32, -1, -1):
+                        %   if instr["basemask"] & (1 << bn):
+                              <text x="${(31 - bn) * 24 + 12}" y="69" text-anchor="middle" font-size="0.8em">
+                                ${ (instr["baseword"] >> bn) & 1 }
+                              </text>
+                        %     if bn and not instr["basemask"] & (1 << (bn - 1)):
+                                <rect x="${(32 - bn) * 24}" y="50px" width="2px" height="25px"></rect>
+                        %     endif
+                        %   endif
+                        % endfor
+
+                        % for f, v in instr["fields"].items():
+                            <rect x="${(32 - v['lsb']) * 24}" y="50px" width="2px" height="25px"></rect>
+                        %   if v["value"] is None:
+                              <text x="${(32 - v['lsb'] - v['size'] / 2.0) * 24}" y="69" font-size="0.8em" text-anchor="middle">
+                                ${f}
+                              </text>
+                        %   endif
+                        % endfor
+                      </g>
+                    </svg>
+                    </div>
+
+
+
+                    <p class="inst-header">Syntax</p>
+                    <p class="inst-syntax">${instr["syntax"]}</p>
+
+                    <p class="inst-header">Description</p>
+                    <p class="inst-desc">${instr["description"]}</p>
+
+
+                    % if instr["accuracy"]:
+                    <div class="note-card">
+                      <p class="card-header">Accuracy <i class="fas fa-exclamation-triangle"></i></p>
+                      <div class="card-content">
+                        <p class="inst-accur">
+                          ${instr["accuracy"]["note"]}
+                        </p>
+                        <p class="inst-accur">
+                          % if "absolute" in instr["accuracy"]:
+                            Absolute error is smaller than <b>${instr["accuracy"]["absolute"]}</b>
+                          % elif "relative" in instr["accuracy"]:
+                            Relative error is smaller than <b>${instr["accuracy"]["relative"]}</b>
+                          % endif
+                        </p>
+                      </div>
+                    </div>
+                    % endif
+
+                    % if instr["hazard"]:
+                    <div class="note-card">
+                      <p class="card-header">Hazards <i class="fas fa-exclamation-triangle"></i></p>
+                      <p class="inst-accur card-content">
+                        ${instr["hazard"]}
+                      </p>
+                    </div>
+                    % endif
+
+                    % if instr["bugs"]:
+                    <div class="note-card">
+                      <p class="card-header">Bugs <i class="fas fa-exclamation-triangle"></i></p>
+                      <p class="inst-accur card-content">
+                        ${instr["bugs"]}
+                      </p>
+                    </div>
+                    % endif
+
+                    % if instr["notes"]:
+                    <p class="inst-header">Notes</p>
+                      <ul>
+                      % for note in instr["notes"]:
+                        <li>${note}</li>
+                      % endfor
+                      </ul>
+                    % endif
+
+                    % if instr["perf-info"]:
+                    <p class="inst-header">Instruction performance</p>
+                    <p class="inst-desc">
+                      Throughput: ${instr["perf-info"]["throughput"]} cycles/instruction<br/>
+                      Latency: ${instr["perf-info"]["latency"]} cycles
+                    </p>
+                    % endif
+
+                    % if instr["register_compat"] != "overlap":
+                    <p class="inst-header">Register overlap compatibility</p>
+                    <p class="inst-regcompat">
+                      % if instr["register_compat"] == "no-overlap":
+                      Output register cannot overlap with input registers
+                      % else:
+                      Output register can only overlap with input registers if they are identical
+                      % endif
+                    </p>
+                    % endif
+
+                    % if instr["prefixes"]:
+                    <p class="inst-header">Allowed prefixes</p>
+                    <ul>
+                    % for reg, pop in instr["prefixes"]:
+                      <li class="inst-pref">${reg}: ${pop}</li>
+                    % endfor
+                    </ul>
+                    % endif
+
+                    % if instr["pseudocode"]:
+                    <p class="inst-header">Pseudocode</p>
+                    <pre class="pcode">${instr["pseudocode"]}</pre>
+                    % endif
+
+                    % if instr["imm-values"]:
+                    <p class="inst-header">Immediate encoding</p>
+                    <table>
+                      <tr><th>Symbol</th><th>Value</th></tr>
+                      % for value, istr in instr["imm-values"].items():
+                        <tr><td>${istr}</td><td>${value}</td></tr>
+                      % endfor
+                    </table>
+                    % endif
+
+                    <div class="divider" style="width:24%; margin:30px 0 50px;"></div>
+                % endfor
+
+                % for page in postpages:
+                  ${page}
+                  <div class="pagebreak"></div>
+                % endfor
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
+

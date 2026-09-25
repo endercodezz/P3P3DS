@@ -1,0 +1,564 @@
+//import flow files
+import( "Utilities.flow" );
+//import( "QuickTests.flow" );
+//import msg files
+import( "ModMenu.msg" );
+//global variables
+global int gFieldMajor;
+global int gFieldMinor;
+global int gEventMajor;
+global int gEventMinor;
+global int gMonth;
+global int gDay;
+global int unitId;
+global bool isPC;
+
+void ModMenuInit()
+{
+    isPC = true;
+    int FldCurMaj = FLD_GET_MAJOR();
+    int FldCurMin = FLD_GET_MINOR();
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 5 );
+        else
+            SEL_DEFKEY( PadButton.R, 5 );
+        int selection = MSG_SELECT( ModMenuName, ModMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Use original square function
+                CallOriginalSquareMenu();
+                return;
+            case 1://Player
+                PlayerEditorDisplay();
+                break;
+            case 2://Battle Select
+                int Encounter = SelectNumberPrompt( EncounterPrompt, 3 );
+                if ( Encounter != -1 )
+                {
+                    CALL_BATTLE( Encounter );
+                    WAIT_BATTLE();
+                    CALL_FIELD( FldCurMaj, FldCurMin, 0, 0 );
+                }
+                return;
+            case 3://Sound Test
+                int bgmId = SelectNumberPrompt( SelectBgmDialog, 3 );
+                if (bgmId != -1)
+                    BGM( bgmId );
+                return;
+            case 4://Field Select
+                FieldSelect();
+                break;
+            case 5://Next Page
+                ModMenuPage2();
+                return;
+        }
+    }
+}
+
+void ModMenuPage2()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 6 );
+        else
+            SEL_DEFKEY( PadButton.L, 6 );
+        int selection = MSG_SELECT( ModMenuName, ModMenu2, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Event Select
+                EventSelect();
+                break;
+            case 1://Facility
+                CallFacilityDisplay();
+                break;
+            case 2://Flags
+                FlagsEditorDisplay();
+                break;
+            case 3://Font Test
+                DisplayMessagePrompt( FontTest );
+                break;
+            case 4://About
+                DisplayMessagePrompt( AboutMsg );
+                //QuickTestsMenu();
+                break;
+            case 5://Set up favorites
+                SetUpFavorites();
+                break;
+            case 6://Previous Page
+                ModMenuInit();
+                return;
+        }
+    }
+}
+
+void PlayerEditorDisplay()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 4 );
+        else
+            SEL_DEFKEY( PadButton.R, 4 );
+        int selection = MSG_SELECT( ModMenuName, PlayerMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Evolve party member persona
+                int unit = SelectUnitNoProtag();
+                if ( unit != -1 )
+                    PERSONA_EVOLUTION( unit );
+                break;
+            case 1://Social Stats
+                StatEditorDisplay();
+                break;
+            case 2://Items
+                ItemEditorDisplay();
+                break;
+            case 3://Party Edit
+                PartyEditorDisplay();
+                break;
+            case 4://Next Page
+                PlayerEditorDisplay2();
+                return;
+        }
+    }
+}
+
+void TimeTravel()
+{
+    int month = SelectNumberPrompt( TimeTravel, 2 );
+    if ( month == -1 )
+        return;
+    int day = SelectNumberPrompt( TimeTravel2, 2 );
+    if ( day == -1 )
+        return;
+    FADE( 3, 20 );
+    FUNCTION_0036( month, day, 0 );
+    NEXT_TIME();
+    return;
+}
+
+void PlayerEditorDisplay2()
+{
+    int FldCurMaj = FLD_GET_MAJOR();
+    int FldCurMin = FLD_GET_MINOR();
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 2 );
+        else
+            SEL_DEFKEY( PadButton.L, 2 );
+        int selection = MSG_SELECT( ModMenuName, PlayerMenu2, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Set Protagonist Name
+                CALL_NAME_ENTRY();
+                CALL_FIELD( FldCurMaj, FldCurMin, 0, 0 );
+                return;
+            case 1://Max Money
+                ADD_PC_MONEY( 99999999 );
+                DisplayMessagePrompt( MoneyAdded );
+                return;
+            case 2://Time Travel
+				TimeTravel();
+                return;
+			case 3://Previous Page
+                PlayerEditorDisplay();
+                return;
+        }
+    }
+}
+
+void StatEditorDisplay()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, StatsMenu, 0 );
+        int pointsToAdd = 0;
+        switch ( selection )
+        {
+            case 999: // Cancel
+                return;
+            case 0: // Academics
+                pointsToAdd = SelectNumberPrompt( StatPrompt, 2 );
+                if ( pointsToAdd != -1 )
+                    ADD_PC_STAT( 0, pointsToAdd );
+                break;
+            case 1: // Charm
+                pointsToAdd = SelectNumberPrompt( StatPrompt, 2 );
+                if ( pointsToAdd != -1 )
+                    ADD_PC_STAT( 1, pointsToAdd );
+                break;
+            case 2: // Courage
+                pointsToAdd = SelectNumberPrompt( StatPrompt, 2 );
+                if ( pointsToAdd != -1 )
+                    ADD_PC_STAT( 2, pointsToAdd );
+                break;
+        }
+    }
+}
+
+void ItemEditorDisplay()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int itemType = MSG_SELECT( ModMenuName, ItemMenu, 0 );
+        switch ( itemType )
+        {
+            case 999: // Cancel
+                return;
+            case 0: // Melee Weapons
+                ItemGetSelect( 0 );
+                break;
+            case 1: // Armor
+                ItemGetSelect( 0x200 );
+                break;
+            case 2: // Boots
+                ItemGetSelect( 0x300 );
+                break;
+            case 3: // Accessories
+                ItemGetSelect( 0x400 );
+                break;
+            case 4: // Items
+                ItemGetSelect( 0x500 );
+                break;
+            case 5: // Key Items
+                ItemGetSelect( 0x600 );
+                break;
+            case 6: // Skill Cards
+                ItemGetSelect( 0x690 );
+                break;
+        }
+    }
+}
+
+void ItemGetSelect( int type )
+{
+    int itemId = SelectNumberPrompt( ItemPrompt, 4 );
+    if ( itemId != -1 )
+    {
+        int amount = SelectNumberPrompt( ItemPrompt2, 2 );
+        if ( amount != -1 )
+        {
+            SET_ITEM_NUM( ( type + itemId ), ( GET_ITEM_NUM( ( type + itemId ) ) + amount ) );
+            SET_MSG_VAR( 1, type + itemId, 5 );
+            SET_MSG_VAR( 2, amount, 0 );
+            DisplayMessagePrompt( ItemAdded );
+        }
+    }
+}
+
+void PartyEditorDisplay()
+{
+    int unit = 0;
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, PartyEditMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Add Party Members
+                unit = SelectUnitNoProtagNoFuuka();
+                if ( unit != -1 )
+                    PARTY_IN( unit );
+                break;
+            case 1://Remove Party Members
+                unit = SelectUnitNoProtagNoFuuka();
+                if ( unit != -1 )
+                    PARTY_OUT( unit );
+                break;
+            case 2://Set Tiredness
+                SetTiredness();
+                break;
+        }
+    }
+}
+
+void SetTiredness()
+{
+    int unit = SelectUnit();
+    if ( unit != -1 )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, SetTiredness, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Great
+                SET_TIREDNESS( unit, 2 );
+                break;
+            case 1://Good
+                SET_TIREDNESS( unit, 0 );
+                break;
+            case 2://Tired
+                SET_TIREDNESS( unit, 3 );
+                break;
+        }
+    }
+}
+
+void FieldSelect()
+{
+    SET_MSG_VAR( 1, FLD_GET_MAJOR(), 0 );
+    SET_MSG_VAR( 2, FLD_GET_MINOR(), 0 );
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, FieldSelect, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Enter Field ID
+                int temp = SelectNumberPrompt( FieldDlg, 3 );
+                if ( temp == -1 )
+                    return;
+                gFieldMajor = temp;
+                temp = SelectNumberPrompt( FieldDlg2, 3 );
+                if ( temp == -1 )
+                    return;
+                gFieldMinor = temp;
+                break;
+            case 1://Load Field
+                if (gFieldMajor == 0 && gFieldMinor == 0)
+                    DisplayMessagePrompt( LoadCheckError );
+                else
+                    CALL_FIELD( gFieldMajor, gFieldMinor, 0, 0  );
+                return;
+            case 2://Load 3D Field
+                if (gFieldMajor == 0 && gFieldMinor == 0)
+                    DisplayMessagePrompt( LoadCheckError );
+                else
+                    FCL_FUNCTION_0015( gFieldMajor, gFieldMinor, 0, 0  );
+                return;
+        }
+    }
+}
+
+void EventSelect()
+{
+    int FldCurMaj = FLD_GET_MAJOR();
+    int FldCurMin = FLD_GET_MINOR();
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, EventSelect, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Enter Event ID
+                int temp = SelectNumberPrompt( EventDlg, 3 );
+                if ( temp == -1 )
+                    return;
+                gEventMajor = temp;
+                temp = SelectNumberPrompt( EventDlg2, 3 );
+                if ( temp == -1 )
+                    return;
+                gEventMinor = temp;
+                EventSelect();
+                break;
+            case 1://Load Event ID
+                if ( gEventMajor == 0 && gEventMinor == 0 )
+                {
+                    DisplayMessagePrompt(LoadCheckError);
+                    return;
+                }
+                FADE( 3, 20 );
+                CALL_EVENT( gEventMajor, gEventMinor );
+                CALL_FIELD( FldCurMaj, FldCurMin, 0, 0 );
+                return;
+        }
+    }
+}
+
+void CallFacilityDisplay()
+{
+    int FldCurMaj = FLD_GET_MAJOR();
+    int FldCurMin = FLD_GET_MINOR();
+    int warn = 0;
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, FacilityMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Town map
+                FLD_SEL_EX( 0 );
+                return;
+            case 1://Save Menu
+                SAVE_MENU();
+                return;
+            case 2://Persona Fusion
+                CALL_COMBINE_SHOP();
+                return;
+        }
+    }
+}
+
+void FlagsEditorDisplay()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, FlagMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Manual Input
+                FlagManualInput();
+                break;
+            case 1://Add Party Members
+                int unit = SelectUnitNoProtag();
+                if ( unit != -1 )
+                    BIT_ON( 334 + unit );
+                if ( unit == PartyMember.Mitsuru )  // Mitsuru has a different flag from
+                    BIT_ON( 82 );                   // everyone else for some reason??????
+                break;
+            case 2://Remove Party Members
+                unit = SelectUnitNoProtag();
+                if ( unit != -1 )
+                    BIT_OFF( 334 + unit );
+                if ( unit == PartyMember.Mitsuru )
+                    BIT_OFF( 82 );
+                break;
+            case 3://Navigator
+                Navigator();
+                break;
+            case 4://Mass Flag Editor
+                FlagMassEditor();
+                break;
+        }
+    }
+}
+
+void Navigator()
+{
+    for ( int i = 0; i < 32; i++ )
+        SET_MSG_VAR( i, i, 4 );
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, NaviMenu, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Fuuka
+                BIT_OFF( 4887 );
+                BIT_OFF( 321 );
+                break;
+            case 1://Mitsuru
+                BIT_OFF( 4887 );
+                BIT_ON( 321 );
+                break;
+            case 2://None
+                BIT_ON( 4887 );
+                break;
+        }
+    }
+}
+
+void FlagManualInput()
+{
+    int id = SelectNumberPrompt( SelectFlagDialog, 4 );
+    if ( id != -1 )
+    {
+        SET_MSG_VAR( 1, id, 0 );
+        int onOff = SelectOnOffCheck();
+        switch (onOff)
+        {
+            case 0: // On
+                BIT_ON( id );
+                DisplayMessagePrompt( FlagOn );
+                return;
+            case 1: // Off
+                BIT_OFF( id );
+                DisplayMessagePrompt( FlagOff );
+                return;
+            case 2: // Check
+                if ( BIT_CHK( id ) )
+                    DisplayMessagePrompt( FlagCheckOn );
+                else
+                    DisplayMessagePrompt( FlagCheckOff );
+                return;
+        }
+    }
+}
+
+void FlagMassEditor()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        int selection = MSG_SELECT( ModMenuName, FlagMassEditor, 0 );
+        switch ( selection )
+        {
+            case 999://Cancel
+                return;
+            case 0://Disable all flags
+                for ( int i = 0; i < 0x1600; i++ )
+                    BIT_OFF( i );
+                return;
+            case 1://Enable all flags
+                for ( int i = 0; i < 0x1600; i++ )
+                    BIT_ON( i );
+                return;
+            case 2://Swap enabled/disabled flags
+        for ( int i = 0; i < 0x1600; i++ )
+                {
+                    if ( BIT_CHK( i ) )
+                        BIT_OFF( i );
+                    else
+                        BIT_ON( i );
+                }
+                return;
+            case 3://Toggle range of flags
+                ToggleRange();
+                break;
+        }
+    }
+}
+
+void ToggleRange()
+{
+    int start = SelectNumberPrompt( FlagRangePrompt, 4 );
+    int end = SelectNumberPrompt( FlagRangePrompt2, 4 );
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    int onOff = SelectOnOff();
+    switch (onOff)
+    {
+        case 999: // Back
+            return;
+        case 0: // On
+            for ( int i = start; i < end; i++ )
+                BIT_ON( i );
+            return;
+        case 1: // Off
+            for ( int i = start; i < end; i++ )
+                BIT_OFF( i );
+            return;
+    }
+}

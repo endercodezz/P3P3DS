@@ -1,0 +1,109 @@
+#!/bin/sh
+# PSP Software Development Kit - https://github.com/pspdev
+# -----------------------------------------------------------------------
+# Licensed under the BSD license, see LICENSE in PSPSDK root for details.
+#
+# bootstrap - Script to bootstrap GNU autoconf and GNU automake.
+#             Inspired by libtool's autogen script.
+#
+# Copyright (c) 2005 Marcus R. Brown <mrbrown@ocgnet.org>
+# Copyright (c) 2005 James Forshaw <tyranid@gmail.com>
+# Copyright (c) 2005 John Kelley <ps2dev@kelley.ca>
+# Copyright (c) 2020 Carsten Teibes <dev f4ke de>
+#
+
+progname=`basename $0`
+top_srcdir=`dirname $0`
+
+verbose=""
+quiet=0
+generate=1
+
+usage() {
+  echo
+  echo "usage: ${progname} [-h|-q|-v|-c]"
+  echo
+  echo "options:"
+  echo "	-h .. display this message and exit"
+  echo "	-q .. quiet, don't display messages"
+  echo "	-v .. verbose, report processed files/directories"
+  echo "	-c .. clean, remove all autotools generated files"
+  echo
+  exit 1
+}
+
+msg() {
+  [ $quiet -eq 0 ] && echo $1
+}
+
+while [ $# -gt 0 ]; do
+  case $1 in
+  -h|--help)
+    usage ;;
+  -q|--quiet)
+    quiet=1
+    shift ;;
+  -v|--verbose)
+    verbose="--verbose"
+    shift ;;
+  -c|--clean)
+    generate=0
+    shift ;;
+  -*)
+    echo "Unknown option: $1"
+    usage ;;
+  *)
+    echo "Invalid parameter: $1"
+    usage ;;
+  esac
+done
+
+# Create version file used while building
+date +"%Y-%m-%d" > $top_srcdir/VERSION
+
+# default mode is generation
+if [ $generate -eq 1 ]; then
+  msg "Running aclocal:"
+  aclocal --install
+  msg "Running autoconf:"
+  autoconf
+  msg "Running autoheader:"
+  autoheader
+  msg "Running automake:"
+  automake --add-missing --copy
+
+  exit
+fi
+
+# cleanup mode
+if [ -f Makefile ]; then
+  msg "running distclean"
+  make distclean
+fi
+msg "removing automake generated Makefile[.in] files:"
+files=`find . -name 'Makefile.am' -print | sed -e 's%\.am%\.in%g'`
+files="$files `echo $files | sed -e 's%\.in%%g'`"
+for i in $files; do if test -f $i; then
+  rm $verbose -f $i
+fi; done
+
+msg "removing configure files:"
+files="configure compile depcomp install-sh missing stamp-h1"
+for i in $files; do if test -f $i; then
+  rm $verbose -f $i
+fi; done
+
+msg "removing aclocal.m4"
+rm -f aclocal.m4
+
+msg "removing autom4te.cache"
+rm -fr autom4te.cache
+
+msg "removing additional files:"
+find . -name '*~' -print | xargs rm $verbose -f
+rm $verbose -f config.status
+rm $verbose -f config.log
+rm $verbose -f config.h
+rm $verbose -f config.h.in
+find . -name '.deps' -print | xargs rm -rf
+find . -name '.libs' -print | xargs rm -rf

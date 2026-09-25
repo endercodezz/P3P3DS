@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <title>VFPU instruction set documentation</title>
+    
+    <style>
+      body {
+        max-width: 100%;
+        font-family: Arial;
+      }
+      .inst-header {
+        background: #777;
+        padding: 10px;
+      }
+      .inst-header > h1 {
+        font-size: 32px;
+        display: inline;
+        padding: 0;
+        margin: 0;
+      }
+      .inst-header > h2 {
+        font-size: 20px;
+        float: right;
+        padding: 0;
+        margin: 0;
+      }
+      .inst-info > h3 {
+        margin-top: 24px;
+        margin-bottom: 14px;
+      }
+      .svg-container {
+        padding: 30px;
+      }
+      code {
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+
+      .maintitle {
+        text-align: center;
+        font-size: 50px;
+      }
+      .pagebreak {
+        clear: both;
+        page-break-after: always;
+      }
+      .inst-enc-graph {
+        display: block;
+        margin: auto;
+      }
+      .matrixsvgdiv {
+          text-align: center;
+      }
+      .matrixsvg {
+          width: 35%;
+      }
+
+      table {
+        border: 1px solid #444;
+        border-collapse: collapse;
+        width: 50%;
+        margin-top: 15px;
+        margin-right: 15px;
+        font-size: 14px;
+      }
+      th {
+        border-bottom: 1px solid #ccc;
+        text-align: center;
+        padding: 10px;
+      }
+      td {
+        border-bottom: 1px solid #ccc;
+        border-right: 1px solid #ccc;
+        text-align: center;
+        padding: 5px;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td:last-child {
+        border-right: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="maintitle">
+      PSP VFPU instruction set documentation
+    </h1>
+
+    <div class="pagebreak"></div>
+
+    % for page in prepages:
+      ${page}
+      <div class="pagebreak"></div>
+    % endfor
+
+    % for instr in instr_list:
+      <div class="inst-header">
+        <h1>${instr["name"]}</h1>
+        <h2>${instr["title"]}</h2>
+      </div>
+
+      <div class="svg-container">
+      <svg class="inst-enc-graph" viewbox="0 0 800 100" width="100%" height="100%" role="img">
+        <g transform="translate(15,0)">
+          <rect y="25" x="0px" width="2px" height="50px"></rect>
+          <rect y="25" x="768px" width="2px" height="50px"></rect>
+          <rect y="50" x="0px" width="770px" height="2px"></rect>
+          <rect y="75" x="0px" width="770px" height="2px"></rect>
+          <rect y="32" x="192px" width="2px" height="18px"></rect>
+          <rect y="32" x="384px" width="2px" height="18px"></rect>
+          <rect y="32" x="576px" width="2px" height="18px"></rect>
+          <rect y="47" x="96px" width="1px" height="3px"></rect>
+          <rect y="47" x="288px" width="1px" height="3px"></rect>
+          <rect y="47" x="480px" width="1px" height="3px"></rect>
+          <rect y="47" x="672px" width="1px" height="3px"></rect>
+          % for i in range(0, 768, 24):
+            <rect y="49" x="${i}px" width="1px" height="1px"></rect>
+          % endfor
+          % for i in range(32):
+            <text x="${(31 - i) * 24 + 12}" text-anchor="middle" y="43" font-size="0.8em" letter-spacing="-1">${i}</text>
+          % endfor
+
+          % for bn in range(32, -1, -1):
+          %   if instr["basemask"] & (1 << bn):
+                <text x="${(31 - bn) * 24 + 12}" y="69" text-anchor="middle" font-size="0.8em">
+                  ${ (instr["baseword"] >> bn) & 1 }
+                </text>
+          %     if bn and not instr["basemask"] & (1 << (bn - 1)):
+                  <rect x="${(32 - bn) * 24}" y="50px" width="2px" height="25px"></rect>
+          %     endif
+          %   endif
+          % endfor
+
+          % for f, v in instr["fields"].items():
+              <rect x="${(32 - v['lsb']) * 24}" y="50px" width="2px" height="25px"></rect>
+          %   if v["value"] is None:
+                <text x="${(32 - v['lsb'] - v['size'] / 2.0) * 24}" y="69" font-size="0.8em" text-anchor="middle">
+                  ${f}
+                </text>
+          %   endif
+          % endfor
+        </g>
+      </svg>
+      </div>
+
+      <div class="inst-info">
+        <h3>Syntax</h3>
+        <p class="inst-syntax">${instr["syntax"]}</p>
+
+        <h3>Description</h3>
+        <p class="inst-desc">${instr["description"]}</p>
+
+        % if instr["accuracy"]:
+        <h3>Accuracy</h3>
+        <p class="inst-accur">
+          ${instr["accuracy"]["note"]}
+        </p>
+        <p class="inst-accur">
+          % if "absolute" in instr["accuracy"]:
+            Absolute error is smaller than <b>${instr["accuracy"]["absolute"]}</b>
+          % elif "relative" in instr["accuracy"]:
+            Relative error is smaller than <b>${instr["accuracy"]["relative"]}</b>
+          % endif
+        </p>
+        % endif
+
+        % if instr["hazard"]:
+        <h3>Hazards</h3>
+        <p class="inst-hazard">
+          ${instr["hazard"]}
+        </p>
+        % endif
+
+        % if instr["bugs"]:
+        <h3>Bugs</h3>
+        <p class="inst-bugs">
+          ${instr["bugs"]}
+        </p>
+        % endif
+
+        % if instr["notes"]:
+        <h3>Notes</h3>
+          % for note in instr["notes"]:
+          <p class="inst-note">
+            ${note}
+          </p>
+          % endfor
+        % endif
+ 
+        % if instr["perf-info"]:
+        <h3>Instruction performance</h3>
+        <p class="inst-perf">
+          Throughput: ${instr["perf-info"]["throughput"]} cycles/instruction<br/>
+          Latency: ${instr["perf-info"]["latency"]} cycles
+        </p>
+        % endif
+
+        % if instr["register_compat"] != "overlap":
+        <h3>Register overlap compatibility</h3>
+        <p class="inst-regcompat">
+          % if instr["register_compat"] == "no-overlap":
+          Output register cannot overlap with input registers
+          % else:
+          Output register can only overlap with input registers if they are identical
+          % endif
+        </p>
+        % endif
+
+        % if instr["prefixes"]:
+        <h3>Allowed prefixes</h3>
+        <ul>
+        % for reg, pop in instr["prefixes"]:
+          <li class="inst-XXXXX">${reg}: ${pop}</li>
+        % endfor
+        </ul>
+        % endif
+
+        % if instr["pseudocode"]:
+        <h3>Pseudocode</h3>
+        <pre><code>${instr["pseudocode"]}</code></pre>
+        % endif
+
+        % if instr["imm-values"]:
+        <h3>Immediate encoding</h3>
+        <table>
+          <tr><th>Symbol</th><th>Value</th></tr>
+          % for value, istr in instr["imm-values"].items():
+            <tr><td>${istr}</td><td>${value}</td></tr>
+          % endfor
+        </table>
+        % endif
+
+        % if instr["auxfns"]:
+        <h3>Used functions</h3>
+        <pre><code>
+        % for fnname in instr["auxfns"]:
+${functions[fnname]["code"]}
+        % endfor
+        </code></pre>
+        % endif
+      </div>
+
+      <div class="pagebreak"></div>
+    % endfor
+
+    % for page in postpages:
+      ${page}
+      <div class="pagebreak"></div>
+    % endfor
+  </body>
+</html>

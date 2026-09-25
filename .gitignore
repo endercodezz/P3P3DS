@@ -1,0 +1,83 @@
+# =============================================================================
+# P3P3DS .gitignore
+# =============================================================================
+
+# Maintainer local preferences and private workspace files
+.claude/LOCAL.md
+.claude/local/
+local/
+private/
+
+# Workspace containment directories
+.tmp/
+.cache/
+
+# Game images, ROMs, dumps, and copyrighted assets
+*.iso
+*.cso
+*.pbp
+*.elf
+*.prx
+*.pkg
+*.3dsx
+*.cia
+*.smdh
+**/EBOOT.BIN
+**/BOOT.BIN
+**/DATA.BIN
+**/UMD_DATA.BIN
+game/
+roms/
+dumps/
+decrypted/
+extracted/
+unpacked/
+**/game/
+**/dumps/
+**/decrypted/
+**/extracted/
+**/unpacked/
+
+# Generated recompilation outputs
+generated/
+profiles/*/generated/
+profiles/*/analysis/
+profiles/*/progress/
+experiments/**/test_generated.cpp
+**/test_generated.cpp
+experiments/p3p-analysis/p3p_report_functions_auto.csv
+experiments/p3p-analysis/p3p_report_function_seeds.csv
+
+# Build artifacts & outputs
+build/
+out/
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+*.o
+*.obj
+
+# Logs and profiling traces
+*.log
+experiments/**/build/
+experiments/**/out/
+experiments/**/logs/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosv
+*.sln.docstates
+Thumbs.db
+.DS_Store

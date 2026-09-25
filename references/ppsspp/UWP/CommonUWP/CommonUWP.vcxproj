@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{acb316ca-3ecb-48e5-be0a-91e72d5b0f12}</ProjectGuid>
+    <Keyword>StaticLibrary</Keyword>
+    <RootNamespace>CommonUWP</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <WindowsTargetPlatformMinVersion>10.0.19041.0</WindowsTargetPlatformMinVersion>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'" Label="Configuration">
+    <ClCompile>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>../..;../../ext/OpenXR-SDK/include;../../ext/native;../../ext/snappy;../../ext/glslang;../../ext/zlib;../../ext/libpng17;../../ext/zstd/lib;$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NOMINMAX;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'arm' or '$(Platform)' == 'ARM64'" Label="Configuration">
+    <ClCompile>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <SDLCheck>false</SDLCheck>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <AdditionalIncludeDirectories>../..;../../ext/OpenXR-SDK/include;../../ext/native;../../ext/snappy;../../ext/glslang;../../ext/zlib;../../ext/libpng17;../../ext/zstd/lib;$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NOMINMAX;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE=1;%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Common\ABI.h" />
+    <ClInclude Include="..\..\Common\Arm64Emitter.h" />
+    <ClInclude Include="..\..\Common\ArmCommon.h" />
+    <ClInclude Include="..\..\Common\ArmEmitter.h" />
+    <ClInclude Include="..\..\Common\BitScan.h" />
+    <ClInclude Include="..\..\Common\BitSet.h" />
+    <ClInclude Include="..\..\Common\Buffer.h" />
+    <ClInclude Include="..\..\Common\Data\Format\DDSLoad.h" />
+    <ClInclude Include="..\..\Common\File\AndroidContentURI.h" />
+    <ClInclude Include="..\..\Common\File\AndroidStorage.h" />
+    <ClInclude Include="..\..\Common\File\VFS\SevenZipFileReader.h" />
+    <ClInclude Include="..\..\Common\GPU\GPUBackendCommon.h" />
+    <ClInclude Include="..\..\Common\GPU\Vulkan\VulkanLoader.h" />
+    <ClInclude Include="..\..\Common\Math\CrossSIMD.h" />
+    <ClInclude Include="..\..\Common\Math\Statistics.h" />
+    <ClInclude Include="..\..\Common\Net\HTTPNaettRequest.h" />
+    <ClInclude Include="..\..\Common\Net\HTTPRequest.h" />
+    <ClInclude Include="..\..\Common\Net\NetBuffer.h" />
+    <ClInclude Include="..\..\Common\Data\Collections\ConstMap.h" />
+    <ClInclude Include="..\..\Common\Data\Collections\FixedSizeQueue.h" />
+    <ClInclude Include="..\..\Common\Data\Collections\Hashmaps.h" />
+    <ClInclude Include="..\..\Common\Data\Collections\TinySet.h" />
+    <ClInclude Include="..\..\Common\Data\Collections\CyclicBuffer.h" />
+    <ClInclude Include="..\..\Common\Data\Color\RGBAUtil.h" />
+    <ClInclude Include="..\..\Common\Data\Convert\SmallDataConvert.h" />
+    <ClInclude Include="..\..\Common\Data\Encoding\Base64.h" />
+    <ClInclude Include="..\..\Common\Data\Encoding\Compression.h" />
+    <ClInclude Include="..\..\Common\Data\Encoding\Shiftjis.h" />
+    <ClInclude Include="..\..\Common\Data\Encoding\Utf16.h" />
+    <ClInclude Include="..\..\Common\Data\Encoding\Utf8.h" />
+    <ClInclude Include="..\..\Common\Data\Format\IniFile.h" />
+    <ClInclude Include="..\..\Common\Data\Format\JSONReader.h" />
+    <ClInclude Include="..\..\Common\Data\Format\JSONWriter.h" />
+    <ClInclude Include="..\..\Common\Data\Format\PNGLoad.h" />
+    <ClInclude Include="..\..\Common\Data\Format\RIFF.h" />
+    <ClInclude Include="..\..\Common\Data\Format\ZIMLoad.h" />
+    <ClInclude Include="..\..\Common\Data\Format\ZIMSave.h" />
+    <ClInclude Include="..\..\Common\Data\Hash\Hash.h" />
+    <ClInclude Include="..\..\Common\Data\Random\Rng.h" />
+    <ClInclude Include="..\..\Common\Data\Text\Demangle.h" />
+    <ClInclude Include="..\..\Common\Data\Text\I18n.h" />
+    <ClInclude Include="..\..\Common\Data\Text\Parsers.h" />
+    <ClInclude Include="..\..\Common\Data\Text\WrapText.h" />
+    <ClInclude Include="..\..\Common\File\DirListing.h" />
+    <ClInclude Include="..\..\Common\File\DiskFree.h" />
+    <ClInclude Include="..\..\Common\File\FileDescriptor.h" />
+    <ClInclude Include="..\..\Common\File\FileUtil.h" />
+    <ClInclude Include="..\..\Common\File\Path.h" />
+    <ClInclude Include="..\..\Common\File\PathBrowser.h" />
+    <ClInclude Include="..\..\Common\File\VFS\DirectoryReader.h" />
+    <ClInclude Include="..\..\Common\File\VFS\ZipFileReader.h" />
+    <ClInclude Include="..\..\Common\File\VFS\VFS.h" />
+    <ClInclude Include="..\..\Common\GPU\DataFormat.h" />
+    <ClInclude Include="..\..\Common\GPU\OpenGL\GLFeatures.h" />
+    <ClInclude Include="..\..\Common\GPU\Shader.h" />
+    <ClInclude Include="..\..\Common\GPU\ShaderTranslation.h" />
+    <ClInclude Include="..\..\Common\GPU\ShaderWriter.h" />
+    <ClInclude Include="..\..\Common\GPU\thin3d.h" />
+    <ClInclude Include="..\..\Common\GPU\thin3d_create.h" />
+    <ClInclude Include="..\..\Common\Input\GestureDetector.h" />
+    <ClInclude Include="..\..\Common\Input\InputState.h" />
+    <ClInclude Include="..\..\Common\Input\KeyCodes.h" />
+    <ClInclude Include="..\..\Common\Math\curves.h" />
+    <ClInclude Include="..\..\Common\Math\expression_parser.h" />
+    <ClInclude Include="..\..\Common\Math\fast\fast_matrix.h" />
+    <ClInclude Include="..\..\Common\Math\geom2d.h" />
+    <ClInclude Include="..\..\Common\Math\lin\matrix4x4.h" />
+    <ClInclude Include="..\..\Common\Math\lin\vec3.h" />
+    <ClInclude Include="..\..\Common\Math\math_util.h" />
+    <ClInclude Include="..\..\Common\Net\HTTPClient.h" />
+    <ClInclude Include="..\..\Common\Net\HTTPHeaders.h" />
+    <ClInclude Include="..\..\Common\Net\HTTPServer.h" />
+    <ClInclude Include="..\..\Common\Net\Resolve.h" />
+    <ClInclude Include="..\..\Common\Net\Sinks.h" />
+    <ClInclude Include="..\..\Common\Net\URL.h" />
+    <ClInclude Include="..\..\Common\Net\WebsocketServer.h" />
+    <ClInclude Include="..\..\Common\Profiler\Profiler.h" />
+    <ClInclude Include="..\..\Common\Render\AtlasGen.h" />
+    <ClInclude Include="..\..\Common\Render\DrawBuffer.h" />
+    <ClInclude Include="..\..\Common\Render\ManagedTexture.h" />
+    <ClInclude Include="..\..\Common\Render\TextureAtlas.h" />
+    <ClInclude Include="..\..\Common\Render\Text\draw_text.h" />
+    <ClInclude Include="..\..\Common\Render\Text\draw_text_android.h" />
+    <ClInclude Include="..\..\Common\Render\Text\draw_text_uwp.h" />
+    <ClInclude Include="..\..\Common\Render\Text\draw_text_win.h" />
+    <ClInclude Include="..\..\Common\Serialize\Serializer.h" />
+    <ClInclude Include="..\..\Common\Serialize\SerializeDeque.h" />
+    <ClInclude Include="..\..\Common\Serialize\SerializeFuncs.h" />
+    <ClInclude Include="..\..\Common\Serialize\SerializeList.h" />
+    <ClInclude Include="..\..\Common\Serialize\SerializeMap.h" />
+    <ClInclude Include="..\..\Common\Serialize\SerializeSet.h" />
+    <ClInclude Include="..\..\Common\CodeBlock.h" />
+    <ClInclude Include="..\..\Common\Data\Convert\ColorConv.h" />
+    <ClInclude Include="..\..\Common\Common.h" />
+    <ClInclude Include="..\..\Common\CommonFuncs.h" />
+    <ClInclude Include="..\..\Common\CommonTypes.h" />
+    <ClInclude Include="..\..\Common\CommonWindows.h" />
+    <ClInclude Include="..\..\Common\Log\ConsoleListener.h" />
+    <ClInclude Include="..\..\Common\CPUDetect.h" />
+    <ClInclude Include="..\..\Common\Crypto\md5.h" />
+    <ClInclude Include="..\..\Common\Crypto\sha1.h" />
+    <ClInclude Include="..\..\Common\Crypto\sha256.h" />
+    <ClInclude Include="..\..\Common\DbgNew.h" />
+    <ClInclude Include="..\..\Common\ExceptionHandlerSetup.h" />
+    <ClInclude Include="..\..\Common\GhidraClient.h" />
+    <ClInclude Include="..\..\Common\GPU\GraphicsContext.h" />
+    <ClInclude Include="..\..\Common\Log.h" />
+    <ClInclude Include="..\..\Common\Log\LogManager.h" />
+    <ClInclude Include="..\..\Common\LogReporting.h" />
+    <ClInclude Include="..\..\Common\MemArena.h" />
+    <ClInclude Include="..\..\Common\MemoryUtil.h" />
+    <ClInclude Include="..\..\Common\RiscVEmitter.h" />
+    <ClInclude Include="..\..\Common\OSVersion.h" />
+    <ClInclude Include="..\..\Common\StringUtils.h" />
+    <ClInclude Include="..\..\Common\Swap.h" />
+    <ClInclude Include="..\..\Common\SysError.h" />
+    <ClInclude Include="..\..\Common\System\Display.h" />
+    <ClInclude Include="..\..\Common\System\NativeApp.h" />
+    <ClInclude Include="..\..\Common\System\OSD.h" />
+    <ClInclude Include="..\..\Common\System\Request.h" />
+    <ClInclude Include="..\..\Common\System\System.h" />
+    <ClInclude Include="..\..\Common\Thread\Channel.h" />
+    <ClInclude Include="..\..\Common\Thread\Promise.h" />
+    <ClInclude Include="..\..\Common\Thread\ThreadUtil.h" />
+    <ClInclude Include="..\..\Common\Thread\ThreadManager.h" />
+    <ClInclude Include="..\..\Common\Thread\ParallelLoop.h" />
+    <ClInclude Include="..\..\Common\Thunk.h" />
+    <ClInclude Include="..\..\Common\TimeUtil.h" />
+    <ClInclude Include="..\..\Common\UI\AsyncImageFileView.h" />
+    <ClInclude Include="..\..\Common\UI\Context.h" />
+    <ClInclude Include="..\..\Common\UI\IconCache.h" />
+    <ClInclude Include="..\..\Common\UI\Notice.h" />
+    <ClInclude Include="..\..\Common\UI\PopupScreens.h" />
+    <ClInclude Include="..\..\Common\UI\Root.h" />
+    <ClInclude Include="..\..\Common\UI\Screen.h" />
+    <ClInclude Include="..\..\Common\UI\ScreenManager.h" />
+    <ClInclude Include="..\..\Common\UI\ScrollView.h" />
+    <ClInclude Include="..\..\Common\UI\TabHolder.h" />
+    <ClInclude Include="..\..\Common\UI\Tween.h" />
+    <ClInclude Include="..\..\Common\UI\UI.h" />
+    <ClInclude Include="..\..\Common\UI\UIScreen.h" />
+    <ClInclude Include="..\..\Common\UI\View.h" />
+    <ClInclude Include="..\..\Common\UI\ViewGroup.h" />
+    <ClInclude Include="..\..\Common\VR\OpenXRLoader.h" />
+    <ClInclude Include="..\..\Common\VR\PPSSPPVR.h" />
+    <ClInclude Include="..\..\Common\VR\VRBase.h" />
+    <ClInclude Include="..\..\Common\VR\VRFramebuffer.h" />
+    <ClInclude Include="..\..\Common\VR\VRInput.h" />
+    <ClInclude Include="..\..\Common\VR\VRMath.h" />
+    <ClInclude Include="..\..\Common\VR\VRRenderer.h" />
+    <ClInclude Include="..\..\Common\x64Analyzer.h" />
+    <ClInclude Include="..\..\Common\x64Emitter.h" />
+    <ClInclude Include="..\..\ext\aemu_postoffice\client\delay_impl.h" />
+    <ClInclude Include="..\..\ext\aemu_postoffice\client\log_impl.h" />
+    <ClInclude Include="..\..\ext\aemu_postoffice\client\postoffice_client.h" />
+    <ClInclude Include="..\..\ext\aemu_postoffice\client\postoffice_mem.h" />
+    <ClInclude Include="..\..\ext\aemu_postoffice\client\sock_impl.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\aac_defines.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\at3_decoders.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\atrac.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\atrac3data.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\atrac3plus.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\atrac3plus_data.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\compat.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\fft.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\get_bits.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\intreadwrite.h" />
+    <ClInclude Include="..\..\ext\at3_standalone\mem.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_containers.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_containers_impl.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_file_headers.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_transcoder.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_transcoder_internal.h" />
+    <ClInclude Include="..\..\ext\basis_universal\basisu_transcoder_uastc.h" />
+    <ClInclude Include="..\..\ext\imgui\imconfig.h" />
+    <ClInclude Include="..\..\ext\imgui\imgui.h" />
+    <ClInclude Include="..\..\ext\imgui\imgui_extras.h" />
+    <ClInclude Include="..\..\ext\imgui\imgui_impl_platform.h" />
+    <ClInclude Include="..\..\ext\imgui\imgui_impl_thin3d.h" />
+    <ClInclude Include="..\..\ext\imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\ext\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\ext\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\ext\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\ext\libpng17\png.h" />
+    <ClInclude Include="..\..\ext\libpng17\pngconf.h" />
+    <ClInclude Include="..\..\ext\libpng17\pngdebug.h" />
+    <ClInclude Include="..\..\ext\libpng17\pnginfo.h" />
+    <ClInclude Include="..\..\ext\libpng17\pnglibconf.h" />
+    <ClInclude Include="..\..\ext\libpng17\pngpriv.h" />
+    <ClInclude Include="..\..\ext\libpng17\pngstruct.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7z.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7zBuf.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7zCrc.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7zFile.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7zTypes.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\7zWindows.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Bcj2.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Bra.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Compiler.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\CpuArch.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Delta.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Lzma2Dec.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\LzmaDec.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\Precomp.h" />
+    <ClInclude Include="..\..\ext\lzma-sdk\RotateDefs.h" />
+    <ClInclude Include="..\..\ext\minimp3\minimp3.h" />
+    <ClInclude Include="..\..\ext\minimp3\minimp3_ex.h" />
+    <ClInclude Include="..\..\ext\naett-lib\naett.h" />
+    <ClInclude Include="..\..\ext\naett-lib\src\naett_internal.h" />
+    <ClInclude Include="..\..\ext\pugixml\pugiconfig.hpp" />
+    <ClInclude Include="..\..\ext\pugixml\pugixml.hpp" />
+    <ClInclude Include="targetver.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Common\ABI.cpp" />
+    <ClCompile Include="..\..\Common\Arm64Emitter.cpp" />
+    <ClCompile Include="..\..\Common\ArmCPUDetect.cpp" />
+    <ClCompile Include="..\..\Common\ArmEmitter.cpp" />
+    <ClCompile Include="..\..\Common\Buffer.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\DDSLoad.cpp" />
+    <ClCompile Include="..\..\Common\File\AndroidContentURI.cpp" />
+    <ClCompile Include="..\..\Common\File\AndroidStorage.cpp" />
+    <ClCompile Include="..\..\Common\File\VFS\SevenZipFileReader.cpp" />
+    <ClCompile Include="..\..\Common\GPU\GPUBackendCommon.cpp" />
+    <ClCompile Include="..\..\Common\GPU\Vulkan\VulkanLoader.cpp" />
+    <ClCompile Include="..\..\Common\Math\Statistics.cpp" />
+    <ClCompile Include="..\..\Common\Net\HTTPNaettRequest.cpp" />
+    <ClCompile Include="..\..\Common\Net\HTTPRequest.cpp" />
+    <ClCompile Include="..\..\Common\Net\NetBuffer.cpp" />
+    <ClCompile Include="..\..\Common\Data\Color\RGBAUtil.cpp" />
+    <ClCompile Include="..\..\Common\Data\Convert\SmallDataConvert.cpp" />
+    <ClCompile Include="..\..\Common\Data\Encoding\Base64.cpp" />
+    <ClCompile Include="..\..\Common\Data\Encoding\Compression.cpp" />
+    <ClCompile Include="..\..\Common\Data\Encoding\Utf8.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\IniFile.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\JSONReader.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\JSONWriter.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\PNGLoad.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\RIFF.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\ZIMLoad.cpp" />
+    <ClCompile Include="..\..\Common\Data\Format\ZIMSave.cpp" />
+    <ClCompile Include="..\..\Common\Data\Hash\Hash.cpp" />
+    <ClCompile Include="..\..\Common\Data\Text\Demangle.cpp" />
+    <ClCompile Include="..\..\Common\Data\Text\I18n.cpp" />
+    <ClCompile Include="..\..\Common\Data\Text\Parsers.cpp" />
+    <ClCompile Include="..\..\Common\Data\Text\WrapText.cpp" />
+    <ClCompile Include="..\..\Common\File\DirListing.cpp" />
+    <ClCompile Include="..\..\Common\File\DiskFree.cpp" />
+    <ClCompile Include="..\..\Common\File\FileDescriptor.cpp" />
+    <ClCompile Include="..\..\Common\File\FileUtil.cpp" />
+    <ClCompile Include="..\..\Common\File\Path.cpp" />
+    <ClCompile Include="..\..\Common\File\PathBrowser.cpp" />
+    <ClCompile Include="..\..\Common\File\VFS\DirectoryReader.cpp" />
+    <ClCompile Include="..\..\Common\File\VFS\ZipFileReader.cpp" />
+    <ClCompile Include="..\..\Common\File\VFS\VFS.cpp" />
+    <ClCompile Include="..\..\Common\GPU\D3D11\thin3d_d3d11.cpp" />
+    <ClCompile Include="..\..\Common\GPU\OpenGL\GLFeatures.cpp" />
+    <ClCompile Include="..\..\Common\GPU\Shader.cpp" />
+    <ClCompile Include="..\..\Common\GPU\ShaderTranslation.cpp" />
+    <ClCompile Include="..\..\Common\GPU\ShaderWriter.cpp" />
+    <ClCompile Include="..\..\Common\GPU\thin3d.cpp" />
+    <ClCompile Include="..\..\Common\Input\GestureDetector.cpp" />
+    <ClCompile Include="..\..\Common\Input\InputState.cpp" />
+    <ClCompile Include="..\..\Common\Math\curves.cpp" />
+    <ClCompile Include="..\..\Common\Math\expression_parser.cpp" />
+    <ClCompile Include="..\..\Common\Math\lin\matrix4x4.cpp" />
+    <ClCompile Include="..\..\Common\Math\lin\vec3.cpp" />
+    <ClCompile Include="..\..\Common\Math\math_util.cpp" />
+    <ClCompile Include="..\..\Common\Net\HTTPClient.cpp" />
+    <ClCompile Include="..\..\Common\Net\HTTPHeaders.cpp" />
+    <ClCompile Include="..\..\Common\Net\HTTPServer.cpp" />
+    <ClCompile Include="..\..\Common\Net\Resolve.cpp" />
+    <ClCompile Include="..\..\Common\Net\Sinks.cpp" />
+    <ClCompile Include="..\..\Common\Net\URL.cpp" />
+    <ClCompile Include="..\..\Common\Net\WebsocketServer.cpp" />
+    <ClCompile Include="..\..\Common\Profiler\Profiler.cpp" />
+    <ClCompile Include="..\..\Common\Render\AtlasGen.cpp" />
+    <ClCompile Include="..\..\Common\Render\DrawBuffer.cpp" />
+    <ClCompile Include="..\..\Common\Render\ManagedTexture.cpp" />
+    <ClCompile Include="..\..\Common\Render\TextureAtlas.cpp" />
+    <ClCompile Include="..\..\Common\Render\Text\draw_text.cpp" />
+    <ClCompile Include="..\..\Common\Render\Text\draw_text_android.cpp" />
+    <ClCompile Include="..\..\Common\Render\Text\draw_text_uwp.cpp" />
+    <ClCompile Include="..\..\Common\Render\Text\draw_text_win.cpp" />
+    <ClCompile Include="..\..\Common\Serialize\Serializer.cpp" />
+    <ClCompile Include="..\..\Common\Data\Convert\ColorConv.cpp" />
+    <ClCompile Include="..\..\Common\Log\ConsoleListener.cpp" />
+    <ClCompile Include="..\..\Common\CPUDetect.cpp" />
+    <ClCompile Include="..\..\Common\FakeCPUDetect.cpp" />
+    <ClCompile Include="..\..\Common\Crypto\md5.cpp" />
+    <ClCompile Include="..\..\Common\Crypto\sha1.cpp" />
+    <ClCompile Include="..\..\Common\Crypto\sha256.cpp" />
+    <ClCompile Include="..\..\Common\ExceptionHandlerSetup.cpp" />
+    <ClCompile Include="..\..\Common\GhidraClient.cpp" />
+    <ClCompile Include="..\..\Common\Log.cpp" />
+    <ClCompile Include="..\..\Common\Log\LogManager.cpp" />
+    <ClCompile Include="..\..\Common\LogReporting.cpp" />
+    <ClCompile Include="..\..\Common\MemArenaAndroid.cpp" />
+    <ClCompile Include="..\..\Common\MemArenaDarwin.cpp" />
+    <ClCompile Include="..\..\Common\MemArenaPosix.cpp" />
+    <ClCompile Include="..\..\Common\MemArenaWin32.cpp" />
+    <ClCompile Include="..\..\Common\MemoryUtil.cpp" />
+    <ClCompile Include="..\..\Common\RiscVEmitter.cpp" />
+    <ClCompile Include="..\..\Common\SysError.cpp" />
+    <ClCompile Include="..\..\Common\OSVersion.cpp" />
+    <ClCompile Include="..\..\Common\StringUtils.cpp" />
+    <ClCompile Include="..\..\Common\System\Display.cpp" />
+    <ClCompile Include="..\..\Common\System\OSD.cpp" />
+    <ClCompile Include="..\..\Common\System\Request.cpp" />
+    <ClCompile Include="..\..\Common\Thread\ThreadUtil.cpp" />
+    <ClCompile Include="..\..\Common\Thread\ThreadManager.cpp" />
+    <ClCompile Include="..\..\Common\Thread\ParallelLoop.cpp" />
+    <ClCompile Include="..\..\Common\Thunk.cpp" />
+    <ClCompile Include="..\..\Common\TimeUtil.cpp" />
+    <ClCompile Include="..\..\Common\UI\AsyncImageFileView.cpp" />
+    <ClCompile Include="..\..\Common\UI\Context.cpp" />
+    <ClCompile Include="..\..\Common\UI\IconCache.cpp" />
+    <ClCompile Include="..\..\Common\UI\Notice.cpp" />
+    <ClCompile Include="..\..\Common\UI\PopupScreens.cpp" />
+    <ClCompile Include="..\..\Common\UI\Root.cpp" />
+    <ClCompile Include="..\..\Common\UI\Screen.cpp" />
+    <ClCompile Include="..\..\Common\UI\ScreenManager.cpp" />
+    <ClCompile Include="..\..\Common\UI\ScrollView.cpp" />
+    <ClCompile Include="..\..\Common\UI\TabHolder.cpp" />
+    <ClCompile Include="..\..\Common\UI\Tween.cpp" />
+    <ClCompile Include="..\..\Common\UI\UI.cpp" />
+    <ClCompile Include="..\..\Common\UI\UIScreen.cpp" />
+    <ClCompile Include="..\..\Common\UI\View.cpp" />
+    <ClCompile Include="..\..\Common\UI\ViewGroup.cpp" />
+    <ClCompile Include="..\..\Common\VR\OpenXRLoader.cpp" />
+    <ClCompile Include="..\..\Common\VR\PPSSPPVR.cpp" />
+    <ClCompile Include="..\..\Common\VR\VRBase.cpp" />
+    <ClCompile Include="..\..\Common\VR\VRFramebuffer.cpp" />
+    <ClCompile Include="..\..\Common\VR\VRInput.cpp" />
+    <ClCompile Include="..\..\Common\VR\VRMath.cpp" />
+    <ClCompile Include="..\..\Common\VR\VRRenderer.cpp" />
+    <ClCompile Include="..\..\Common\x64Analyzer.cpp" />
+    <ClCompile Include="..\..\Common\x64Emitter.cpp" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\delay_impl_cpp.cpp" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\log_impl_ppsspp.cpp" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\mutex_impl_cpp.cpp" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\postoffice.c" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\postoffice_mem_stdc.c" />
+    <ClCompile Include="..\..\ext\aemu_postoffice\client\sock_impl_windows.c" />
+    <ClCompile Include="..\..\ext\at3_standalone\atrac.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\atrac3.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\atrac3plus.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\atrac3plusdec.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\atrac3plusdsp.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\compat.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\fft.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\get_bits.cpp" />
+    <ClCompile Include="..\..\ext\at3_standalone\mem.cpp" />
+    <ClCompile Include="..\..\ext\basis_universal\basisu_transcoder.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_extras.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_impl_platform.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_impl_thin3d.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\..\ext\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\ext\libpng17\png.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngerror.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngget.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngmem.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngpread.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngread.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngrio.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngrtran.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngrutil.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngset.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngtest.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngtrans.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngwio.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngwrite.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngwtran.c" />
+    <ClCompile Include="..\..\ext\libpng17\pngwutil.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zArcIn.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zBuf.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zCrc.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zCrcOpt.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zDec.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zFile.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\7zStream.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\Bcj2.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\CpuArch.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\Delta.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\Lzma2Dec.c" />
+    <ClCompile Include="..\..\ext\lzma-sdk\LzmaDec.c" />
+    <ClCompile Include="..\..\ext\minimp3\minimp3.cpp" />
+    <ClCompile Include="..\..\ext\naett-lib\src\naett_core.c" />
+    <ClCompile Include="..\..\ext\naett-lib\src\naett_win.c" />
+    <ClCompile Include="..\..\ext\pugixml\pugixml.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_astc.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_astc_0_255.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_atc_55.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_atc_56.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_bc7_m5_alpha.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_bc7_m5_color.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_dxt1_5.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_dxt1_6.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_pvrtc2_45.inc" />
+    <None Include="..\..\ext\basis_universal\basisu_transcoder_tables_pvrtc2_alpha_33.inc" />
+    <None Include="..\..\ext\libpng17\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\cpu_features_UWP\cpu_features_UWP.vcxproj">
+      <Project>{c249f016-7f82-45cf-bb6e-0642a988c4d3}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\ext\at3_standalone\CMakeLists.txt" />
+    <Text Include="..\..\ext\at3_standalone\README.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

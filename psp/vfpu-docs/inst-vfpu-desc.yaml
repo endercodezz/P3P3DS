@@ -1,0 +1,2302 @@
+
+# This file was written by David Guillen Fandos <david@davidgf.net>
+#
+# The contents are released into the public domain without any license.
+# I wave all copyright and related rights to the extent allowed by law.
+# You are free to copy, modify, distribute, and perform the work, even for
+# commercial purposes, without asking for permission.
+#
+# I would really appreciate if you kept this header though :)
+
+
+# Instruction prefixes types: s/t/d (for rs, rt and rd operands)
+#  Prefix "S" has a special meaning: rs prefixing is allowed but only for swizzle operations
+#  Prefix "D" has a special meaning: rd prefixing is allowed but only for masking operations
+
+# Possible instruction operands
+instruction-operands:
+
+  # No input/ouput instructions
+  vfpu-static:
+    syntax: "%opcode"
+
+  # Prefix operations
+  vfpu-prefix:
+    syntax: "%opcode imm24"
+
+  # Memory instructions
+  vfpu-load4:
+    syntax: "%opcode %rd, imm14(%rt)"
+    inputs:
+      rt: gpr
+    outputs:
+      rd: single
+
+  vfpu-load16:
+    syntax: "%opcode %rd, imm14(%rt)"
+    inputs:
+      rt: gpr
+    outputs:
+      rd: vector
+
+  vfpu-store4:
+    syntax: "%opcode %rs, imm14(%rt)"
+    inputs:
+      rt: gpr
+      rs: single
+
+  vfpu-store16:
+    syntax: "%opcode %rs, imm14(%rt)"
+    inputs:
+      rt: gpr
+      rs: vector
+
+  # Vector-related insts
+  vector-binary:     # An instruction with two arguments: rs and rt, both vectors
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: vector
+      rt: vector
+    outputs:
+      rd: vector
+
+  vfpu-compare:
+    syntax: "%opcode %cond, %rs, %rt"
+    inputs:
+      rs: vector
+      rt: vector
+    outputs:
+      vfpu_cc: vfpucc
+    immediates:
+      cond:
+        type: enum
+        enum: ["FL", "EQ", "LT", "LE", "TR", "NE", "GE", "GT", "EZ", "EN", "EI", "ES", "NZ", "NN", "NI", "NS"]
+        minval: 0
+        maxval: 15
+
+  vector-binary-reduce:   # Same as above but produces a single value as result
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: vector
+      rt: vector
+    outputs:
+      rd: single
+
+  vector-binary-scale:   # Second input is an scalar number instead of a vector
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: vector
+      rt: single
+    outputs:
+      rd: vector
+
+  vector-unary:      # An instruction with just an input: rs
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector
+
+  vector-unary-reduce:    # Same as above but result is a single value
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: vector
+    outputs:
+      rd: single
+
+  vector-unary-reduce2:    # A N to N/2 reduction type (q->p / p->s)
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector:H
+
+  vector-unary-expand2:    # A N to N*2 expansions type (q->p / p->s)
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector:D
+
+  vector-unary-expand4:    # A N to N*4 expansions type (s->q)
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector:Q
+
+  vector-unary-scale:      # Features an extra imm5 field
+    syntax: "%opcode %rd, %rs, %imval"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector
+    immediates:
+      imval:
+        type: integer
+        minval: 0
+        maxval: 31
+
+  vector-unary-rot:       # rs is always single and has an extra imm5 field
+    syntax: "%opcode %rd, %rs, %imval"
+    inputs:
+      rs: single
+    outputs:
+      rd: vector
+    immediates:
+      imval:
+        type: enum
+        enum:
+          p: [
+            "[c,s]", "[s,c]", "[s,0]", "[s,0]", "[c,s]", "[s,c]", "[0,s]", "[0,s]",
+            "[c,0]", "[0,c]", "[s,s]", "[0,0]", "[c,0]", "[0,c]", "[0,0]", "[s,s]",
+            "[c,-s]", "[-s,c]", "[-s,0]", "[-s,0]", "[c,-s]", "[-s,c]", "[0,-s]", "[0,-s]",
+            "[c,0]", "[0,c]", "[-s,-s]", "[0,0]", "[c,0]", "[0,c]", "[0,0]", "[-s,-s]" ]
+          t: [
+            "[c,s,s]", "[s,c,0]", "[s,0,c]", "[s,0,0]",
+            "[c,s,0]", "[s,c,s]", "[0,s,c]", "[0,s,0]",
+            "[c,0,s]", "[0,c,s]", "[s,s,c]", "[0,0,s]",
+            "[c,0,0]", "[0,c,0]", "[0,0,c]", "[s,s,s]",
+            "[c,-s,-s]", "[-s,c,0]", "[-s,0,c]", "[-s,0,0]",
+            "[c,-s,0]", "[-s,c,-s]", "[0,-s,c]", "[0,-s,0]",
+            "[c,0,-s]", "[0,c,-s]", "[-s,-s,c]", "[0,0,-s]",
+            "[c,0,0]", "[0,c,0]", "[0,0,c]", "[-s,-s,-s]" ]
+          q: [
+            "[c,s,s,s]", "[s,c,0,0]", "[s,0,c,0]", "[s,0,0,c]",
+            "[c,s,0,0]", "[s,c,s,s]", "[0,s,c,0]", "[0,s,0,c]",
+            "[c,0,s,0]", "[0,c,s,0]", "[s,s,c,s]", "[0,0,s,c]",
+            "[c,0,0,s]", "[0,c,0,s]", "[0,0,c,s]", "[s,s,s,c]",
+            "[c,-s,-s,-s]", "[-s,c,0,0]", "[-s,0,c,0]", "[-s,0,0,c]",
+            "[c,-s,0,0]", "[-s,c,-s,-s]", "[0,-s,c,0]", "[0,-s,0,c]",
+            "[c,0,-s,0]", "[0,c,-s,0]", "[-s,-s,c,-s]", "[0,0,-s,c]",
+            "[c,0,0,-s]", "[0,c,0,-s]", "[0,0,c,-s]", "[-s,-s,-s,c]" ]
+        minval: 0
+        maxval: 31
+
+
+  vector-unary-mod:       # Features an extra imm8 field
+    syntax: "%opcode %rd, %rs, %imval"
+    inputs:
+      rs: vector
+    outputs:
+      rd: vector
+    immediates:
+      imval:
+        type: integer
+        minval: 1
+        maxval: 254
+
+  vector-inullary:    # An instruction with inputs, no outputs (yeah weird)
+    syntax: "%opcode %rs"
+    inputs:
+      rs: vector
+
+  vector-nullary:    # An instruction with no inputs, just output
+    syntax: "%opcode %rd"
+    outputs:
+      rd: vector
+
+  vector-nullary-uimm16:    # An instruction with a uint16 immediate input
+    syntax: "%opcode %rd, %imval"
+    immediates:
+      imval:
+        minval: 0
+        maxval: 65535
+    outputs:
+      rd: single
+
+  vector-nullary-cst:    # An instruction with a magic constant as immediate field
+    syntax: "%opcode %rd, %imval"
+    immediates:
+      imval:
+        type: enum
+        enum: [
+          "VFPU_HUGE", "VFPU_SQRT2", "VFPU_SQRT1_2", "VFPU_2_SQRTPI", "VFPU_2_PI", "VFPU_1_PI",
+          "VFPU_PI_4", "VFPU_PI_2", "VFPU_PI", "VFPU_E", "VFPU_LOG2E", "VFPU_LOG10E", "VFPU_LN2",
+          "VFPU_LN10", "VFPU_2PI", "VFPU_PI_6", "VFPU_LOG10TWO", "VFPU_LOG2TEN", "VFPU_SQRT3_2" ]
+        minval: 1
+        maxval: 19
+    outputs:
+      rd: vector
+
+  # Matrix related functions
+  matrix-binary:     # An instruction with two arguments: rs and rt, both matrices
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: matrix
+      rt: matrix
+    outputs:
+      rd: matrix
+
+  matrix-binary-scale:   # Second input is an scalar number instead of a matrix
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: matrix
+      rt: single
+    outputs:
+      rd: matrix
+
+  matrix-unary:     # An instruction with one arguments, rs, which is a matrix
+    syntax: "%opcode %rd, %rs"
+    inputs:
+      rs: matrix
+    outputs:
+      rd: matrix
+
+  matrix-nullary:     # An instruction with no inputs, just output (matrix)
+    syntax: "%opcode %rd"
+    outputs:
+      rd: matrix
+
+  # Mixed instructions (vec-mat)
+  vector-matrix-transform:
+    syntax: "%opcode %rd, %rs, %rt"
+    inputs:
+      rs: matrix
+      rt: vector
+    outputs:
+      rd: vector
+
+  # VFPU Conditional move
+  vfpu-condmove:
+    syntax: "%opcode %rd, %rs, %cc_sel"
+    inputs:
+      rs: vector
+      vfpu_cc: vfpucc
+    outputs:
+      rd: vector
+    immediates:
+      cc_sel:
+        minval: 0
+        maxval: 6
+
+  # Branch instructions
+  vfpu-branch:     # An VFPU-CC branch instruction
+    syntax: "%opcode imm3, offset"
+    inputs:
+      imm3: immediate
+      offset: immediate
+
+  # VFPU control access
+  vfpu-control-gpr-read:
+    syntax: "%opcode %rt, $%ccreg"
+    outputs:
+      rt: gpr
+    immediates:
+      ccreg:
+        minval: 128
+        maxval: 143
+
+  vfpu-control-gpr-write:
+    syntax: "%opcode %rt, $%ccreg"
+    inputs:
+      rt: gpr
+    immediates:
+      ccreg:
+        minval: 128
+        maxval: 143
+
+  vfpu-control-vfpu-read:
+    syntax: "%opcode %rd, $%ccreg"
+    outputs:
+      rd: single
+    immediates:
+      ccreg:
+        minval: 128
+        maxval: 143
+
+  vfpu-control-vfpu-write:
+    syntax: "%opcode $%ccreg, %rs"
+    inputs:
+      rs: single
+    immediates:
+      ccreg:
+        minval: 128
+        maxval: 143
+
+# Instruction encodings described as follows:
+encodings:
+
+  vfpu-fixedop:
+    # A control instruction (it's a full 32 bit opcode)
+    encoding: "oooooooooooooooooooooooooooooooo"
+    fields:
+      o: opcode
+
+  vfpu-prefix:
+    # A prefix setting instruction
+    encoding: "ooooooppiiiiiiiiiiiiiiiiiiiiiiii"
+    fields:
+      o: opcode      # 6 bit opcode
+      p: ptype       # 2 bit prefix type
+      i: imm24       # 24 bit prefix operation
+
+  vfpu-memory:
+    # A load/store instruction that loads/stores one element
+    encoding: "oooooossssstttttiiiiiiiiiiiiiirr"
+    fields:
+      o: opcode      # 6 bit opcode
+      s: gpr         # GPR register (base address)
+      t: rtlo        # rt input/output VFPU register (5 LSB)
+      r: rthi        # rt input/output VFPU register (2 MSB)
+      i: offset      # 14 bit address offset
+
+  vfpu-memory-quad:
+    # A load/store instruction that loads/stores a quad vector
+    # Only register numbers in the 0-63 range allowed (due to quad size)
+    encoding: "oooooossssstttttiiiiiiiiiiiiiipr"
+    fields:
+      o: opcode      # 6 bit opcode
+      s: gpr         # GPR register (base address)
+      t: rtlo        # rt input/output VFPU register (5 LSB)
+      r: rthi        # rt input/output VFPU register (bit #5)
+      i: offset      # 14 bit address offset
+      p: partop      # Indicates left(0) or right(1)
+
+  vfpu-alu:
+    # A regular VFPU ALU instruction, with two, one or no inputs and one output register.
+    # Operands can be elements, vectors or matrices, and two bits encode their size.
+    encoding: "oooooooootttttttisssssssjddddddd"
+    fields:
+      o: opcode      # 9 bit (6 + 3) opcode
+      t: rt          # rt input register
+      s: rs          # rs input register
+      d: rd          # rd output register
+      i: sizehi      # 1 for t/q flavors
+      j: sizelo      # 1 for p/q flavors
+
+  vfpu-alu-m1:
+    # Same as above but size is encoded differently (p/t/q -> 0/1/2)
+    encoding: "oooooooootttttttisssssssjddddddd"
+    fields:
+      o: opcode      # 9 bit (6 + 3) opcode
+      t: rt          # rt input register
+      s: rs          # rs input register
+      d: rd          # rd output register
+      i: sizehi-m1   # 1 for q flavor
+      j: sizelo-m1   # 1 for t flavor
+
+  vfpu-alu-compare:
+    # An almost regular VFPU ALU instruction, but writes to an implicit control reg.
+    # Has a 4 bit encoded immediate where destination register usually lives.
+    encoding: "oooooooootttttttisssssssj000cccc"
+    fields:
+      o: opcode      # 9 bit (6 + 3) opcode
+      t: rt          # rt input register
+      s: rs          # rs input register
+      c: cond        # condition immediate
+      i: sizehi      # 1 for t/q flavors
+      j: sizelo      # 1 for p/q flavors
+
+  vector-imm5:
+    # A one source one destination VFPU ALU instruction with a 5 bit immediate.
+    encoding: "oooooooooppmmmmmisssssssjddddddd"
+    fields:
+      o: opcode      # 9 bit (6 + 3) opcode
+      p: opcode2     # 2 bit sub-opcode
+      m: imval       # 5 bit immediate
+      s: rs          # rs input register
+      d: rd          # rd output register
+      i: sizehi      # 1 for t/q flavors
+      j: sizelo      # 1 for p/q flavors
+
+  vector-imm8:
+    # A one source one destination VFPU ALU instruction with a 8 bit immediate.
+    encoding: "oooooooommmmmmmmisssssssjddddddd"
+    fields:
+      o: opcode      # 8 bit (6 + 2) opcode
+      m: imval       # 8 bit immediate
+      s: rs          # rs input register
+      d: rd          # rd output register
+      i: sizehi      # 1 for t/q flavors
+      j: sizelo      # 1 for p/q flavors
+
+  vector-imm16:
+    # A one source one destination VFPU ALU instruction with a 5 bit immediate.
+    encoding: "ooooooootdddddddiiiiiiiiiiiiiiii"
+    fields:
+      o: opcode      # 8 bit (6 + 2) opcode
+      t: itype       # 1 bit constant type (0 int/1 float)
+      d: rd          # rd output register
+      i: imval       # 16 bit constant immediate
+
+  vfpu-condmove:
+    # A conditional move instruction (uses VFPU CC register as input).
+    encoding: "oooooooooooocrrrisssssssjddddddd"
+    fields:
+      o: opcode      # 12 bit (6 + 6) opcode
+      c: rcond       # 1 bit (false/true)
+      r: cc_sel      # VFPU CC bit number
+      s: rs          # rs input register
+      d: rd          # rd output register
+      i: sizehi      # 1 for t/q flavors
+      j: sizelo      # 1 for p/q flavors
+
+  vfpu-branch:
+    # A branch instruction that uses the VFPU CC register as input.
+    encoding: "ooooooooooorrrlvffffffffffffffff"
+    fields:
+      o: opcode      # 11 bit (6 + 5) opcode
+      r: vfpucc      # VFPU CC bit number
+      l: likely      # likely bit
+      v: value       # value to branch on
+      f: offset      # pc offset (signed)
+
+  vfpu-gpr-control:
+    # An instruction to read/write VFPU CC registers (to/from CPU GPR regs)
+    encoding: "01001000d11ggggg00000000rrrrrrrr"
+    fields:
+      d: direction   # 1 bit (1 write, 0 read)
+      g: gpr         # GPR reg number
+      r: ccreg       # VFPU CC reg number
+
+  vfpu-write-control:
+    # An instruction to write VFPU CC registers (from a vector reg)
+    encoding: "11010000010100010sssssssrrrrrrrr"
+    fields:
+      s: rs          # rs input register
+      r: ccreg       # VFPU CC reg number
+
+  vfpu-read-control:
+    # An instruction to read VFPU CC registers (to a vector reg)
+    encoding: "1101000001010000rrrrrrrr0ddddddd"
+    fields:
+      d: rd          # rd output register
+      r: ccreg       # VFPU CC reg number
+
+# List of instructions defined in the ISA
+instructions:
+
+  # Control flow instructions (branch)
+  bvf:
+    type: vfpu-branch
+    encoding: vfpu-branch
+    perf-class: vfpu-branch
+    title: "VFPU branch on false"
+    description: "Branch on VFPU CC register being false"
+    opcode: "01001001000"
+    likely: 0
+    value: 0
+
+  bvfl:
+    type: vfpu-branch
+    encoding: vfpu-branch
+    perf-class: vfpu-branch
+    title: "VFPU likely branch on false"
+    description: "Branch on VFPU CC register being false (likely)"
+    opcode: "01001001000"
+    likely: 1
+    value: 0
+
+  bvt:
+    type: vfpu-branch
+    encoding: vfpu-branch
+    perf-class: vfpu-branch
+    title: "VFPU branch on true"
+    description: "Branch on VFPU CC register being true"
+    opcode: "01001001000"
+    likely: 0
+    value: 1
+
+  bvtl:
+    type: vfpu-branch
+    encoding: vfpu-branch
+    perf-class: vfpu-branch
+    title: "VFPU likely branch on true"
+    description: "Branch on VFPU CC register being true (likely)"
+    opcode: "01001001000"
+    likely: 1
+    value: 1
+
+  # CC mangling instructions
+  mtvc:
+    type: vfpu-control-gpr-write
+    encoding: vfpu-gpr-control
+    title: "Move GPR to VFPU control register"
+    description: "Writes the contents of a CPU general purpose register to the specified VFPU control register"
+    direction: 1
+
+  mfvc:
+    type: vfpu-control-gpr-read
+    encoding: vfpu-gpr-control
+    title: "Move VFPU control register to GPR"
+    description: "Writes the contents of the specified VPFU control register into a CPU general purpose register"
+    hazard: >
+      The instruction does not have interlocks, so the result of a vcmp instruction
+      is only available one cycle later. You will need to interleave at least one VFPU
+      instruction between a vcmp and mfvc (ie. a vnop).
+    direction: 0
+
+  vmtvc:
+    type: vfpu-control-vfpu-write
+    encoding: vfpu-write-control
+    title: "Move vector register to VFPU control register"
+    description: "Writes the contents of a VFPU vector general to the specified VFPU control register"
+
+  vmfvc:
+    type: vfpu-control-vfpu-read
+    encoding: vfpu-read-control
+    title: "Move VFPU control register to vector register"
+    description: "Writes the contents of the specified VPFU control register into a VFPU vector register"
+    hazard: >
+      The instruction does not have interlocks, so the result of a previous vcmp instruction
+      is only available one cycle later. You will need to interleave at least one VFPU
+      instruction between a vcmp and mfvc (ie. a vnop).
+
+  # Memory instructions
+  lv.s:
+    type: vfpu-load4
+    encoding: vfpu-memory
+    title: "Load VFPU element"
+    description: >
+      Performs a 4 byte memory load to a VFPU register.
+      Address must be 4 byte aligned or a fault is generated.
+    opcode: "110010"
+
+  lv.q:
+    type: vfpu-load16
+    encoding: vfpu-memory-quad
+    title: "Load VFPU quad element"
+    description: >
+      Performs a 16 byte memory load to a VFPU quad register.
+      Address must be 16 byte aligned or a fault is generated.
+    opcode: "110110"
+    partop: 0
+
+  lvl.q:
+    type: vfpu-load16
+    encoding: vfpu-memory-quad
+    title: "Load left VFPU quad element"
+    description: >
+      Performs a 16 byte left unaligned memory load to a VFPU quad register.
+      Instruction ignores the two LSB (forces them to zero), so the address is assumed aligned to 4 bytes.
+      This instruction is similar to MIPS LWL instruction: loads the most significant elements from the
+      specified address leaving the other elements unchanged. Users can use `ulv.q` pseudoinstruction
+      to generate a sequence of `lvl.q` and `lvr.q` instructions in order to load unaligned data.
+      You can check `psp-tests/manual/memops.c` to see examples on how the instruction behaves.
+    bugs: >
+        The instruction has an errata on PSP-1000 models that causes FPU register corruption
+        (these are the MIPS CPU FPU registers, not the VFPU registers).
+        The bottom 5 bits of the VFPU destination register determine which FPU register will be corrupted.
+        A workaround is to assume the side effect (ie. mark the register are clobbered).
+    opcode: "110101"
+    partop: 0
+
+  lvr.q:
+    type: vfpu-load16
+    encoding: vfpu-memory-quad
+    title: "Load right VFPU quad element"
+    description: >
+      Performs a 16 byte right unaligned memory load to a VFPU quad register.
+      Instruction ignores the two LSB (forces them to zero), so the address is assumed aligned to 4 bytes.
+      This instruction is similar to MIPS LWR instruction: loads the least significant elements from the
+      specified address leaving the other elements unchanged. Users can use `ulv.q` pseudoinstruction
+      to generate a sequence of `lvl.q` and `lvr.q` instructions in order to load unaligned data.
+      You can check `psp-tests/manual/memops.c` to see examples on how the instruction behaves.
+    bugs: >
+        The instruction has an errata on PSP-1000 models that causes FPU register corruption
+        (these are the MIPS CPU FPU registers, not the VFPU registers).
+        The bottom 5 bits of the VFPU destination register determine which FPU register will be corrupted.
+        A workaround is to assume the side effect (ie. mark the register are clobbered).
+    opcode: "110101"
+    partop: 1
+
+  sv.s:
+    type: vfpu-store4
+    encoding: vfpu-memory
+    title: "Store VFPU element"
+    description: >
+      Performs a 4 byte memory store from a VFPU register.
+      Address must be 4 byte aligned or a fault is generated.
+    opcode: "111010"
+
+  sv.q:
+    type: vfpu-store16
+    encoding: vfpu-memory-quad
+    title: "Store VFPU quad element"
+    description: >
+      Performs a 16 byte memory store from a VFPU quad register.
+      Address must be 16 byte aligned or a fault is generated.
+    opcode: "111110"
+    partop: 0
+
+  svl.q:
+    type: vfpu-store16
+    encoding: vfpu-memory-quad
+    title: "Store left VFPU quad element"
+    description: >
+      Performs a 16 byte left unaligned memory store from a VFPU quad register.
+      Instruction ignores the two address LSB (forces them to zero), so the address is assumed aligned to 4 bytes.
+      This instruction is similar to MIPS SWL instruction: stores the most significant part of the elements
+      to the specified address leaving any other elements unchanged. Users can use `usv.q` pseudoinstruction
+      to generate a sequence of `svl.q` and `svr.q` instructions in order to store unaligned data.
+      You can check `psp-tests/manual/memops.c` to see examples on how the instruction behaves.
+    opcode: "111101"
+    partop: 0
+
+  svr.q:
+    type: vfpu-store16
+    encoding: vfpu-memory-quad
+    title: "Store right VFPU quad element"
+    description: >
+      Performs a 16 byte right unaligned memory store from a VFPU quad register.
+      Instruction ignores the two address LSB (forces them to zero), so the address is assumed aligned to 4 bytes.
+      This instruction is similar to MIPS SWR instruction: stores the least significant part of the elements
+      to the specified address leaving any other elements unchanged. Users can use `usv.q` pseudoinstruction
+      to generate a sequence of `svl.q` and `svr.q` instructions in order to store unaligned data.
+      You can check `psp-tests/manual/memops.c` to see examples on how the instruction behaves.
+    opcode: "111101"
+    partop: 1
+
+  # Binary VFPU-vector operations (use rd, rs, rt)
+  # Encoding is the same for all of them, however rt and rs might be sometimes used as a secondary opcode.
+  vadd:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Add elements"
+    description: "Performs element-wise floating point addition"
+    pcode: "@ rd[{i}] = rs[{i}] + rt[{i}]"
+    opcode: "011000000"
+    prefix: std
+
+  vsub:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Subtract elements"
+    description: "Performs element-wise floating point subtraction"
+    pcode: "@ rd[{i}] = rs[{i}] - rt[{i}]"
+    opcode: "011000001"
+    prefix: std
+
+  vmul:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Multiply elements"
+    description: "Performs element-wise floating point multiplication"
+    pcode: "@ rd[{i}] = rs[{i}] * rt[{i}]"
+    opcode: "011001000"
+    prefix: std
+
+  vdiv:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: division
+    title: "Divide elements"
+    description: "Performs element-wise floating point division"
+    pcode: "@ rd[{i}] = rs[{i}] / rt[{i}]"
+    opcode: "011000111"
+    reg-compat: partial-overlap
+    prefix: s0t0d0
+
+  vmin:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Select smallest elements"
+    description: "Performs element-wise floating point min(rs, rt) operation"
+    pcode: "@ rd[{i}] = fminf(rs[{i}], rt[{i}])"
+    opcode: "011011010"
+    prefix: std
+
+  vmax:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Select biggest elements"
+    description: "Performs element-wise floating point max(rs, rt) operation"
+    pcode: "@ rd[{i}] = fmaxf(rs[{i}], rt[{i}])"
+    opcode: "011011011"
+    prefix: std
+
+  vscmp:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Compare and set elements"
+    description: "Performs element-wise floating point comparison. The result is -1.0f, 0.0f or 1.0f depending on whether the input vs is less that vt, equal, or greater, respectively."
+    pcode: "@ rd[{i}] = rs[{i}] < rt[{i}] ? -1.0f : rs[{i}] > rt[{i}] ? 1.0f : 0.0f"
+    opcode: "011011101"
+    prefix: std
+
+  vsge:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Compare greater or equal and set elements"
+    description: "Performs element-wise floating point bigger-or-equal comparison. The result will be 1.0 if vs is bigger or equal to vt, otherwise will be zero."
+    pcode: "@ rd[{i}] = rs[{i}] >= rt[{i}] ? 1.0f : 0.0f"
+    opcode: "011011110"
+    prefix: std
+
+  vslt:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Compare less-than and set elements"
+    description: "Performs element-wise floating point less-than comparison. The result will be 1.0 if vs less than vt, otherwise will be zero."
+    pcode: "@ rd[{i}] = rs[{i}] < rt[{i}] ? 1.0f : 0.0f"
+    opcode: "011011111"
+    prefix: std
+
+  vcrs:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: t
+    perf-class: arithmetic
+    title: "Partial vector cross product"
+    description: "Performs a partial cross-product operation"
+    pcode: "rd[0] = rs[1] * rt[2]; rd[1] = rs[2] * rt[0]; rd[2] = rs[0] * rt[1]"
+    opcode: "011001101"
+    prefix: d
+
+  vcrsp:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: t
+    perf-class: transform
+    title: "Vector cross product"
+    description: "Performs a full cross-product operation"
+    pcode: >
+      rd[0] = rs[1] * rt[2] - rs[2] * rt[1];
+      rd[1] = rs[2] * rt[0] - rs[0] * rt[2];
+      rd[2] = rs[0] * rt[1] - rs[1] * rt[0]
+    opcode: "111100101"
+    reg-compat: no-overlap
+
+  vqmul:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: transform
+    title: "Quaternion multiplication"
+    description: "Performs a vector-matrix homogeneous transform (matrix-vector product), with a vector result"
+    pcode: >
+      rd[0] = rs[3] * rt[0] - rs[2] * rt[1] + rs[1] * rt[2] + rs[0] * rt[3];
+      rd[1] = rs[3] * rt[1] + rs[2] * rt[0] + rs[1] * rt[3] - rs[0] * rt[2];
+      rd[2] = rs[3] * rt[2] + rs[2] * rt[3] - rs[1] * rt[0] + rs[0] * rt[1];
+      rd[3] = rs[3] * rt[3] - rs[2] * rt[2] - rs[1] * rt[1] - rs[0] * rt[0]
+    opcode: "111100101"
+    reg-compat: no-overlap
+
+  vsbn:
+    type: vector-binary
+    encoding: vfpu-alu
+    flavors: s
+    perf-class: arithmetic
+    title: "Change exponent scale"
+    description: >
+      Rescales rs operand to have rt as exponent. This would be equivalent to
+      ldexp(frexp(rs, NULL), rt + 128). If we express the number in its IEEE754
+      terms, that is, if rs can be expressed as ±m * 2^e, the instruction will
+      replace "e" with the value of rt + 127 mod 256.
+    alu-mode: integer
+    pcode: >
+      rd[0] = (fpiszero(rs[0]) || fpisnanorinf(rs[0])) ? rs[0] :
+              (rs[0] & 0x807FFFFF) | (((rt[0] + 127) & 0xFF) << 23)
+    opcode: "011000010"
+    prefix: std
+
+  # Scaling is a bit special
+  vscl:
+    type: vector-binary-scale
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: arithmetic
+    title: "Vector scalar scale"
+    description: "Scales a vector (element-wise) by an scalar factor"
+    pcode: "@ rd[{i}] = rs[{i}] * rt[0]"
+    opcode: "011001010"
+    prefix: sd
+
+  # Reduction instructions, its destination is narrower
+  vdot:
+    type: vector-binary-reduce
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: arithmetic-reduction
+    title: "Vector dot product"
+    description: "Performs vector floating point dot product"
+    pcode:
+      - "rd[0] = rs[0] * rt[0] + rs[1] * rt[1]"
+      - "rd[0] = rs[0] * rt[0] + rs[1] * rt[1] + rs[2] * rt[2]"
+      - "rd[0] = rs[0] * rt[0] + rs[1] * rt[1] + rs[2] * rt[2] + rs[3] * rt[3]"
+    opcode: "011001001"
+    prefix: std
+
+  vdet:
+    type: vector-binary-reduce
+    encoding: vfpu-alu
+    flavors: p
+    perf-class: arithmetic-reduction
+    title: "2x2 matrix determinant"
+    description: "Performs a 2x2 matrix determinant between two matrix rows"
+    pcode: "rd[0] = rs[0] * rt[1] - rs[1] * rt[0]"
+    opcode: "011001110"
+    prefix: sd
+
+  vhdp:
+    type: vector-binary-reduce
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: arithmetic-reduction
+    title: "Homogeneous dot product"
+    description: "Performs vector floating point homegeneous dot product"
+    pcode:
+      - "rd[0] = rs[0] * rt[0] + rt[1]"
+      - "rd[0] = rs[0] * rt[0] + rs[1] * rt[1] + rt[2]"
+      - "rd[0] = rs[0] * rt[0] + rs[1] * rt[1] + rs[2] * rt[2] + rt[3]"
+    opcode: "011001100"
+    prefix: td
+
+  # Unary VFPU-vector operations (use rd, rs)
+  vmov:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Vector copy"
+    description: "Element-wise data copy"
+    pcode: "@ rd[{i}] = rs[{i}]"
+    opcode: "110100000"
+    rt: "0000000"
+    prefix: sd
+
+  vabs:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Absolute value"
+    description: "Performs element-wise floating point absolute value"
+    pcode: "@ rd[{i}] = fabsf(rs[{i}])"
+    opcode: "110100000"
+    rt: "0000001"
+    prefix: Sd
+
+  vneg:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Floating point negation"
+    description: "Performs element-wise floating point negation"
+    pcode: "@ rd[{i}] = -rs[{i}]"
+    opcode: "110100000"
+    rt: "0000010"
+    prefix: Sd
+
+  vsat0:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Saturate float to 0..1"
+    description: "Saturates inputs to the [0.0f ... 1.0f] range"
+    pcode: "@ rd[{i}] = fminf(fmaxf(rs[{i}], 0.0f), 1.0f)"
+    opcode: "110100000"
+    rt: "0000100"
+    prefix: sD
+
+  vsat1:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Saturate float to -1..1"
+    description: "Saturates inputs to the [-1.0f ... 1.0f] range"
+    pcode: "@ rd[{i}] = fminf(fmaxf(rs[{i}], -1.0f), 1.0f)"
+    opcode: "110100000"
+    rt: "0000101"
+    prefix: sD
+
+  vrcp:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Reciprocate elements"
+    description: "Performs element-wise floating point reciprocal"
+    pcode: "@ rd[{i}] = 1.0f / rs[{i}]"
+    accuracy:
+      relative: 6.3e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3.5 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    opcode: "110100000"
+    rt: "0010000"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vrsq:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Reciprocal square root"
+    description: "Performs element-wise floating pointreciprocal square root"
+    pcode: "@ rd[{i}] = 1.0f / sqrt(rs[{i}])"
+    accuracy:
+      relative: 7.3e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3.5 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    opcode: "110100000"
+    rt: "0010001"
+    reg-compat: partial-overlap
+    prefix: d0s0
+
+  vsin:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Sine function"
+    description: "Performs element-wise floating point sin(π/2⋅rs) operation"
+    pcode: "@ rd[{i}] = sin(rs[{i}] * M_PI_2)"
+    accuracy:
+      absolute: 4.8e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    edgecases:
+      - operand: rs
+        input-range: -2^32 <= rs <= 2^32
+        result: invalid
+    opcode: "110100000"
+    rt: "0010010"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vcos:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Cosine function"
+    description: "Performs element-wise floating point cos(π/2⋅rs) operation"
+    pcode: "@ rd[{i}] = cos(rs[{i}] * M_PI_2)"
+    accuracy:
+      absolute: 4.0e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 2.5 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    edgecases:
+      - operand: rs
+        input-range: -2^32 <= rs <= 2^32
+        result: invalid
+    opcode: "110100000"
+    rt: "0010011"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vexp2:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Base-2 exponentiation"
+    description: "Performs element-wise floating point exp2(rs) operation"
+    pcode: >
+      @ rd[{i}] = (rs[{i}] >= 128)  ? INFINITY :
+                  (rs[{i}] <= -127) ? 0.0f :
+                  exp2(rs[{i}])
+
+    accuracy:
+      relative: 7.2e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+        Inputs larger than 127 result in overflow (cannot represent over 2^127)
+    opcode: "110100000"
+    rt: "0010100"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vlog2:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Base-2 logarithm"
+    description: "Performs element-wise floating point log2(rs) operation"
+    pcode: "@ rd[{i}] = log2(rs[{i}])"
+    accuracy:
+      absolute: 3.0e-5
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. Accuracy varies greatly depending
+        on the input value. Please refer to psp-tests/accuracy for more details.
+    opcode: "110100000"
+    rt: "0010101"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vlgb:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: s
+    perf-class: arithmetic
+    title: "LogB calculation"
+    description: "Performs element-wise logB() calculation"
+    pcode: "@ rd[{i}] = logbf(rs[{i}])"
+    opcode: "110100000"
+    rt: "0110111"
+    prefix: sd
+
+  vsbz:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: s
+    perf-class: arithmetic
+    title: "Reset exponent scale"
+    description: >
+      Rescales rs operand to have zero as exponent, so that it is reduced to the
+      [1.0, 2.0) interval. This is essentially equivalent to the vsbn instruction
+      with rt=0.
+    alu-mode: integer
+    pcode: >
+      rd[0] = (fpiszero(rs[0]) || fpisnan(rs[0])) ? rs[0] :
+              (rs[0] & 0x007FFFFF) | 0x3F800000
+    opcode: "110100000"
+    rt: "0110110"
+    prefix: sd
+
+  vwbn:
+    type: vector-unary-mod
+    encoding: vector-imm8
+    flavors: s
+    perf-class: arithmetic
+    title: "Floating point modulus"
+    description: >
+      TODO: Document this better. Performs some sort of modulus operation.
+    alu-mode: integer
+    pcode: "@ rd[{i}] = ivwbn(rs[{i}], imval)"
+    opcode: "11010011"
+    prefix: sd
+    auxcode:
+      - ivwbn
+
+  vsqrt:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Square root"
+    description: "Performs element-wise floating point aproximate square root"
+    accuracy:
+      relative: 7.1e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3 mantissa bits seem to be
+        innacurate. Please refer to psp-tests/accuracy for more details.
+    pcode: "@ rd[{i}] = sqrt(rs[{i}])"
+    opcode: "110100000"
+    rt: "0010110"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vasin:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Arc sine function"
+    description: "Performs element-wise floating point asin(rs)⋅2/π operation"
+    pcode: "@ rd[{i}] = asin(rs[{i}]) / M_PI_2"
+    accuracy:
+      absolute: 2.0e-2
+      note: >
+        This function provides an approximate value. The precision seems quite good
+        for arguments between -0.5 and 0.5 (around 2.5e-7), but it becomes very
+        inaccurate outside of this range, as it approaches +/-1.
+        Please refer to psp-tests/accuracy for more details.
+    opcode: "110100000"
+    rt: "0010111"
+    reg-compat: partial-overlap
+    prefix: s0d0
+
+  vnrcp:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Negative reciprocal"
+    description: "Performs element-wise floating point negated reciprocal"
+    pcode: "@ rd[{i}] = -1.0f / rs[{i}]"
+    accuracy:
+      relative: 6.3e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3.5 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    opcode: "110100000"
+    rt: "0011000"
+    reg-compat: partial-overlap
+    prefix: d0
+
+  vnsin:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Negative sine function"
+    description: "Performs element-wise floating point -sin(π/2⋅rs) operation"
+    pcode: "@ rd[{i}] = -sin(rs[{i}] * M_PI_2)"
+    accuracy:
+      absolute: 4.8e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+    edgecases:
+      - operand: rs
+        input-range: -2^32 <= rs <= 2^32
+        result: invalid
+    opcode: "110100000"
+    rt: "0011010"
+    reg-compat: partial-overlap
+    prefix: d0
+
+  vrexp2:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: transcendental
+    title: "Base-2 negative exponentiation"
+    description: "Performs element-wise floating point 1/exp2(rs) operation (equivalent to exp2(-rs))"
+    pcode: >
+      @ rd[{i}] = (rs[{i}] >= 127)  ? 0.0f :
+                  (rs[{i}] <= -128) ? INFINITY :
+                  exp2(-rs[{i}])
+
+    accuracy:
+      relative: 7.2e-7
+      note: >
+        This function provides an approximate value, with lower accuracy to what
+        FP32 IEEE754 numbers can represent. The lowest 3 mantissa bits seem to
+        be innacurate. Please refer to psp-tests/accuracy for more details.
+        Inputs larger than 127 result in overflow (cannot represent over 2^127)
+    opcode: "110100000"
+    rt: "0011100"
+    reg-compat: partial-overlap
+    prefix: d0
+
+  vsrt1:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: arithmetic
+    title: "Element min-sort pass #1"
+    description: "Performs a min() sorting step between elements pairs 0-1 and 2-3, shuffling them depending on their values."
+    pcode: "rd[0] = fminf(rs[0], rs[1]); rd[1] = fmaxf(rs[0], rs[1]); rd[2] = fminf(rs[2], rs[3]); rd[3] = fmaxf(rs[2], rs[3])"
+    opcode: "110100000"
+    rt: "1000000"
+    prefix: d
+
+  vsrt2:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: arithmetic
+    title: "Element min-sort pass #2"
+    description: "Performs a min() sorting step between elements pairs 3-0 and 1-2, shuffling them depending on their values."
+    pcode: "rd[0] = fminf(rs[0], rs[3]); rd[1] = fminf(rs[1], rs[2]); rd[2] = fmaxf(rs[1], rs[2]); rd[3] = fmaxf(rs[0], rs[3])"
+    opcode: "110100000"
+    rt: "1000001"
+    prefix: d
+
+  vsrt3:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: arithmetic
+    title: "Element max-sort pass #1"
+    description: "Performs a max() sorting step between elements pairs 0-1 and 2-3, shuffling them depending on their values."
+    pcode: "rd[0] = fmaxf(rs[0], rs[1]); rd[1] = fminf(rs[0], rs[1]); rd[2] = fmaxf(rs[2], rs[3]); rd[3] = fminf(rs[2], rs[3])"
+    opcode: "110100000"
+    rt: "1001000"
+    prefix: d
+
+  vsrt4:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: arithmetic
+    title: "Element max-sort pass #2"
+    description: "Performs a max() sorting step between elements pairs 3-0 and 1-2, shuffling them depending on their values."
+    pcode: "rd[0] = fmaxf(rs[0], rs[3]); rd[1] = fmaxf(rs[1], rs[2]); rd[2] = fminf(rs[1], rs[2]); rd[3] = fminf(rs[0], rs[3])"
+    opcode: "110100000"
+    rt: "1001001"
+    prefix: d
+
+  vbfy1:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: pq
+    perf-class: arithmetic
+    title: "Butterfly function #1"
+    description: "Performs a `butterfly` operation between the input elements."
+    pcode:
+      - "rd[0] = rs[0] + rs[1]; rd[1] = rs[0] - rs[1]"
+      - "rd[0] = rs[0] + rs[1]; rd[1] = rs[0] - rs[1]; rd[2] = rs[2] + rs[3]; rd[3] = rs[2] - rs[3]"
+    opcode: "110100000"
+    rt: "1000010"
+    prefix: d
+
+  vbfy2:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: arithmetic
+    title: "Butterfly function #2"
+    description: "Performs a `butterfly` operation between the input elements."
+    pcode: "rd[0] = rs[0] + rs[2]; rd[1] = rs[1] + rs[3]; rd[2] = rs[0] - rs[2]; rd[3] = rs[1] - rs[3]"
+    opcode: "110100000"
+    rt: "1000011"
+    prefix: d
+
+  vsgn:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Sign function"
+    description: "Performs element-wise floating point sign(rs) operation. This function returns -1, 0 or 1 depending on whether the input is negative zero or positive respectively."
+    pcode: "@ rd[{i}] = rs[{i}] < 0 ? -1.0f : rs[{i}] > 0 ? 1.0f : 0.0f"
+    opcode: "110100000"
+    rt: "1001010"
+    prefix: sd
+
+  vocp:
+    type: vector-unary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: arithmetic
+    title: "One complement function"
+    description: "Performs element-wise one's complement (1.0f - x)"
+    pcode: "@ rd[{i}] = 1 - rs[{i}]"
+    opcode: "110100000"
+    rt: "1000100"
+    prefix: d
+
+  vi2f:
+    type: vector-unary-scale
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Integer to float with scaling"
+    description: "Performs element-wise integer to float conversion with optional scaling factor. The integer is divided by 2^scale after the conversion."
+    alu-mode:
+      rs: sinteger
+      rd: float
+    pcode: "@ rd[{i}] = ldexp(rs[{i}], -imval)"
+    opcode: "110100101"
+    opcode2: "00"
+    prefix: Sd
+
+  vf2in:
+    type: vector-unary-scale
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Float to integer round-to-nearest with scaling"
+    description: "Performs element-wise float to integer conversion with optional scaling factor, rounding to the nearest integer"
+    alu-mode:
+      rs: float
+      rd: sinteger
+    pcode: "@ rd[{i}] = rintf(rs[{i}] * pow(2.0f, imval))"
+    opcode: "110100100"
+    opcode2: "00"
+    prefix: sD
+
+  vf2iz:
+    type: vector-unary-scale
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Float to integer truncation with scaling"
+    description: "Performs element-wise float to integer conversion with optional scaling factor, truncating the decimal argument (that is, rounding towards zero)"
+    alu-mode:
+      rs: float
+      rd: sinteger
+    pcode: "@ rd[{i}] = truncf(rs[{i}] * pow(2.0f, imval))"
+    opcode: "110100100"
+    opcode2: "01"
+    prefix: sD
+
+  vf2iu:
+    type: vector-unary-scale
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Float to integer round-up with scaling"
+    description: "Performs element-wise float to integer conversion with optional scaling factor, rounding up (that is, towards the next, equal or greater, integer value)"
+    alu-mode:
+      rs: float
+      rd: sinteger
+    pcode: "@ rd[{i}] = ceilf(rs[{i}] * pow(2.0f, imval))"
+    opcode: "110100100"
+    opcode2: "10"
+    prefix: sD
+
+  vf2id:
+    type: vector-unary-scale
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: arithmetic
+    title: "Float to integer round-down with scaling"
+    description: "Performs element-wise float to integer conversion with optional scaling factor, rounding down (that is, towards the previous, equal or smaller, integer value)"
+    alu-mode:
+      rs: float
+      rd: sinteger
+    pcode: "@ rd[{i}] = floorf(rs[{i}] * pow(2.0f, imval))"
+    opcode: "110100100"
+    opcode2: "11"
+    prefix: sD
+
+  vrot:
+    type: vector-unary-rot
+    encoding: vector-imm5
+    flavors: ptq
+    perf-class: rot-matrix
+    title: "Rotation matrix row calculation"
+    description: "Calculates a rotation matrix row, given an angle argument"
+    pcode: "@ rd[{i}] = ivrot({i}, rs[0], imval)"
+    accuracy:
+      absolute: 4.8e-7
+      note: >
+        This function provides the same accuracy as its vsin/vcos counterparts.
+    opcode: "111100111"
+    opcode2: "01"
+    reg-compat: no-overlap
+    auxcode:
+      - ivrot
+
+  # Expanding instruction, its destination is wider
+  vsocp:
+    type: vector-unary-expand2
+    encoding: vfpu-alu
+    flavors: sp
+    perf-class: arithmetic
+    title: "One complement with saturation"
+    description: "Performs element-wise one's complement (1.0f - x) with saturation to [0.0f ... 1.0f]"
+    pcode:
+      - "rd[0] = fminf(fmaxf(1.0f - rs[0], 0.0f), 1.0f); rd[1] = fminf(fmaxf(rs[0], 0.0f), 1.0f)"
+      - "rd[0] = fminf(fmaxf(1.0f - rs[0], 0.0f), 1.0f); rd[1] = fminf(fmaxf(rs[0], 0.0f), 1.0f); rd[2] = fminf(fmaxf(1.0f - rs[1], 0.0f), 1.0f); rd[3] = fminf(fmaxf(rs[1], 0.0f), 1.0f)"
+    opcode: "110100000"
+    rt: "1000101"
+
+  # Reduction instructions, its destination is narrower
+  vavg:
+    type: vector-unary-reduce
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: arithmetic-reduction
+    title: "Calculate element average"
+    description: "Calculates the average value of the vector elements"
+    pcode:
+      - "rd[0] = (rs[0] + rs[1]) / 2"
+      - "rd[0] = (rs[0] + rs[1] + rs[2]) / 3"
+      - "rd[0] = (rs[0] + rs[1] + rs[2] + rs[3]) / 4"
+    opcode: "110100000"
+    rt: "1000111"
+    prefix: sd
+
+  vfad:
+    type: vector-unary-reduce
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: arithmetic-reduction
+    title: "Calculate element sum"
+    description: "Adds all vector elements toghether producing a single result"
+    pcode:
+      - "rd[0] = rs[0] + rs[1]"
+      - "rd[0] = rs[0] + rs[1] + rs[2]"
+      - "rd[0] = rs[0] + rs[1] + rs[2] + rs[3]"
+    opcode: "110100000"
+    rt: "1000110"
+    prefix: sd
+
+  # Comparison functions, a bit special
+  vcmp:
+    type: vfpu-compare
+    encoding: vfpu-alu-compare
+    flavors: sptq
+    perf-class: vfpu-compare
+    title: "Compare vector elements"
+    description: >
+      Performs an element wise comparison specified by the immediate and writes the result to VFPU_CC.
+      Aggregated `and` and `or` operations are also calculated for convenience.
+    pcode: "% vfpu_cc[{i}] = comparefn(cond, rs[{i}], rt[{i}])"
+    pepilogue:
+      - "vfpu_cc[4] = vfpu_cc[0]; vfpu_cc[5] = vfpu_cc[0]"
+      - "vfpu_cc[4] = vfpu_cc[0] | vfpu_cc[1]; vfpu_cc[5] = vfpu_cc[0] & vfpu_cc[1]"
+      - "vfpu_cc[4] = vfpu_cc[0] | vfpu_cc[1] | vfpu_cc[2]; vfpu_cc[5] = vfpu_cc[0] & vfpu_cc[1] & vfpu_cc[2]"
+      - "vfpu_cc[4] = vfpu_cc[0] | vfpu_cc[1] | vfpu_cc[2] | vfpu_cc[3]; vfpu_cc[5] = vfpu_cc[0] & vfpu_cc[1] & vfpu_cc[2] & vfpu_cc[3]"
+    auxcode:
+      - comparefn
+    opcode: "011011000"
+    prefix: st
+
+  # No-input instructions
+  vidt:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: pq
+    perf-class: bit-manipulation
+    title: "Identity matrix row/col initialize"
+    description: "Initializes destination register as an identity matrix row (all zeros but one). The behaviour depends on the destination register number."
+    opcode: "110100000"
+    rt: "0000011"
+    rs: "0000000"
+    prefix: d
+
+  vzero:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Clear vector to zero"
+    description: "Writes zeros (0.0f) into the destination register"
+    pcode: "@ rd[{i}] = 0"
+    opcode: "110100000"
+    rt: "0000110"
+    rs: "0000000"
+    prefix: d
+
+  vone:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Clear vector to one"
+    description: "Writes ones (1.0f) into the destination register"
+    pcode: "@ rd[{i}] = 1.0f"
+    opcode: "110100000"
+    rt: "0000111"
+    rs: "0000000"
+    prefix: d
+
+  vrnds:
+    type: vector-inullary
+    encoding: vfpu-alu
+    flavors: s
+    title: "Random seed"
+    description: "Uses the integer value as a seed for the pseudorandom number generator."
+    opcode: "110100000"
+    rt: "0100000"
+    rd: "0000000"
+
+  vrndi:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: random-draw
+    title: "Random integer"
+    description: "Writes pseudorandom 32 bit numbers to the destination elements (full 32bit range)"
+    opcode: "110100000"
+    rt: "0100001"
+    rs: "0000000"
+    prefix: d0
+
+  vrndf1:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: random-draw
+    title: "Random float in [1..2] range"
+    description: "Writes pseudorandom numbers to the destination elements so that each element (x) can assert 1.0f <= x < 2.0f"
+    opcode: "110100000"
+    rt: "0100010"
+    rs: "0000000"
+    prefix: d0
+
+  vrndf2:
+    type: vector-nullary
+    encoding: vfpu-alu
+    flavors: sptq
+    perf-class: random-draw
+    title: "Random float in [2..4] range"
+    description: "Writes pseudorandom numbers to the destination elements so that each element (x) can assert 2.0f <= x < 4.0f"
+    opcode: "110100000"
+    rt: "0100011"
+    rs: "0000000"
+    prefix: d0
+
+  # Matrix operations (between matrices)
+  # Binary matrix operations
+  vmmul:
+    type: matrix-binary
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-multiplication
+    title: "Matrix by matrix multiplication"
+    description: "Performs a matrix multiplication"
+    pcode:
+      - "@ rd[{i}] = rs[{c}*2] * rt[{r}*2] + rs[{c}*2+1] * rt[{r}*2+1]"
+      - "@ rd[{i}] = rs[{c}*3] * rt[{r}*3] + rs[{c}*3+1] * rt[{r}*3+1] + rs[{c}*3+2] * rt[{r}*3+2]"
+      - "@ rd[{i}] = rs[{c}*4] * rt[{r}*4] + rs[{c}*4+1] * rt[{r}*4+1] + rs[{c}*4+2] * rt[{r}*4+2] + rs[{c}*4+3] * rt[{r}*4+3]"
+    opcode: "111100000"
+    reg-compat: no-overlap
+
+  # matrix-vector-matrix instruction
+  vmscl:
+    type: matrix-binary-scale
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-scaling
+    title: "Matrix scale by single factor"
+    description: "Performs a matrix scaling by a single factor"
+    pcode: "@ rd[{i}] = rs[{i}] * rt[0]"
+    opcode: "111100100"
+    reg-compat: partial-overlap
+
+  # Unary operations
+  vmmov:
+    type: matrix-unary
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-init
+    title: "Copy matrix"
+    description: "Element-wise data copy"
+    pcode: "@ rd[{i}] = rs[{i}]"
+    opcode: "111100111"
+    rt: "0000000"
+    reg-compat: partial-overlap
+  
+  # No-input instructions
+  vmidt:
+    type: matrix-nullary
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-init
+    title: "Set matrix to identity"
+    description: "Writes the identity matrix into the destination register"
+    pcode: "@ rd[{i}] = {c} == {r} ? 1.0f : 0.0f"
+    opcode: "111100111"
+    rt: "0000011"
+    rs: "0000000"
+
+  vmzero:
+    type: matrix-nullary
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-init
+    title: "Clear matrix to zero"
+    description: "Writes a zero matrix into the destination register"
+    pcode: "@ rd[{i}] = 0"
+    opcode: "111100111"
+    rt: "0000110"
+    rs: "0000000"
+
+  vmone:
+    type: matrix-nullary
+    encoding: vfpu-alu
+    flavors: ptq
+    perf-class: matrix-init
+    title: "Clear matrix to one"
+    description: "Overwrites all elements in a matrix with ones (1.0f)"
+    pcode: "@ rd[{i}] = 1"
+    opcode: "111100111"
+    rt: "0000111"
+    rs: "0000000"
+
+  # Matrix-Vector transforms
+  vtfm2:
+    type: vector-matrix-transform
+    encoding: vfpu-alu
+    flavors: p
+    perf-class: transform
+    title: "Vector by matrix transform"
+    description: "Performs a vector-matrix transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[2*{i}] * rt[0] + rs[2*{i}+1] * rt[1]"
+    opcode: "111100001"
+    reg-compat: no-overlap
+
+  vtfm3:
+    type: vector-matrix-transform
+    encoding: vfpu-alu
+    flavors: t
+    perf-class: transform
+    title: "Vector by matrix transform"
+    description: "Performs a vector-matrix transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[3*{i}] * rt[0] + rs[3*{i}+1] * rt[1] + rs[3*{i}+2] * rt[2]"
+    opcode: "111100010"
+    reg-compat: no-overlap
+
+  vtfm4:
+    type: vector-matrix-transform
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: transform
+    title: "Vector by matrix transform"
+    description: "Performs a vector-matrix transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[4*{i}] * rt[0] + rs[4*{i}+1] * rt[1] + rs[4*{i}+2] * rt[2] + rs[4*{i}+3] * rt[3]"
+    opcode: "111100011"
+    reg-compat: no-overlap
+
+  # Homogeneous transforms encode their input size differently!
+  # That's cause rt is one element smaller than rd, rs
+  vhtfm2:
+    type: vector-matrix-transform
+    encoding: vfpu-alu-m1
+    flavors: p
+    perf-class: transform
+    title: "Vector by matrix homogeneous transform"
+    description: "Performs a vector-matrix homogeneous transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[2*{i}] * rt[0] + rs[2*{i}+1]"
+    opcode: "111100001"
+    reg-compat: no-overlap
+    bugs: >
+        Whenever the used output register rd is 64 or above the output is incorrect.
+        The result is rotated left by one position around the 4-element register (row or column).
+        Check vfpu-bugs.c for more information and examples.
+
+  vhtfm3:
+    type: vector-matrix-transform
+    encoding: vfpu-alu-m1
+    flavors: t
+    perf-class: transform
+    title: "Vector by matrix homogeneous transform"
+    description: "Performs a vector-matrix homogeneous transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[3*{i}] * rt[0] + rs[3*{i}+1] * rt[1] + rs[3*{i}+2]"
+    opcode: "111100010"
+    reg-compat: no-overlap
+    bugs: >
+        Whenever the used output register rd is 64 or above the output is incorrect.
+        The result is rotated left by two position around the 4-element register (row or column).
+        Check vfpu-bugs.c for more information and examples.
+
+  vhtfm4:
+    type: vector-matrix-transform
+    encoding: vfpu-alu-m1
+    flavors: q
+    perf-class: transform
+    title: "Vector by matrix homogeneous transform"
+    description: "Performs a vector-matrix homogeneous transform (matrix-vector product), with a vector result"
+    pcode: "@ rd[{i}] = rs[4*{i}] * rt[0] + rs[4*{i}+1] * rt[1] + rs[4*{i}+2] * rt[2] + rs[4*{i}+3]"
+    opcode: "111100011"
+    reg-compat: no-overlap
+
+  vcmovf:
+    type: vfpu-condmove
+    encoding: vfpu-condmove
+    flavors: stpq
+    perf-class: arithmetic
+    title: "Conditional move (false)"
+    description: >
+      Performs a register move operation (like vmov) conditional to a VFPU_CC bit being zero.
+      If cc_sel has the special value of 6, each vector lane will check its corresponding bit instead.
+      This can be used to conditionally move each of the elements based on, for instance, a vcmp operation.
+      A value of 7 in cc_sel is not specified.
+    pcode: >
+      @ rd[{i}] = (cc_sel == 6) ?
+                  (vfpu_cc[{i}]    ? rd[{i}] : rs[{i}]) :
+                  (vfpu_cc[cc_sel] ? rd[{i}] : rs[{i}])
+    opcode: "110100101010"
+    rcond: 1
+    prefix: s
+
+  vcmovt:
+    type: vfpu-condmove
+    encoding: vfpu-condmove
+    flavors: stpq
+    perf-class: arithmetic
+    title: "Conditional move (true)"
+    description: >
+      Performs a register move operation (like vmov) conditional to a VFPU_CC bit being one.
+      If imm3 has the special value of 6, each vector lane will check its corresponding bit instead.
+      This can be used to conditionally move each of the elements based on, for instance, a vcmp operation.
+      A value of 7 in imm3 is not specified.
+    pcode: >
+      @ rd[{i}] = (cc_sel == 6) ?
+                  (vfpu_cc[{i}]    ? rs[{i}] : rd[{i}]) :
+                  (vfpu_cc[cc_sel] ? rs[{i}] : rd[{i}])
+    opcode: "110100101010"
+    rcond: 0
+    prefix: s
+
+  # Packing instructions
+  vi2uc:
+    type: vector-unary-reduce
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: bit-manipulation
+    title: "Pack integer to unsigned char"
+    description: >
+      Converts the four integer inputs to char and packs them as a single element word.
+      The conversion process takes the 8 most significant bits of each integer and clamps
+      any negative input values to zero.
+    alu-mode: integer
+    pcode: >
+      rd[0] = (rs[0] & 0x80000000 ? 0 : ((rs[0] >> 23) <<  0)) |
+              (rs[1] & 0x80000000 ? 0 : ((rs[1] >> 23) <<  8)) |
+              (rs[2] & 0x80000000 ? 0 : ((rs[2] >> 23) << 16)) |
+              (rs[3] & 0x80000000 ? 0 : ((rs[3] >> 23) << 24))
+    opcode: "110100000"
+    rt: "0111100"
+    prefix: SD
+
+  vi2c:
+    type: vector-unary-reduce
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: bit-manipulation
+    title: "Pack integer to char"
+    description: >
+      Converts the four integer inputs to char and packs them as a single element word.
+      The conversion process takes the 8 most significant bits of each integer.
+    alu-mode: integer
+    pcode: >
+      rd[0] = ((rs[0] >> 24) <<  0) |
+              ((rs[1] >> 24) <<  8) |
+              ((rs[2] >> 24) << 16) |
+              ((rs[3] >> 24) << 24)
+    opcode: "110100000"
+    rt: "0111101"
+    prefix: SD
+
+  vi2us:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: pq
+    perf-class: bit-manipulation
+    title: "Pack integer to unsigned short"
+    description: >
+      Converts the integer inputs to short and packs them in pairs in the output register.
+      The conversion process takes the 16 most significant bits of each integer and clamps
+      any negative input values to zero.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = (rs[{i}*2+0] & 0x80000000 ? 0 : ((rs[{i}*2+0] >> 15) <<  0)) |
+                  (rs[{i}*2+1] & 0x80000000 ? 0 : ((rs[{i}*2+1] >> 15) << 16))
+    opcode: "110100000"
+    rt: "0111110"
+    prefix: SD
+
+  vi2s:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: pq
+    perf-class: bit-manipulation
+    title: "Pack integer to short"
+    description: >
+      Converts the integer inputs to short and packs them in pairs in the output register.
+      The conversion process takes the 16 most significant bits of each integer.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = ((rs[{i}*2+0] >> 16) <<  0) |
+                  ((rs[{i}*2+1] >> 16) << 16)
+    opcode: "110100000"
+    rt: "0111111"
+    prefix: SD
+
+  vf2h:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: pq
+    perf-class: arithmetic
+    title: "Pack float to float16"
+    description: >
+      Converts the float inputs to float16 (half-float) and packs them in pairs in the output register.
+      The conversion process may naturally result in precision loss.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = (ifloat32(rs[{i}*2+0]) <<  0) |
+                  (ifloat32(rs[{i}*2+1]) << 16)
+    opcode: "110100000"
+    rt: "0110010"
+    prefix: sD
+    notes:
+      - The conversion discards the most significant mantissa bits. This can affect NaN encoding.
+    auxcode:
+      - ifloat32
+
+  # Unpack instructions
+  vs2i:
+    type: vector-unary-expand2
+    encoding: vfpu-alu
+    flavors: sp
+    perf-class: bit-manipulation
+    title: "Unpack short to integer"
+    description: >
+      Converts the input packed shorts into full 32 bit integers in the output register.
+      The input is placed on the most significant bits of the output integer, while the
+      least significant bits are filled with zeros.
+    alu-mode: integer
+    pcode: "@ rd[{i}] = (rs[{i}/2] >> (16 * ({i} % 2))) << 16"
+    opcode: "110100000"
+    rt: "0111011"
+    prefix: D
+
+  vus2i:
+    type: vector-unary-expand2
+    encoding: vfpu-alu
+    flavors: sp
+    perf-class: bit-manipulation
+    title: "Unpack short to unsigned integer"
+    description: >
+      Converts the input packed shorts into full 32 bit integers in the output register.
+      The input is placed on the most significant bits of the output integer, while the
+      least significant bits are filled with zeros.
+    alu-mode: integer
+    pcode: "@ rd[{i}] = ((rs[{i}/2] >> (16 * ({i} % 2))) << 15) & 0x7FFFFFFF"
+    opcode: "110100000"
+    rt: "0111010"
+    prefix: D
+
+  vc2i:
+    type: vector-unary-expand4
+    encoding: vfpu-alu
+    flavors: s
+    perf-class: bit-manipulation
+    title: "Unpack char to integer"
+    description: >
+      Converts the input packed chars into full 32 bit integers in the output register.
+      The input is placed on the most significant bits of the output integer, while the
+      least significant bits are filled with zeros.
+    alu-mode: integer
+    pcode: "@ rd[{i}] = (rs[0] >> (8 * ({i} % 4))) << 24"
+    opcode: "110100000"
+    rt: "0111001"
+    prefix: D
+
+  vuc2ifs:
+    type: vector-unary-expand4
+    encoding: vfpu-alu
+    flavors: s
+    perf-class: bit-manipulation
+    title: "Unpack char to unsigned integer"
+    description: >
+      Converts the input packed chars into full 32 bit integers in the output register.
+      The input is placed on the most significant bits of the output integer, while the
+      least significant bits are filled with zeros  XXXXXs.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = (((rs[0] >> (8 * ({i} % 4))) & 0xFF) << 23) |
+                  (((rs[0] >> (8 * ({i} % 4))) & 0xFF) << 15) |
+                  (((rs[0] >> (8 * ({i} % 4))) & 0xFF) <<  7) |
+                  (((rs[0] >> (8 * ({i} % 4))) & 0xFF) >>  1)
+    opcode: "110100000"
+    rt: "0111000"
+    prefix: D
+
+  vh2f:
+    type: vector-unary-expand2
+    encoding: vfpu-alu
+    flavors: sp
+    perf-class: arithmetic
+    title: "Unpack float16 to float"
+    description: >
+      Converts the input packed float16 into full 32 bit floating point numbers.
+    alu-mode: integer
+    pcode: "@ rd[{i}] = ifloat16(rs[{i}/2] >> (16 * ({i} % 2)))"
+    opcode: "110100000"
+    rt: "0110011"
+    prefix: d
+    auxcode:
+      - ifloat16
+
+  # Color conversion/bitpacking
+  vt4444:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: bit-manipulation
+    title: "ABGR4444 color conversion"
+    description: >
+      Converts four ABGR8888 color points to ABGR4444. The output 16 bit values
+      are packed into a vector register pair.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = ((rs[{i}*2+0] >>  4) & 0x0000000F) |
+                  ((rs[{i}*2+0] >>  8) & 0x000000F0) |
+                  ((rs[{i}*2+0] >> 12) & 0x00000F00) |
+                  ((rs[{i}*2+0] >> 16) & 0x0000F000) |
+                  ((rs[{i}*2+1] << 12) & 0x000F0000) |
+                  ((rs[{i}*2+1] <<  8) & 0x00F00000) |
+                  ((rs[{i}*2+1] <<  4) & 0x0F000000) |
+                  ((rs[{i}*2+1] <<  0) & 0xF0000000)
+    opcode: "110100000"
+    rt: "1011001"
+    prefix: S
+
+  vt5551:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: bit-manipulation
+    title: "ABGR1555 color conversion"
+    description: >
+      Converts four ABGR8888 color points to ABGR1555. The output 16 bit values
+      are packed into a vector register pair.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = ((rs[{i}*2+0] >>  3) & 0x0000001F) |
+                  ((rs[{i}*2+0] >>  6) & 0x000003E0) |
+                  ((rs[{i}*2+0] >>  9) & 0x00007C00) |
+                  ((rs[{i}*2+0] >> 16) & 0x00008000) |
+                  ((rs[{i}*2+1] << 13) & 0x001F0000) |
+                  ((rs[{i}*2+1] << 10) & 0x03E00000) |
+                  ((rs[{i}*2+1] <<  7) & 0x7C000000) |
+                  ((rs[{i}*2+1] <<  0) & 0x80000000)
+    opcode: "110100000"
+    rt: "1011010"
+    prefix: S
+
+  vt5650:
+    type: vector-unary-reduce2
+    encoding: vfpu-alu
+    flavors: q
+    perf-class: bit-manipulation
+    title: "BGR565 color conversion"
+    description: >
+      Converts four ABGR8888 color points to BGR565. The output 16 bit values
+      are packed into a vector register pair.
+    alu-mode: integer
+    pcode: >
+      @ rd[{i}] = ((rs[{i}*2+0] >>  3) & 0x0000001F) |
+                  ((rs[{i}*2+0] >>  5) & 0x000007E0) |
+                  ((rs[{i}*2+0] >>  8) & 0x0000F800) |
+                  ((rs[{i}*2+1] << 13) & 0x001F0000) |
+                  ((rs[{i}*2+1] << 11) & 0x07E00000) |
+                  ((rs[{i}*2+1] <<  8) & 0xF8000000)
+    opcode: "110100000"
+    rt: "1011011"
+    prefix: S
+
+  # Immediate loading instructions
+  viim:
+    type: vector-nullary-uimm16
+    encoding: vector-imm16
+    flavors: s
+    perf-class: arithmetic
+    title: "Load constant integer value"
+    description: "Loads a signed 16 bit immediate value (converted to floating point) in a register"
+    pcode: "rd[0] = (float)(int16_t)(imval)"
+    opcode: "11011111"
+    itype: 0
+    prefix: d
+
+  vfim:
+    type: vector-nullary-uimm16
+    encoding: vector-imm16
+    flavors: s
+    perf-class: arithmetic
+    title: "Load constant float value"
+    description: "Loads a float16 immediate value in a register"
+    alu-mode: integer
+    pcode: "rd[0] = ifloat16(imval)"
+    opcode: "11011111"
+    itype: 1
+    prefix: d
+    auxcode:
+      - ifloat16
+
+  vcst:
+    type: vector-nullary-cst
+    encoding: vector-imm5
+    flavors: sptq
+    perf-class: bit-manipulation
+    title: "Load special constant"
+    description: "Loads a predefined indexed floating point constant specified by the immediate field"
+    pcode: "@ rd[{i}] = fpcst(imval)"
+    alu-mode: integer
+    opcode: "110100000"
+    opcode2: "11"
+    rs: "0000000"
+    prefix: d
+    auxcode:
+      - const-lut
+
+  # Special instructions
+  vnop:
+    type: vfpu-static
+    encoding: vfpu-fixedop
+    title: "Nop (no operation)"
+    description: "Does nothing and wastes one VFPU cycle. Used to avoid pipeline hazards. This instruction does consume prefixes."
+    opcode: "11111111111111110000000000000000"
+
+  vflush:
+    type: vfpu-static
+    encoding: vfpu-fixedop
+    title: "Write buffer flush"
+    description: "Waits until the write buffer has been flushed"
+    opcode: "11111111111111110000010000001101"
+
+  vsync:
+    type: vfpu-static
+    encoding: vfpu-fixedop
+    title: "Pipeline synchronize"
+    description: "Waits until all operations in the VFPU pipeline have completed"
+    opcode: "11111111111111110000001100100000"
+
+  # Prefix instructions
+  vpfxs:
+    type: vfpu-prefix
+    encoding: vfpu-prefix
+    perf-class: prefix
+    title: "Source prefix"
+    description: "Sets the prefix operation code in the VFPU_PFXS ($128) register"
+    notes:
+      - Overrides any previous state of the VFPU_PFXS register.
+      - Only the 20 lowest significant bits are set.
+    opcode: "110111"
+    ptype: "00"
+
+  vpfxt:
+    type: vfpu-prefix
+    encoding: vfpu-prefix
+    perf-class: prefix
+    title: "Target prefix"
+    description: "Sets the prefix operation code in the VFPU_PFXT ($129) register"
+    notes:
+      - Overrides any previous state of the VFPU_PFXT register.
+      - Only the 20 lowest significant bits are set.
+    opcode: "110111"
+    ptype: "01"
+
+  vpfxd:
+    type: vfpu-prefix
+    encoding: vfpu-prefix
+    perf-class: prefix
+    title: "Destination prefix"
+    description: "Sets the prefix operation code in the VFPU_PFXD ($130) register"
+    notes:
+      - Overrides any previous state of the VFPU_PFXD register.
+      - Only the 12 lowest significant bits are set.
+    opcode: "110111"
+    ptype: "10"
+
+
+# Performance figures, based on tests
+pref-classes:
+  vfpu-branch:
+    throughput: 1
+    latency: 4
+
+  vfpu-compare:
+    throughput: 1
+    latency: 8
+
+  bit-manipulation:
+    throughput: 1
+    latency: 3
+
+  arithmetic:
+    throughput: 1
+    latency: 5
+
+  arithmetic-reduction:
+    throughput: 1
+    latency: 7
+
+  transcendental:
+    throughput: N
+    latency: N+6
+
+  transform:
+    throughput: N
+    latency: N+6
+
+  random-draw:
+    throughput: 3*N
+    latency: 3*N + 2
+
+  matrix-init:
+    throughput: N
+    latency: N+2
+
+  matrix-multiplication:
+    throughput: N*N
+    latency: N*N + 6
+
+  matrix-scaling:
+    throughput: N
+    latency: N+4
+
+  rot-matrix:
+    throughput: 2
+    latency: 8
+
+  division:
+    throughput: 14*N
+    latency: 14*N + 3
+
+  prefix:
+    throughput: 1
+    latency: 1       # Used immediately by the next instruction
+
+# Functions used by different instructions
+functions:
+  ifloat16:
+    description: 16 bit float unpacking into full 32 bit float
+    code: >
+      uint32_t ifloat16(uint16_t fp16) {
+        // Format is S.EEEEE.MMMMMMMMMM
+        uint32_t exponent = (fp16 >> 10) & 0x1F;
+        uint32_t mantissa = (fp16 & 0x3FF);
+        uint32_t sign = (fp16 & 0x8000) << 16;
+
+        if (!exponent)
+          return sign;   // Denormals rounded to zero
+
+        if (exponent == 31) {   // NaN/Inf
+          exponent = 255;
+        }
+        else {
+          mantissa <<= 13;
+          exponent += 127 - 15;
+        }
+
+        // Direct conversion, no mantissa/exponent conversion
+        return sign | (exponent << 23) | mantissa;
+      }
+
+  ifloat32:
+    description: 16 bit float pack from full 32 bit float
+    code: >
+      uint16_t ifloat32(uint32_t fp32) {
+        uint16_t exponent = (fp32 >> 23) & 0xFF;
+        uint32_t mantissa = (fp32 & 0x7FFFFF);
+        uint16_t sign = (fp32 >> 16) & 0x8000;
+
+        if (!exponent)
+          return sign;   // Denormals rounded to zero
+
+        if (exponent == 255) {
+          // Inf/Nan case
+          // Note: there's a bug around NaN conversion,
+          // sometimes a NaN will be converted to Inf depending on the mantissa
+          // (ie. 0x7ffff000 is a NaN but will be converted to +Inf)
+          exponent = 31;
+          mantissa &= 0x3FF;
+        }
+        else if (exponent <= 112) {
+          // Too small to be represented (or zero or subnormal)
+          mantissa = 0;
+          exponent = 0;
+        }
+        else if (exponent >= 143) {
+          // Too big to be represented (map to inf)
+          mantissa = 0;
+          exponent = 31;
+        }
+        else {
+          // Convert with mantissa precision loss
+          exponent -= 127 - 15;
+          mantissa >>= 13;
+        }
+
+        return sign | (exponent << 10) | mantissa;
+      }
+
+  comparefn:
+    description: Compare function logic
+    code: >
+      unsigned comparefn(unsigned cond, float rs, float rt) {
+        switch (cond) {
+        case 0: return 0;
+        case 1: return rs == rt;
+        case 2: return rs < rt;
+        case 3: return rs <= rt;
+        case 4: return 1;
+        case 5: return rs != rt;
+        case 6: return rs >= rt;
+        case 7: return rs > rt;
+        case 8: return rs == 0;
+        case 9: return isnan(rs);
+        case 10: return isinf(rs);
+        case 11: return isinf(rs) || isnan(rs);
+        case 12: return rs != 0;
+        case 13: return !isnan(rs);
+        case 14: return !isinf(rs);
+        case 15: return !isnan(rs) && !isinf(rs);
+        };
+      }
+
+  ivrot:
+    description: Calculate rotation matrix element
+    code: >
+      float ivrot(unsigned elem, float arg, unsigned imm) {
+        unsigned cl = imm & 3;
+        unsigned sl = (imm >> 2) & 3;
+        float s = sin(arg * M_PI_2);
+        float c = cos(arg * M_PI_2);
+        if (imm & 0x10)
+          s = -s;
+
+        // Special case where all elements are sine but one
+        if (cl == sl)
+          return (elem == cl) ? c : s;
+
+        // Each bit pair indicates the position
+        return (elem == cl) ? c :
+               (elem == sl) ? s : 0.0f;
+      }
+
+  ivwbn:
+    description: Calculates vwbn modulus operation
+    code: >
+      uint32_t ivwbn(uint32_t arg, unsigned imm) {
+        uint32_t sbit = arg & 0x80000000;
+        uint32_t exp = (arg >> 23) & 0xff;
+        uint32_t m = (arg & 0x007FFFFF) | 0x800000;
+        if (!exp || exp == 0xff)
+          return arg | (imm << 23);
+
+        if (imm > exp) {
+          unsigned sh = (imm - exp) & 0xf;
+          m >>= sh;
+        } else {
+          unsigned sh = (exp - imm) & 0xf;
+          m <<= sh;
+        }
+        return sbit | (m & 0x7FFFFF) | (imm << 23);
+      }
+
+  const-lut:
+    description: Constant look up table for vcst instruction
+    code: >
+      uint32_t fpcst(uint8_t cnum) {
+        const uint32_t cntlist[] = {
+          0x7f7fffff,   // VFPU_HUGE  [3.40282346e+38] (max exp & mantissa)
+          0x3fb504f3,   // SQRT(2)    [1.41421353e+00]
+          0x3f3504f3,   // SQRT(1/2)  [7.07106769e-01]
+          0x3f906ebb,   // 2/SQRT(PI) [1.12837922e+00]
+          0x3f22f983,   // 2/PI       [6.36619746e-01]
+          0x3ea2f983,   // 1/PI       [3.18309873e-01]
+          0x3f490fdb,   // PI/4       [7.85398185e-01]
+          0x3fc90fdb,   // PI/2       [1.57079637e+00]
+          0x40490fdb,   // PI         [3.14159274e+00]
+          0x402df854,   // e          [2.71828174e+00]
+          0x3fb8aa3b,   // LOG2(e)    [1.44269502e+00]
+          0x3ede5bd9,   // LOG10(e)   [4.34294492e-01]
+          0x3f317218,   // LOGe(2)    [6.93147182e-01]
+          0x40135d8e,   // LOGe(10)   [2.30258512e+00]
+          0x40c90fdb,   // 2PI        [6.28318548e+00]
+          0x3f060a92,   // PI/6       [5.23598790e-01]
+          0x3e9a209b,   // LOG10(2)   [3.01030009e-01]
+          0x40549a78,   // LOG2(10)   [3.32192802e+00]
+          0x3f5db3d7,   // SQRT(3)/2  [8.66025388e-01]
+        };
+        return cntlist[cnum - 1];
+      }
+

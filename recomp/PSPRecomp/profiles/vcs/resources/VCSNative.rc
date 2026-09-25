@@ -1,0 +1,8 @@
+// Windows resource script for VCSNative.
+//
+// The lowest numeric icon id in an executable is the one Explorer, the task bar
+// and Alt-Tab pick up, so the application icon is deliberately id 1.
+
+#define VCSNATIVE_ICON 1
+
+VCSNATIVE_ICON ICON "vcsnative.ico"

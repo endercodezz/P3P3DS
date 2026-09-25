@@ -1,0 +1,12 @@
+{
+  "input": "/mnt/data/PSPRecomp_synthetic/tests/synthetic_psp.elf",
+  "sha256": "64a9e3648d890258a926d88ef411744be492a917d46c0cee632bc5c5b2685bb8",
+  "entry": "0x08804000",
+  "elf_type": 2,
+  "segments": [
+    {"type":1,"vaddr":"0x08804000","filesz":12,"memsz":12}
+  ],
+  "module": null,
+  "imports": [
+  ]
+}

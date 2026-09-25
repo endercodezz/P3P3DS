@@ -1,0 +1,445 @@
+// Super simplified ini file processor.
+// Doesn't even bother with understanding comments.
+// Just understands section headings and
+// keys and values, split by ' = '.
+
+use regex::Regex;
+
+#[derive(Debug, Clone)]
+pub struct Section {
+    pub name: String,
+    pub title_line: String,
+    pub lines: Vec<String>,
+}
+
+pub fn split_line(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim();
+    if let Some(pos) = line.find(" =") {
+        let value = &line[pos + 2..];
+        if value.is_empty() {
+            return None;
+        }
+        return Some((line[0..pos].trim(), value.trim()));
+    }
+    None
+}
+
+pub fn line_value(line: &str) -> Option<&str> {
+    split_line(line).map(|tuple| tuple.1)
+}
+
+/// The comment we put on a line that's deliberately identical to the English string, so we don't
+/// keep paying to have it "translated" over and over.
+pub const SAME_COMMENT: &str = "same as English";
+
+/// Splits the value part of a line into the value itself and its trailing comment, if any
+/// (without the '#').
+pub fn split_comment(value: &str) -> (&str, &str) {
+    match value.split_once('#') {
+        Some((value, comment)) => (value.trim(), comment.trim()),
+        None => (value.trim(), ""),
+    }
+}
+
+/// True if the comment marks the line as deliberately left as the English string. Lenient about
+/// what follows, so "# same", "# same as English" and "# same as English, checked by hrydgard"
+/// all count.
+pub fn marked_same(comment: &str) -> bool {
+    comment.to_ascii_lowercase().starts_with("same")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Section;
+
+    #[test]
+    fn remove_ampersands_removes_ampersands_from_values() {
+        let mut section = Section {
+            name: "Test".to_string(),
+            title_line: "[Test]".to_string(),
+            lines: vec!["Menu = &Open &Close # Example".to_string()],
+        };
+
+        section.remove_ampersands("Menu");
+
+        assert_eq!(section.lines[0], "Menu = Open Close # Example");
+    }
+}
+
+impl Section {
+    pub fn apply_regex(&mut self, key: &str, pattern: &str, replacement: &str) {
+        let re = Regex::new(pattern).unwrap();
+        for line in self.lines.iter_mut() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+            if prefix.eq(key) {
+                if let Some((_, value)) = split_line(line) {
+                    let new_value = re.replace_all(value, replacement);
+                    *line = format!("{} = {}", key, new_value);
+                }
+            }
+        }
+    }
+
+    pub fn remove_line(&mut self, key: &str) -> Option<String> {
+        let mut remove_index = None;
+        for (index, line) in self.lines.iter().enumerate() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+
+            if prefix.eq(key) {
+                remove_index = Some(index);
+                break;
+            }
+        }
+
+        if let Some(remove_index) = remove_index {
+            Some(self.lines.remove(remove_index))
+        } else {
+            None
+        }
+    }
+
+    pub fn remove_linebreaks(&mut self, key: &str) {
+        for line in self.lines.iter_mut() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+            if !prefix.trim().eq(key) {
+                continue;
+            }
+            // Escaped linebreaks.
+            *line = line.replace("\\n", " ");
+        }
+    }
+
+    pub fn remove_ampersands(&mut self, key: &str) {
+        for line in self.lines.iter_mut() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+            if !prefix.trim().eq(key) {
+                continue;
+            }
+            if let Some((_, value)) = split_line(line) {
+                let (value_without_comment, comment) = split_comment(value);
+                let cleaned_value = value_without_comment.replace('&', "").trim().to_string();
+                if comment.is_empty() {
+                    *line = format!("{} = {}", key, cleaned_value);
+                } else {
+                    *line = format!("{} = {} # {}", key, cleaned_value, comment);
+                }
+            }
+        }
+    }
+
+    pub fn get_line(&self, key: &str) -> Option<String> {
+        for line in self.lines.iter() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+
+            if prefix.eq(key) {
+                return Some(line.clone());
+            }
+        }
+        None
+    }
+
+    pub fn insert_line_if_missing(&mut self, line: &str) -> bool {
+        let prefix = if let Some(pos) = line.find(" =") {
+            &line[0..pos + 2]
+        } else {
+            return false;
+        };
+
+        // Ignore comments when copying lines.
+        if prefix.starts_with('#') {
+            return false;
+        }
+        // Need to decide a policy for these.
+        if prefix.starts_with("translators") {
+            return false;
+        }
+        let prefix = prefix.to_owned();
+
+        for iter_line in &self.lines {
+            if iter_line.starts_with(&prefix) {
+                // Already have it
+                return false;
+            }
+        }
+
+        // Now try to insert it at an alphabetic-ish location.
+        let prefix = prefix.to_ascii_lowercase();
+
+        // Then, find a suitable insertion spot
+        for (i, iter_line) in self.lines.iter().enumerate() {
+            if iter_line.to_ascii_lowercase() > prefix {
+                println!("{}: Inserting line {line}", self.name);
+                self.lines.insert(i, line.to_owned());
+                return true;
+            }
+        }
+
+        for i in (0..self.lines.len()).rev() {
+            if self.lines[i].is_empty() {
+                continue;
+            }
+            println!("{}: Inserting line {line}", self.name);
+            self.lines.insert(i + 1, line.to_owned());
+            return true;
+        }
+
+        println!("{}: failed to insert {line}", self.name);
+        true
+    }
+
+    pub fn rename_key(&mut self, old: &str, new: &str) {
+        let prefix = old.to_owned() + " =";
+        let mut found_index = None;
+        for (index, line) in self.lines.iter().enumerate() {
+            if line.starts_with(&prefix) {
+                found_index = Some(index);
+            }
+        }
+        if let Some(index) = found_index {
+            let line = self.lines.remove(index);
+            let mut right_part = line.strip_prefix(&prefix).unwrap().to_string();
+            if right_part.trim() == old.trim() {
+                // Was still untranslated - replace the translation too.
+                right_part = format!(" {new}");
+            }
+            let line = new.to_owned() + " =" + &right_part;
+            self.insert_line_if_missing(&line);
+        } else {
+            let name = &self.name;
+            println!("rename_key: didn't find a line starting with {prefix} in section {name}");
+        }
+    }
+
+    fn capitalize_first_letter(s: &str) -> String {
+        if let Some(first_char) = s.chars().next() {
+            if first_char.is_ascii_alphabetic() {
+                let mut c = first_char.to_ascii_uppercase().to_string();
+                c.push_str(&s[first_char.len_utf8()..]);
+                return c;
+            }
+        }
+        s.to_string()
+    }
+
+    // split_key should take a line like:
+    // KeyName (KeyDescription) = TranslatedKeyName (TranslatedKeyDescription)
+    //  and split it into:
+    // KeyName = TranslatedKeyName
+    // KeyDescription = TranslatedKeyDescription
+    // (Note: the first letter ONLY of description gets capitalized).
+    // Additional note, this must handle utf-8 unicode characters. Chinese characters for example
+    // can't be capitalized so we shouldn't do that to them. Also, parentheses around description shouldn't come
+    // along for the ride - get rid of them.
+    pub fn split_key(&mut self, key: &str) {
+        let prefix = key.to_owned() + " =";
+        let mut found_index = None;
+        for (index, line) in self.lines.iter().enumerate() {
+            if line.starts_with(&prefix) {
+                found_index = Some(index);
+            }
+        }
+        if let Some(index) = found_index {
+            let line = self.lines.remove(index);
+            let right_part = line.strip_prefix(&prefix).unwrap().to_string();
+            if let Some(pos) = key.find('(') {
+                let key_name = key[0..pos].trim();
+                let key_desc = key[pos + 1..key.len() - 1].trim();
+                if let Some(pos) = right_part.find('(') {
+                    let value_name = right_part[0..pos].trim();
+                    let value_desc = right_part[pos + 1..right_part.len() - 1].trim();
+                    self.insert_line_if_missing(&format!("{} = {}", key_name, value_name));
+                    self.insert_line_if_missing(&format!(
+                        "{} = {}",
+                        Self::capitalize_first_letter(key_desc),
+                        Self::capitalize_first_letter(value_desc)
+                    ));
+                } else {
+                    println!(
+                        "split_key: didn't find '(' in the value part {right_part} for key {key}. Leaving description untranslated."
+                    );
+                    self.insert_line_if_missing(&format!("{} = {}", key_name, right_part.trim()));
+                    self.insert_line_if_missing(&format!(
+                        "{} = {}",
+                        Self::capitalize_first_letter(key_desc),
+                        Self::capitalize_first_letter(key_desc)
+                    ));
+                }
+            } else {
+                println!("split_key: didn't find '(' in the key {key}");
+            }
+        } else {
+            let name = &self.name;
+            println!("split_key: didn't find a line starting with {prefix} in section {name}");
+        }
+    }
+
+    pub fn dupe_key(&mut self, old: &str, new: &str) {
+        let prefix = old.to_owned() + " =";
+        let mut found_index = None;
+        for (index, line) in self.lines.iter().enumerate() {
+            if line.starts_with(&prefix) {
+                found_index = Some(index);
+            }
+        }
+        if let Some(index) = found_index {
+            let line = self.lines.get(index).unwrap();
+            let mut right_part = line.strip_prefix(&prefix).unwrap().to_string();
+            if right_part.trim() == old.trim() {
+                // Was still untranslated - replace the translation too.
+                right_part = format!(" {new}");
+            }
+            let line = new.to_owned() + " =" + &right_part;
+            self.insert_line_if_missing(&line);
+        } else {
+            let name = &self.name;
+            println!("dupe_key: didn't find a line starting with {prefix} in section {name}");
+        }
+    }
+
+    pub fn sort(&mut self) {
+        self.lines.sort();
+    }
+
+    pub fn comment_out_lines_if_not_in(&mut self, other: &Section) {
+        // Brute force (O(n^2)). Bad but not a problem.
+
+        for line in &mut self.lines {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos + 2]
+            } else {
+                // Keep non-key lines.
+                continue;
+            };
+            if prefix.starts_with("Font") || prefix.starts_with('#') {
+                continue;
+            }
+            if !other.lines.iter().any(|line| line.starts_with(prefix)) && !prefix.contains("URL") {
+                println!("Commenting out from {}: {line}", other.name);
+                // Comment out the line.
+                *line = "#".to_owned() + line;
+            }
+        }
+    }
+
+    pub fn remove_lines_if_not_in(&mut self, other: &Section) {
+        // Brute force (O(n^2)). Bad but not a problem.
+
+        self.lines.retain(|line| {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos + 2]
+            } else {
+                // Keep non-key lines.
+                return true;
+            };
+            if prefix.starts_with("Font") || prefix.starts_with('#') {
+                return true;
+            }
+
+            // keeps the line if this expression returns true.
+            other.lines.iter().any(|line| line.starts_with(prefix))
+        });
+    }
+
+    pub fn get_lines_not_in(&self, other: &Section) -> Vec<String> {
+        let mut missing_lines = Vec::new();
+        // Brute force (O(n^2)). Bad but not a problem.
+        for line in &self.lines {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos + 2]
+            } else {
+                // Keep non-key lines.
+                continue;
+            };
+            if prefix.starts_with("Font") || prefix.starts_with('#') {
+                continue;
+            }
+
+            // keeps the line if this expression returns true.
+            if !other.lines.iter().any(|line| line.starts_with(prefix)) {
+                missing_lines.push(line.clone());
+            }
+        }
+        missing_lines
+    }
+
+    pub fn get_keys_if_not_in(&mut self, other: &Section) -> Vec<String> {
+        let mut missing_lines = Vec::new();
+        // Brute force (O(n^2)). Bad but not a problem.
+        for line in &self.lines {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos + 2]
+            } else {
+                // Keep non-key lines.
+                continue;
+            };
+            if prefix.starts_with("Font") || prefix.starts_with('#') {
+                continue;
+            }
+
+            // keeps the line if this expression returns true.
+            if !other.lines.iter().any(|line| line.starts_with(prefix)) {
+                missing_lines.push(prefix[0..prefix.len() - 2].trim().to_string());
+            }
+        }
+        missing_lines
+    }
+
+    // Returns true if the key was found and updated.
+    pub fn set_value(&mut self, key: &str, value: &str, comment: Option<&str>) -> bool {
+        let mut found_index = None;
+        for (index, line) in self.lines.iter().enumerate() {
+            let prefix = if let Some(pos) = line.find(" =") {
+                &line[0..pos]
+            } else {
+                continue;
+            };
+
+            if prefix.eq(key) {
+                found_index = Some(index);
+                break;
+            }
+        }
+
+        if let Some(found_index) = found_index {
+            self.lines[found_index] = match comment {
+                Some(c) => format!("{} = {}  # {}", key, value, c),
+                None => format!("{} = {}", key, value),
+            };
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_value(&self, key: &str) -> Option<String> {
+        for line in &self.lines {
+            if let Some((ref_key, value)) = split_line(line) {
+                if key.eq(ref_key) {
+                    // Found it! The value might have a comment, that's not part of the value.
+                    return Some(split_comment(value).0.to_string());
+                }
+            }
+        }
+        None
+    }
+}

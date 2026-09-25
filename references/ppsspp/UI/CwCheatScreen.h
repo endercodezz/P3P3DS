@@ -1,0 +1,88 @@
+// Copyright (c) 2013- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <cstdint>
+#include <functional>
+
+#include "Common/UI/View.h"
+#include "Common/UI/UIScreen.h"
+#include "Common/UI/Context.h"
+#include "UI/BaseScreens.h"
+#include "UI/SimpleDialogScreen.h"
+#include "UI/MiscViews.h"
+#include "Common/Net/HTTPClient.h"
+
+struct CheatFileInfo;
+class CWCheatEngine;
+class NoticeView;
+
+class CwCheatScreen : public UITwoPaneBaseDialogScreen {
+public:
+	CwCheatScreen(const Path &gamePath);
+	~CwCheatScreen();
+
+	bool TryLoadCheatInfo();
+
+	void OnAddCheat(UI::EventParams &params);
+	void OnImportCheat(UI::EventParams &params);
+	void OnImportBrowse(UI::EventParams &params);
+	void OnEditCheatFile(UI::EventParams &params);
+	void OnDisableAll(UI::EventParams &params);
+
+	void update() override;
+	bool key(const KeyInput &input) override;
+	void onFinish(DialogResult result) override;
+
+	const char *tag() const override { return "CwCheat"; }
+
+	bool WantsTextInput() const override;
+
+protected:
+	void BeforeCreateViews() override;
+	void CreateSettingsViews(UI::ViewGroup *) override;
+	void CreateContentViews(UI::ViewGroup *) override;
+	std::string_view GetTitle() const override;
+
+	void dialogFinished(const Screen *dialog, DialogResult result) override;
+
+private:
+	void OnCheckBox(int index);
+	bool ImportCheats(const Path &cheatFile, int *cheatsFound);
+
+	void ImportAndReport(const Path &cheatFile);
+
+	enum { INDEX_ALL = -1 };
+	bool HasCheatWithName(const std::string &name);
+	bool RebuildCheatFile(int index);
+
+	CWCheatEngine *engine_ = nullptr;
+	std::vector<CheatFileInfo> fileInfo_;
+	std::string gameID_;
+	int fileCheckCounter_ = 0;
+	uint64_t fileCheckHash_ = 0;
+
+	std::string errorMessage_;
+	NoticeLevel errorLevel_ = NoticeLevel::ERROR;
+	std::string errorDetails_;
+
+	UI::ViewGroup *cheatList_ = nullptr;
+	ViewSearch search_;
+
+	std::shared_ptr<http::Request> downloadRequest_;
+};

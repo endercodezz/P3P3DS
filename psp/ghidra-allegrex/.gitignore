@@ -1,0 +1,51 @@
+*.sla
+*.zip
+.kotlin/
+
+## Java
+
+*.class
+*.war
+*.ear
+hs_err_pid*
+
+## IntelliJ IDEA
+
+.idea/
+*.ipr
+*.iws
+*.iml
+out/
+
+## Eclipse
+
+.metadata
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.pydevproject
+.project
+.classpath
+.externalToolBuilders/
+*.launch
+
+## NetBeans
+
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+## Gradle
+
+.gradle
+build/
+/target
+lib/

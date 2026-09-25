@@ -1,0 +1,84 @@
+name: Test report
+description: Report how far the smoke test got on your platform.
+title: "Test report: <platform>, <commit>"
+labels: ["test report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing. Run through [the smoke test](https://github.com/TeamGDB/Yakumo/blob/main/docs/TESTING.md) and fill this in. Please do not attach or link any part of the game, including screenshots of copyrighted assets beyond what is needed to show a problem.
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The output of `git rev-parse --short HEAD`. A report without it cannot be compared with anything.
+      placeholder: 2934418
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86-64)
+        - Linux (ARM64)
+        - Steam Deck
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Operating system and version, CPU and memory.
+      placeholder: SteamOS 3.7, AMD Zen 2 APU, 16 GB
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: AMD Custom GPU 0405, RADV Mesa 25.1
+    validations:
+      required: true
+  - type: input
+    id: input
+    attributes:
+      label: Controller
+      description: Keyboard, or the gamepad you used.
+      placeholder: DualSense over Bluetooth
+  - type: checkboxes
+    id: steps
+    attributes:
+      label: Steps that worked
+      description: Tick each smoke-test step that behaved as expected.
+      options:
+        - label: 1. Start the game
+        - label: 2. Logos and title screen
+        - label: 3. New game
+        - label: 4. Character creation
+        - label: 5. Name and confirm
+        - label: 6. Hot spring scene
+        - label: 7. Into the village
+        - label: 8. Walk around the village
+        - label: 9. Take a quest and depart
+        - label: 10. Hunt a small monster
+        - label: 11. Stand still with no input
+        - label: 12. Camera on the right stick
+        - label: 13. Return to the village
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened
+      description: Where it went wrong, what you saw and what you expected. Include any `[interpreter] no recompiled function at …` addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Console output
+      description: The last lines of the console, especially if the game stopped.
+      render: shell

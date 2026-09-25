@@ -1,0 +1,52 @@
+# Build output
+/out/
+/build/
+CMakeUserPresets.json
+
+# Build directories created outside /out/ (per-stage trees use names like b457_perf)
+b*_perf/
+cmake-build-*/
+
+# Binary build artifacts, wherever they land
+*.exe
+*.dll
+*.lib
+*.obj
+*.exp
+*.iobj
+*.ipdb
+*.res
+*.tlog
+
+# Copyrighted game data.  Never publish: the PSP executable, its decrypted ELF
+# and save data are the user's own dumped media, not part of this source tree.
+PSP_DATA/
+SAVEDATA/
+*.ELF
+*.elf
+*.iso
+*.cso
+
+# User-owned game data and reverse-engineering workspace
+/profiles/*/game/
+/profiles/*/analysis/
+/profiles/*/progress/
+/profiles/*/captures/
+
+# Generated scratch output (the checked-in profile corpus is not ignored)
+*.generated
+*.tmp
+*.log
+*.pdb
+*.ilk
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc

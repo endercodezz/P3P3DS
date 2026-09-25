@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.0.4" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.0.4" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AtlusScriptLibrary\AtlusScriptLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="TestResources/*.*" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="TestResources\Complex.BF" />
+    <None Remove="TestResources\JumpInstruction2.bf" />
+    <None Remove="TestResources\POPREG.bf" />
+    <None Remove="TestResources\Version2BigEndian.bmd" />
+    <None Remove="TestResources\Version2BigEndianAlt.bmd" />
+    <None Remove="TestResources\Version3BigEndian.bm2" />
+  </ItemGroup>
+
+</Project>

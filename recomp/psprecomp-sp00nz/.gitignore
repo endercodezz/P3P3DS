@@ -1,0 +1,59 @@
+# Build output
+build/
+out/
+*.obj
+*.o
+*.a
+*.lib
+*.exe
+*.pdb
+*.ilk
+
+# Game data is never committed — bring your own UMD/PSN dump
+roms/
+*.iso
+*.cso
+*.chd
+*.dax
+*.pbp
+*.PBP
+*.prx
+*.PRX
+*.self
+*.SELF
+EBOOT.BIN
+BOOT.BIN
+DATA.PSP
+DATA.PSAR
+*.pkb
+*.pkh
+*.pmf
+*.sgb
+!tests/*.bin
+
+# PSP crypto keys are not distributed here — supply your own
+keys/
+*.keys
+
+# IDA / Ghidra databases
+*.i64
+*.idb
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+ghidra_projects/
+
+# Editor / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Artifacts
+*.ppm
+*.bmp
+*.wav
+*.log

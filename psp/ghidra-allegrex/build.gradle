@@ -1,0 +1,131 @@
+// Builds a Ghidra Extension for a given Ghidra installation.
+//
+// An absolute path to the Ghidra installation directory must be supplied either by setting the
+// GHIDRA_INSTALL_DIR environment variable or Gradle project property:
+//
+//     > export GHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//     > gradle
+//
+//         or
+//
+//     > gradle -PGHIDRA_INSTALL_DIR=<Absolute path to Ghidra>
+//
+// Gradle should be invoked from the directory of the project to build.  Please see the
+// application.gradle.version property in <GHIDRA_INSTALL_DIR>/Ghidra/application.properties
+// for the correction version of Gradle to use for the Ghidra installation you specify.
+
+//----------------------START "DO NOT MODIFY" SECTION------------------------------
+def ghidraInstallDir
+
+if (System.env.GHIDRA_INSTALL_DIR) {
+  ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
+} else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
+  ghidraInstallDir = project.getProperty("GHIDRA_INSTALL_DIR")
+}
+
+if (ghidraInstallDir) {
+  apply from: new File(ghidraInstallDir).getCanonicalPath() + "/support/buildExtension.gradle"
+} else {
+  throw new GradleException("GHIDRA_INSTALL_DIR is not defined!")
+}
+//----------------------END "DO NOT MODIFY" SECTION-------------------------------
+
+buildscript {
+  ext.kotlinVersion = '2.0.21'
+  ext.testLog4j2Version = '2.24.1'
+  repositories {
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+  }
+}
+
+repositories {
+  mavenCentral()
+}
+
+apply plugin: 'java'
+apply plugin: 'kotlin'
+
+dependencies {
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+  testImplementation "org.apache.logging.log4j:log4j-api:$testLog4j2Version"
+  testImplementation "org.apache.logging.log4j:log4j-core:$testLog4j2Version"
+}
+
+kotlin {
+  jvmToolchain(21)
+}
+
+def ghidraUserDir
+
+if (System.env.GHIDRA_USER_DIR) {
+  ghidraUserDir = System.env.GHIDRA_USER_DIR
+} else if (project.hasProperty("GHIDRA_USER_DIR")) {
+  ghidraUserDir = project.getProperty("GHIDRA_USER_DIR")
+}
+
+task checkCanGhidraInstall {
+  dependsOn 'buildExtension'
+  doFirst {
+    if (!ghidraUserDir) {
+      throw new GradleException("GHIDRA_USER_DIR is not defined!")
+    }
+  }
+}
+
+task ghidraInstall(type: Copy) {
+  dependsOn 'checkCanGhidraInstall'
+  from {
+    zipTree(new File("$projectDir/dist/").listFiles().sort { it.lastModified() }.last())
+  }
+  into ghidraUserDir + '/Extensions'
+}
+
+task ghidraInstallThenRun {
+  dependsOn 'ghidraInstall'
+  doLast {
+    exec {
+      if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        commandLine 'cmd', '/c', 'ghidraRun.bat'
+      } else {
+        commandLine './ghidraRun'
+      }
+      workingDir ghidraInstallDir
+      ignoreExitValue true
+    }
+  }
+}
+
+task ghidraInstallThenDebug {
+  dependsOn 'ghidraInstall'
+  doLast {
+    exec {
+      if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        commandLine 'cmd', '/c', 'support\\ghidraDebug.bat'
+      } else {
+        commandLine './support/ghidraDebug'
+      }
+      workingDir ghidraInstallDir
+      ignoreExitValue true
+    }
+  }
+}
+
+task ghidraCompileSleigh {
+  doLast {
+    exec {
+      if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        commandLine 'cmd', '/c', 'support\\sleigh.bat', '-a', "$projectDir\\data\\languages"
+      } else {
+        commandLine './support/sleigh', '-a', "$projectDir/data/languages"
+      }
+      workingDir ghidraInstallDir
+      ignoreExitValue false
+    }
+  }
+}
+
+buildExtension.dependsOn ghidraCompileSleigh

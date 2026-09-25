@@ -1,0 +1,10 @@
+debug
+release
+deps
+build
+lib
+docs
+internal_docs
+*.bz2
+.*/
+*.tag

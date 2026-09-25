@@ -1,0 +1,50 @@
+# psprecomp key file — EXAMPLE / TEMPLATE
+#
+# Copy to keys/psp_keys.txt and fill in the values. That path is gitignored.
+#
+# NO KEY MATERIAL IS DISTRIBUTED WITH THIS TOOLKIT. Every value below is a
+# placeholder. The PSP's decryption constants have been public since the
+# console's active life -- they are published facts, in the same sense that the
+# Lynx boot ROM's RSA modulus is a published public key -- but they are not
+# this project's to redistribute, so you supply them yourself. This is the same
+# arrangement lynxrecomp has with the Lynx boot ROM.
+#
+# Format: one `name = hex` per line. Whitespace, ':' and ',' inside a hex value
+# are ignored, so long keys can be grouped for readability. '#' starts a
+# comment. Unknown names are loaded and simply never asked for, so extra
+# entries are harmless.
+
+# ---------------------------------------------------------------------------
+# KIRK command 1 header key (16 bytes)
+#
+# The AES-128 key that unwraps a CMD1 header's first 0x20 bytes, yielding the
+# body key and the CMAC key. This is the only key needed by `allegrexrecomp
+# kirk1`, and it is the one whose correctness is self-evident: if it is right,
+# the header CMAC verifies; if it is wrong, it does not. There is no ambiguity
+# and no judgement call.
+# ---------------------------------------------------------------------------
+
+kirk1 = 00000000000000000000000000000000
+
+# ---------------------------------------------------------------------------
+# Per-tag PRX keys
+#
+# A ~PSP module carries a 32-bit tag at header offset 0xD0 selecting a key set.
+# Name each entry `prx.<TAG>` with the tag in uppercase hex.
+#
+# Note 0xD0, not 0x130. Offset 0x130 falls inside the encrypted key material
+# and yields a different plausible-looking value for every module -- see the
+# correction in docs/DECRYPT.md.
+#
+# The tags observed on WTF: Work Time Fun (ULUS10172), as concrete examples:
+#
+#   prx.C0CB167C   EBOOT.BIN, module "hell2k"   decrypt mode 9
+#   prx.09000000   all five game-sharing microgames, decrypt mode 10
+#
+# These are commented out because the tag -> CMD1 transform that consumes them
+# is not implemented yet (see docs/DECRYPT.md, phase 2b). Uncomment and fill
+# them when it is.
+# ---------------------------------------------------------------------------
+
+# prx.C0CB167C = ...
+# prx.09000000 = ...

@@ -1,0 +1,827 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx</Extensions>
+    </Filter>
+    <Filter Include="Windows">
+      <UniqueIdentifier>{62201f4b-45e8-4ee7-a26e-bebdd67a7bca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\Debugger">
+      <UniqueIdentifier>{15b28fe0-299c-4200-a8f9-c93ffd3ae85b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\W32Util">
+      <UniqueIdentifier>{c1ddb9f6-d854-4af9-bb56-c42697f62709}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\UI">
+      <UniqueIdentifier>{6773bb6d-149e-4e08-af81-e9eaacc039d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\System">
+      <UniqueIdentifier>{45e2a327-0a36-4292-ab24-a297639b797e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\Input">
+      <UniqueIdentifier>{a1963305-bf88-43ef-8ba2-bb3933584b38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms">
+      <UniqueIdentifier>{d53d0871-8572-4393-822e-d14db0a88dab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\GE Debugger">
+      <UniqueIdentifier>{15f0e146-e39c-4bad-ba10-3c714a7dbf74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\SDL">
+      <UniqueIdentifier>{5bfed059-8636-4b1e-a3cf-f948d645babb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\iOS">
+      <UniqueIdentifier>{950b34a4-d66c-4e7a-aada-e364887cb614}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\Android">
+      <UniqueIdentifier>{edf0716f-a255-4061-ad58-702e4b51b0ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\libretro">
+      <UniqueIdentifier>{30a32908-a72f-4728-a721-1f44e700bcea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Build">
+      <UniqueIdentifier>{68db42ae-cf1b-42cd-b17a-c3e99211a7d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\UWP">
+      <UniqueIdentifier>{21c262bc-bc21-49d7-a332-2e2614e89217}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Build\Actions">
+      <UniqueIdentifier>{14abd855-ec8b-47a5-8b4c-eadcff122dc8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\iOS\iCade">
+      <UniqueIdentifier>{ce617e38-1bc8-4eab-a3cb-d3d664116c91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Build\CMake">
+      <UniqueIdentifier>{8f39c005-9738-41c5-a8d8-cfc05bf178e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\Darkmode">
+      <UniqueIdentifier>{e6f1a7f6-807b-484e-9595-bdb58ecaa2ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Other Platforms\Mac">
+      <UniqueIdentifier>{e2dd8951-ccb6-4575-996a-69c6832fafbf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Windows\Input\Hid">
+      <UniqueIdentifier>{55d277d0-1afa-464d-9bde-672334ad73fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{a5b85611-e50f-4179-814d-426816c1e04d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Debugger\CtrlDisAsmView.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\CtrlMemView.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\CtrlRegisterList.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Debugger_MemoryDlg.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Debugger_VFPUDlg.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\DialogManager.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\Misc.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\ShellUtil.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="InputBox.cpp">
+      <Filter>Windows\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Debugger_Disasm.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="XinputDevice.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="InputDevice.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="..\android\jni\ArmEmitterTest.cpp">
+      <Filter>Other Platforms</Filter>
+    </ClCompile>
+    <ClCompile Include="..\android\jni\Arm64EmitterTest.cpp">
+      <Filter>Other Platforms</Filter>
+    </ClCompile>
+    <ClCompile Include="DinputDevice.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\DebuggerShared.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\BreakpointWindow.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Debugger_Lists.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\GEDebugger.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\SimpleGLWindow.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\CtrlDisplayListView.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\TabControl.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\TabDisplayLists.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\TabState.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\DumpMemoryWindow.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\VertexPreview.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="RawInput.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="TouchInputHandler.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="GEDebugger\TabVertices.cpp">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\glew\glew.c" />
+    <ClCompile Include="MainWindowMenu.cpp">
+      <Filter>Windows\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="MainWindow.cpp">
+      <Filter>Windows\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\WindowsGLContext.cpp">
+      <Filter>Windows\System</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU\D3D11Context.cpp">
+      <Filter>Windows\System</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowsAudio.cpp">
+      <Filter>Windows\System</Filter>
+    </ClCompile>
+    <ClCompile Include="WASAPIContext.cpp">
+      <Filter>Windows\System</Filter>
+    </ClCompile>
+    <ClCompile Include="CaptureDevice.cpp">
+      <Filter>Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\android\jni\app-android.cpp">
+      <Filter>Other Platforms\Android</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ios\SmartKeyboardMap.cpp">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroGraphicsContext.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroVulkanContext.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\libretro.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroVulkanPresentation.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroD3D11Context.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroGLContext.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SDL\SDLGLGraphicsContext.cpp">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SDL\SDLJoystick.cpp">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SDL\SDLMain.cpp">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UWP\NKCodeFromWindowsSystem.cpp">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UWP\PPSSPP_UWPMain.cpp">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UWP\App.cpp">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UWP\XAudioSoundStream.cpp">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UWP\pch.cpp">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\android\jni\AndroidAudio.cpp">
+      <Filter>Other Platforms\Android</Filter>
+    </ClCompile>
+    <ClCompile Include="..\android\jni\OpenSLContext.cpp">
+      <Filter>Other Platforms\Android</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\ContextMenu.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libretro\LibretroGLCoreContext.cpp">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\DarkMode.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="W32Util\UAHMenuBar.cpp">
+      <Filter>Windows\W32Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WatchItemWindow.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\EditSymbolsWindow.cpp">
+      <Filter>Windows\Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="HID\DualShock.cpp">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClCompile>
+    <ClCompile Include="HID\SwitchPro.cpp">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClCompile>
+    <ClCompile Include="HID\DualSense.cpp">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClCompile>
+    <ClCompile Include="Hid\HidInputDevice.cpp">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClCompile>
+    <ClCompile Include="Hid\HidCommon.cpp">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Debugger\CtrlDisAsmView.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\CtrlMemView.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\CtrlRegisterList.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\Debugger_MemoryDlg.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\Debugger_VFPUDlg.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\DialogManager.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\Misc.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\ShellUtil.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="InputBox.h">
+      <Filter>Windows\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="Debugger\Debugger_Disasm.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="InputDevice.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="XinputDevice.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="..\android\jni\ArmEmitterTest.h">
+      <Filter>Other Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="..\android\jni\Arm64EmitterTest.h">
+      <Filter>Other Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="DinputDevice.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\DebuggerShared.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\BreakpointWindow.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\Debugger_Lists.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\GEDebugger.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\SimpleGLWindow.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\CtrlDisplayListView.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\TabControl.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\TabDisplayLists.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\TabState.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\DumpMemoryWindow.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="RawInput.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="TouchInputHandler.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="GEDebugger\TabVertices.h">
+      <Filter>Windows\GE Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="MainWindowMenu.h">
+      <Filter>Windows\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="MainWindow.h">
+      <Filter>Windows\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\WindowsGLContext.h">
+      <Filter>Windows\System</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU\D3D11Context.h">
+      <Filter>Windows\System</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowsAudio.h">
+      <Filter>Windows\System</Filter>
+    </ClInclude>
+    <ClInclude Include="WASAPIContext.h">
+      <Filter>Windows\System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ppsspp_config.h" />
+    <ClInclude Include="CaptureDevice.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="BufferLock.h">
+      <Filter>Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\android\jni\app-android.h">
+      <Filter>Other Platforms\Android</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\ViewController.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\PPSSPPUIApplication.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\AppDelegate.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\AudioEngine.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\CameraHelper.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\LocationHelper.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\iOSCoreAudio.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\SmartKeyboardMap.hpp">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\SubtleVolume.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroGLContext.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroGraphicsContext.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroVulkanContext.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroVulkanPresentation.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\libretro.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\libretro_d3d.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\libretro_vulkan.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroD3D11Context.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SDL\NKCodeFromSDL.h">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SDL\SDLCocoaMetalLayer.h">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SDL\SDLGLGraphicsContext.h">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SDL\SDLJoystick.h">
+      <Filter>Other Platforms\SDL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\NKCodeFromWindowsSystem.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\PPSSPP_UWPMain.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\App.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\UWPUtil.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\XAudioSoundStream.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UWP\pch.h">
+      <Filter>Other Platforms\UWP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\android\jni\AndroidAudio.h">
+      <Filter>Other Platforms\Android</Filter>
+    </ClInclude>
+    <ClInclude Include="..\android\jni\OpenSLContext.h">
+      <Filter>Other Platforms\Android</Filter>
+    </ClInclude>
+    <ClInclude Include="..\android\jni\AndroidContentURI.h">
+      <Filter>Other Platforms\Android</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\ContextMenu.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\libretro_core_options.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\libretro_core_options_intl.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\LibretroGLCoreContext.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libretro\retro_inline.h">
+      <Filter>Other Platforms\libretro</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\iCade\iCadeState.h">
+      <Filter>Other Platforms\iOS\iCade</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\iCade\iCadeReaderView.h">
+      <Filter>Other Platforms\iOS\iCade</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\DarkMode.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\IatHook.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="W32Util\UAHMenuBar.h">
+      <Filter>Windows\W32Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WatchItemWindow.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\EditSymbolsWindow.h">
+      <Filter>Windows\Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SDL\CocoaBarItems.h">
+      <Filter>Other Platforms\Mac</Filter>
+    </ClInclude>
+    <ClInclude Include="..\UI\PSPNSApplicationDelegate.h">
+      <Filter>Other Platforms\Mac</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Core\Util\DarwinFileSystemServices.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\ViewControllerCommon.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ios\ViewControllerMetal.h">
+      <Filter>Other Platforms\iOS</Filter>
+    </ClInclude>
+    <ClInclude Include="HID\DualShock.h">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClInclude>
+    <ClInclude Include="HID\SwitchPro.h">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClInclude>
+    <ClInclude Include="HID\DualSense.h">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClInclude>
+    <ClInclude Include="Hid\HidInputDevice.h">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClInclude>
+    <ClInclude Include="Hid\HidCommon.h">
+      <Filter>Windows\Input\Hid</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="icon1.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="stop1.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="ppsspp.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\README.md" />
+    <None Include="..\assets\knownfuncs.ini">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="PPSSPP.manifest">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\assets\langregion.ini">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\assets\compat.ini">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\android\jni\Android.mk">
+      <Filter>Other Platforms\Android</Filter>
+    </None>
+    <None Include="..\CMakeLists.txt">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\appveyor.yml">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\atlasscript.txt">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\b.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\build_fontatlas.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\build_ppgeatlas.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\buildatlas.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\build.gradle">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\copyrelease.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\git-version.cmake">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\history.md" />
+    <None Include="..\ppsspp.iss">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\settings.gradle">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\android\jni\Application.mk">
+      <Filter>Other Platforms\Android</Filter>
+    </None>
+    <None Include="..\ios\AudioEngine.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\android\jni\Locals.mk">
+      <Filter>Other Platforms\Android</Filter>
+    </None>
+    <None Include="..\ios\main.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\ViewController.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\android\git-version-gen.sh">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\ios\PPSSPPUIApplication.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\AppDelegate.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\LocationHelper.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\CameraHelper.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\iOSCoreAudio.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\PPSSPP-Info.plist">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\SubtleVolume.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\libretro\Makefile">
+      <Filter>Other Platforms\libretro</Filter>
+    </None>
+    <None Include="..\libretro\Makefile.common">
+      <Filter>Other Platforms\libretro</Filter>
+    </None>
+    <None Include="..\libretro\jni\Android.mk">
+      <Filter>Other Platforms\libretro</Filter>
+    </None>
+    <None Include="..\libretro\jni\Application.mk">
+      <Filter>Other Platforms\libretro</Filter>
+    </None>
+    <None Include="..\SDL\macbundle.sh">
+      <Filter>Other Platforms\SDL</Filter>
+    </None>
+    <None Include="..\SDL\SDLCocoaMetalLayer.mm">
+      <Filter>Other Platforms\SDL</Filter>
+    </None>
+    <None Include="..\assets\compatvr.ini">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="git-version-gen.cmd">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="zipup.cmd">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="build-x64.cmd">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="build-x86.cmd">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\Dockerfile">
+      <Filter>Build</Filter>
+    </None>
+    <None Include="..\gradle.properties">
+      <Filter>Other Platforms\Android</Filter>
+    </None>
+    <None Include="..\.github\workflows\build.yml">
+      <Filter>Build\Actions</Filter>
+    </None>
+    <None Include="..\.github\workflows\manual_generate_apk.yml">
+      <Filter>Build\Actions</Filter>
+    </None>
+    <None Include="..\.github\workflows\tarball.yml">
+      <Filter>Build\Actions</Filter>
+    </None>
+    <None Include="..\.github\workflows\generateDockerLayer.yml">
+      <Filter>Build\Actions</Filter>
+    </None>
+    <None Include="..\ios\Launch Screen.storyboard">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\macbundle.sh">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\README.md">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\iCade\iCadeReaderView.m">
+      <Filter>Other Platforms\iOS\iCade</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindMINIUPNPC.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindSnappy.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindWayland.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindZSTD.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\ccache.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindFFmpeg.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Modules\FindLIBZIP.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\sdl\FindSDL2.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\raspberry.armv6.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\raspberry.armv7.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\raspberry.armv8.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\vero4k.armv8.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\beagleboard.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\generic.armv7.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\ios.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\cmake\Toolchains\nvidiajetsonsdl.armv8.cmake">
+      <Filter>Build\CMake</Filter>
+    </None>
+    <None Include="..\SDL\CocoaBarItems.mm">
+      <Filter>Other Platforms\Mac</Filter>
+    </None>
+    <None Include="..\UI\PSPNSApplicationDelegate.mm">
+      <Filter>Other Platforms\Mac</Filter>
+    </None>
+    <None Include="..\Core\Util\DarwinFileSystemServices.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\ios\ViewControllerMetal.mm">
+      <Filter>Other Platforms\iOS</Filter>
+    </None>
+    <None Include="..\scripts\websocket-test.py">
+      <Filter>Other Platforms</Filter>
+    </None>
+    <None Include="..\assets\adhoc-servers.json">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\infra-dns.json">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\redump.csv">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\shaders\defaultshaders.ini">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\assets\cheats.json">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\AGENTS.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ppsspp.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="ppsspp_gold.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="BreakpointSmall.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\ppge_atlasscript.txt">
+      <Filter>Build</Filter>
+    </Text>
+    <Text Include="..\libretro\CMakeLists.txt">
+      <Filter>Other Platforms\libretro</Filter>
+    </Text>
+    <Text Include="..\libretro\README_WINDOWS.txt">
+      <Filter>Other Platforms\libretro</Filter>
+    </Text>
+    <Text Include="debugger.txt" />
+    <Text Include="..\font_atlasscript.txt">
+      <Filter>Build</Filter>
+    </Text>
+    <Text Include="..\asciifont_atlasscript.txt">
+      <Filter>Build</Filter>
+    </Text>
+    <Text Include="..\SDL\README.TXT">
+      <Filter>Other Platforms\SDL</Filter>
+    </Text>
+    <Text Include="..\assets\gamecontrollerdb.txt">
+      <Filter>assets</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

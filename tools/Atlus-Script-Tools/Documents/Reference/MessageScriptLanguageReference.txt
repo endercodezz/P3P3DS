@@ -1,0 +1,82 @@
+
+// ---------------
+// functions
+// ---------------
+
+[d <string identifier> <string speakerName>]
+Defines a dialogue dialog with as identifier the value of parameter 'identifier'.
+Optionally you can specify a speaker name with the second parameter, 'speakerName'.
+
+[s <string identifier>]
+Defines a selection dialog with as identifier the value of parameter 'identifier'.
+
+[f <integer tableIndex> <integer functionIndex> <variadic argument list>]
+Executes function by the specified id.
+The argument list is a variable list of integers.
+
+[n]
+Inserts a newline.
+
+[e]
+Defines the end of a line.
+A line in this context is defined as a series of sentences that make up the dialogue before it moves on to the next phase.
+
+[w]
+Shorthand version of [f 1 1].
+Waits for the player to press A.
+
+[we]
+Shorthand version of [w][e].
+
+[nwe]
+Shorthand version of [n][w][e].
+
+[b <integer characterId> <integer expressionId> <integer costumeId> <integer a4> <integer a5>
+Shorthand version of [f 4 6 a5 characterId expressionId costumeId a4]
+Defines the bustup to display.
+
+Example:
+If you wanted to display bustup "b002_001_04", you could do so by using [b 002 001 04] in your script.
+Parameters can be left out, however for each of the parameters that is left out, the default value of 0 will be used.
+
+[v <integer eventIdMajor> <integer eventIdMinor> <integer cueIndex>
+Shorthand verson of [f 3 1 eventIdMajor eventIdMinor 0 cueIndex -1 0]
+Defines the sound cue to play.
+
+Example:
+If you wanted to play sound cue 1 from sound/facility/e080_001.acb, you could do so by using [v 8 0 1] in your script.
+
+// [f 0 5 254] = does nothing, possibly left over for debugging purposes?
+// [f 2 1] = at the start of every line ?
+// [f 0 1 arg] = set text color
+// [f 2 4 arg] = get variable
+// [f 4 10 -1 0 0] = bustup animation parameters
+// speakerId = 0xFFFF = use no speaker name?
+// speakerId = 0x8000 = use variable speaker name?
+// speakerName is actually a line itself-- functions can be used as a name
+
+// ---------------
+// syntax 
+// ---------------
+
+// selection dialog style concepts
+[s "FCL_MSG_COMBINE_SELECT"]
+[f 0 5 ffff][f 2 1]Go ahead.[e]
+[f 0 5 ffff][f 2 1]Never mind.[e]
+
+[d "FCL_MSG_COMBINE_CONFIRM" "Igor"]
+[f 0 5 ffff][f 2 1]Are you certain this[n]Persona is acceptable?[f 1 1][e]
+
+[d "fev0410_02_mes01" "Sakura"]
+[f 0 5 ffff][f 2 1][f 4 6 0 103 600 0 0]Sheesh, that was annoying...[n]I didn't think the traffic[n]jam would get that bad.[n][f 20][e]
+[f 0 5 ffff][f 2 1]I wonder what I should[n]do about the shop today.[n][f 1 1][e]
+
+[d "fev0410_02_mes01" "Sakura"]
+[f 0 5 ffff][f 2 1][b 103 600]Sheesh, that was annoying...[n]I didn't think the traffic[n]jam would get that bad.[nwe]
+[f 0 5 ffff][f 2 1]I wonder what I should[n]do about the shop today.[nwe]
+
+[d "MSG_001_0_0" "Igor"]
+[f 0 5 ffff][f 2 1][b 201][f 4 10 -1 0 0][v 8 0 1]So, the game is over...[n][f 1 3 0][w][e]
+
+
+

@@ -1,0 +1,304 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <cstdint>
+#include <cmath>
+#include <string>
+#include <string_view>
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
+#include "Common/Common.h"
+#include "Common/CommonFuncs.h"
+
+struct ConfigBlock {
+	virtual ~ConfigBlock() = default;
+	virtual bool CanResetToDefault() const { return false; }
+	// If a block returns false here (like Config itself does), resetting to default will happen by the old per-setting mechanism.
+	virtual bool ResetToDefault(std::string_view blockName) { return false; }
+	virtual size_t Size() const { return sizeof(ConfigBlock); }  // For sanity checks
+};
+
+constexpr int PSP_MODEL_FAT = 0;
+constexpr int PSP_MODEL_SLIM = 1;
+constexpr int PSP_DEFAULT_FIRMWARE = 660;
+constexpr int VOLUME_OFF = 0;
+constexpr int VOLUME_FULL = 10;
+constexpr int VOLUMEHI_FULL = 100;  // for newer volume params. will convert them all later
+constexpr int AUDIOSAMPLES_MIN = 0;
+constexpr int AUDIOSAMPLES_MAX = 2048;
+constexpr float NO_DEFAULT_FLOAT = -1000000.0f;
+constexpr int NO_DEFAULT_INT = -1000000;
+
+// This matches exactly the old shift-based curve.
+float Volume10ToMultiplier(int volume);
+
+// NOTE: This is used for new volume parameters.
+// It uses a more intuitive-feeling curve.
+float Volume100ToMultiplier(int volume);
+
+// Used for migration from the old settings.
+int MultiplierToVolume100(float multiplier);
+
+float UIScaleFactorToMultiplier(int factor);
+
+struct ConfigTouchPos {
+	float x = -1.0f;
+	float y = -1.0f;
+	float scale = 1.0f;
+	// Note: Show is not used for all settings.
+	bool show = true;
+};
+
+struct ConfigCustomButton {
+	uint64_t key;
+	int image;
+	int shape;
+	bool toggle;
+	bool repeat;
+};
+
+enum class CPUCore {
+	INTERPRETER = 0,
+	JIT = 1,
+	IR_INTERPRETER = 2,
+	JIT_IR = 3,
+};
+
+enum class AdhocServerRelayMode {
+	Auto = 0,
+	AlwaysOn = 1,
+	AlwaysOff = 2,
+};
+
+enum {
+	ROTATION_AUTO = 0,
+	ROTATION_LOCKED_HORIZONTAL = 1,
+	ROTATION_LOCKED_VERTICAL = 2,
+	ROTATION_LOCKED_HORIZONTAL180 = 3,
+	ROTATION_LOCKED_VERTICAL180 = 4,  // Deprecated
+	ROTATION_AUTO_HORIZONTAL = 5,     // Un-deprecated again
+};
+
+enum TextureFiltering {
+	TEX_FILTER_AUTO = 1,
+	TEX_FILTER_FORCE_NEAREST = 2,
+	TEX_FILTER_FORCE_LINEAR = 3,
+	TEX_FILTER_AUTO_MAX_QUALITY = 4,
+};
+
+// Can't be named WindowState due to collision with SDL.
+enum class WindowSizeState {
+	Normal = 0,
+	Minimized = 1,
+	Maximized = 2,
+};
+
+enum ReplacementTextureLoadSpeed {
+	SLOW = 0,
+	MEDIUM = 1,
+	FAST = 2,
+	INSTANT = 3,
+};
+
+enum BufferFilter {
+	SCALE_LINEAR = 1,
+	SCALE_NEAREST = 2,
+};
+
+enum class ScreenshotMode {
+	FinalOutput = 0,
+	GameImage = 1,
+};
+
+// Software is not among these because it will have one of these perform the blit to display.
+enum class GPUBackend {
+	OPENGL = 0,
+	DIRECT3D11 = 2,
+	VULKAN = 3,
+};
+
+enum class DepthRasterMode {
+	DEFAULT = 0,
+	LOW_QUALITY = 1,
+	OFF = 2,
+	FORCE_ON = 3,
+};
+
+enum class AudioSyncMode {
+	GRANULAR = 0,
+	CLASSIC_PITCH = 1,
+};
+
+// TODO: We can make this more fine-grained.
+enum class RestoreSettingsBits : int {
+	SETTINGS = 1,
+	CONTROLS = 2,
+	RECENT = 4,
+};
+ENUM_CLASS_BITOPS(RestoreSettingsBits);
+
+// Modules that are candidates for disabling HLE of, and just running the modules directly.
+enum class DisableHLEFlags : int {
+	sceFont = (1 << 0),
+	sceAtrac = (1 << 1),
+	scePsmf = (1 << 2),
+	scePsmfPlayer = (1 << 3),
+	sceMpeg = (1 << 4),
+	sceMp3 = (1 << 5),
+	sceParseHttp = (1 << 6),
+	sceCcc = (1 << 7),  // character conversion library.
+	// Swaps in flash0:/kd/libmp4.prx and mp4msv.prx, which then decode through our sceAudiocodec.
+	sceMp4 = (1 << 8),
+	// Small leaf libraries games carry on the disc themselves - see AlwaysDisableHLEFlags. None of
+	// them is provided in any firmware version.
+	sceDeflt = (1 << 9),
+	sceAdler = (1 << 10),
+	sceMd5 = (1 << 11),
+	sceSha256 = (1 << 12),
+	sceMt19937 = (1 << 13),
+	sceSfmt19937 = (1 << 14),
+	sceHeap = (1 << 15),
+	sceParseUri = (1 << 16),
+	Count = 17,
+	// TODO: Some of the networking libraries may be interesting candidates, like HTTP.
+};
+ENUM_CLASS_BITOPS(DisableHLEFlags);
+
+std::string GPUBackendToString(GPUBackend backend);
+GPUBackend GPUBackendFromString(std::string_view backend);
+
+// For iIOTimingMethod.
+enum IOTimingMethods {
+	IOTIMING_FAST = 0,
+	IOTIMING_HOST = 1,
+	IOTIMING_REALISTIC = 2,
+	IOTIMING_UMDSLOWREALISTIC = 3,
+};
+
+enum class ExceptionAction {
+	Default = 0,  // Obey the value of "Ignore bad memory accesses" (that corresponds to Ignore vs Crash)
+	Ignore = 1,
+	Log = 2,  // Ignore, but log details
+	Break = 3, // Break execution in the PPSSPP debuggers
+};
+
+enum class AutoLoadSaveState {
+	OFF = 0,
+	OLDEST = 1,
+	NEWEST = 2,
+};
+
+enum class FastForwardMode {
+	CONTINUOUS = 0,
+	SKIP_FLIP = 2,
+};
+
+enum class BackgroundAnimation {
+	OFF = 0,
+	FLOATING_SYMBOLS = 1,
+	RECENT_GAMES = 2,
+	WAVE = 3,
+	MOVING_BACKGROUND = 4,
+	BOUNCING_ICON = 5,
+	FLOATING_SYMBOLS_COLORED = 6,
+};
+
+// iOS only
+enum class AppSwitchMode {
+	SINGLE_SWIPE_NO_INDICATOR = 0,
+	DOUBLE_SWIPE_INDICATOR = 1,
+};
+
+// for Config.iShowStatusFlags
+enum class ShowStatusFlags {
+	FPS_COUNTER = 1 << 1,
+	SPEED_COUNTER = 1 << 2,
+	BATTERY_PERCENT = 1 << 3,
+};
+
+enum class SplineQuality {
+	LOW_QUALITY = 0,
+	MEDIUM_QUALITY = 1,
+	HIGH_QUALITY = 2,
+};
+
+enum class DumpFileType {
+	EBOOT = (1 << 0),
+	PRX = (1 << 1),
+	Atrac3 = (1 << 2),
+	PBP_ISO = (1 << 3),
+};
+ENUM_CLASS_BITOPS(DumpFileType);
+
+// for iTiltInputType
+enum TiltTypes {
+	TILT_NULL = 0,
+	TILT_ANALOG,
+	TILT_DPAD,
+	TILT_ACTION_BUTTON,
+	TILT_TRIGGER_BUTTONS,
+};
+
+enum class ScreenEdgePosition {
+	BOTTOM_LEFT = 0,
+	BOTTOM_CENTER = 1,
+	BOTTOM_RIGHT = 2,
+	TOP_LEFT = 3,
+	TOP_CENTER = 4,
+	TOP_RIGHT = 5,
+	CENTER_LEFT = 6,
+	CENTER_RIGHT = 7,
+	CENTER = 8,  // Used for REALLY important messages! Not RetroAchievements notifications.
+	VALUE_COUNT,
+};
+
+enum class DebugOverlay : int {
+	OFF,
+	DEBUG_STATS,
+	FRAME_GRAPH,
+	FRAME_TIMING,
+#ifdef USE_PROFILER
+	FRAME_PROFILE,
+#endif
+	CONTROL,
+	Audio,
+	GPU_PROFILE,
+	GPU_ALLOCATOR,
+	FRAMEBUFFER_LIST,
+};
+
+// Android-only for now
+enum class DisplayFramerateMode : int {
+	DEFAULT,
+	REQUEST_60HZ,
+	FORCE_60HZ_METHOD1,
+	FORCE_60HZ_METHOD2,
+};
+
+enum class SkipGPUReadbackMode : int {
+	NO_SKIP,
+	SKIP,
+	COPY_TO_TEXTURE,
+};
+
+enum class RemoteISOShareType : int {
+	RECENT,
+	LOCAL_FOLDER,
+};

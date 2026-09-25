@@ -1,0 +1,15 @@
+import( "../../original/init_free/field.bf" );
+import( "../../ModMenu.flow" );
+
+global bool isFieldBf;
+
+void field_order_party_hook()
+{
+    isFieldBf = true;
+    ModMenuInit();
+}
+
+void CallOriginalSquareMenu()
+{
+    field_order_party_unhooked();
+}

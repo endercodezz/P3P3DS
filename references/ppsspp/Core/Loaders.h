@@ -1,0 +1,210 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma	once
+
+#include <string>
+#include <memory>
+
+#include "Common/CommonTypes.h"
+#include "Common/File/Path.h"
+#include "Common/File/VFS/ZipFileReader.h"
+
+enum class IdentifiedFileType {
+	ERROR_IDENTIFYING,
+
+	PSP_PBP_DIRECTORY,
+
+	PSP_PBP,
+	PSP_ELF,
+	PSP_ISO,
+	PSP_ISO_NP,
+
+	PSP_DISC_DIRECTORY,
+
+	// Try to reduce support emails...
+	ARCHIVE_RAR,
+	ARCHIVE_ZIP,
+	ARCHIVE_7Z,
+	// A .pkg game update - a container we install from rather than boot. See Core/Util/PkgUnpack.h.
+	PSP_PKG,
+	PSP_PS1_PBP,
+	PSX_ISO,
+	PS2_ISO,
+	PS3_ISO,
+	PSP_UMD_VIDEO_ISO,
+
+	UNKNOWN_BIN,
+	UNKNOWN_ELF,
+	UNKNOWN_ISO,
+
+	NORMAL_DIRECTORY,
+
+	PSP_SAVEDATA_DIRECTORY,
+	PPSSPP_SAVESTATE,
+
+	PPSSPP_GE_DUMP,
+
+	UNKNOWN,
+};
+
+const char *IdentifiedFileTypeToString(IdentifiedFileType type);
+
+// NB: It is a REQUIREMENT that implementations of this class are entirely thread safe!
+// TODO: actually, is it really?
+class FileLoader {
+public:
+	enum class Flags {
+		NONE,
+		// Not necessary to read from / store into cache.
+		HINT_UNCACHED,
+	};
+
+	virtual ~FileLoader() {}
+
+	virtual bool IsRemote() {
+		return false;
+	}
+	virtual bool Exists() = 0;  // This is permitted to essentially be "IsReadable" and not actually report existence (let's say the permissions are wrong, for example...)
+	virtual bool ExistsFast() {
+		return Exists();
+	}
+	virtual bool IsDirectory() = 0;
+	virtual s64 FileSize() = 0;
+	virtual Path GetPath() const = 0;
+	virtual std::string GetFileExtension() const {
+		return GetPath().GetFileExtension();
+	}
+	virtual size_t ReadAt(s64 absolutePos, size_t bytes, size_t count, void *data, Flags flags = Flags::NONE) = 0;
+	virtual size_t ReadAt(s64 absolutePos, size_t bytes, void *data, Flags flags = Flags::NONE) {
+		return ReadAt(absolutePos, 1, bytes, data, flags);
+	}
+
+	// Cancel any operations that might block, if possible.
+	virtual void Cancel() {}
+
+	virtual std::string LatestError() const {
+		return "";
+	}
+};
+
+class ProxiedFileLoader : public FileLoader {
+public:
+	ProxiedFileLoader(FileLoader *backend) : backend_(backend) {}
+	~ProxiedFileLoader() {
+		// Takes ownership.
+		delete backend_;
+	}
+	bool IsRemote() override {
+		return backend_->IsRemote();
+	}
+	bool Exists() override {
+		return backend_->Exists();
+	}
+	bool ExistsFast() override {
+		return backend_->ExistsFast();
+	}
+	bool IsDirectory() override {
+		return backend_->IsDirectory();
+	}
+	s64 FileSize() override {
+		return backend_->FileSize();
+	}
+	Path GetPath() const override {
+		return backend_->GetPath();
+	}
+	void Cancel() override {
+		backend_->Cancel();
+	}
+	std::string LatestError() const override {
+		return backend_->LatestError();
+	}
+	size_t ReadAt(s64 absolutePos, size_t bytes, size_t count, void *data, Flags flags = Flags::NONE) override {
+		return backend_->ReadAt(absolutePos, bytes, count, data, flags);
+	}
+	size_t ReadAt(s64 absolutePos, size_t bytes, void *data, Flags flags = Flags::NONE) override {
+		return backend_->ReadAt(absolutePos, bytes, data, flags);
+	}
+	FileLoader *Steal() {
+		FileLoader *backend = backend_;
+		backend_ = nullptr;
+		return backend;
+	}
+
+protected:
+	FileLoader *backend_;
+};
+
+inline u32 operator & (const FileLoader::Flags &a, const FileLoader::Flags &b) {
+	return (u32)a & (u32)b;
+}
+
+FileLoader *ConstructFileLoader(const Path &filename);
+// Identifies the file and resolves to the target binary, ISO, or other file (e.g. from a directory.)
+FileLoader *ResolveFileLoaderTarget(FileLoader *fileLoader, IdentifiedFileType *fileType, std::string *errorString);
+
+Path ResolvePBPDirectory(const Path &filename);
+Path ResolvePBPFile(const Path &filename);
+
+IdentifiedFileType Identify_File(FileLoader *fileLoader, std::string *errorString);
+
+bool UmdReplace(const Path &filepath, FileLoader **fileLoader, std::string &error);
+
+enum class ArchiveType {
+	ZIP,
+	SevenZ,
+};
+
+enum class ZipFileContents {
+	NOT_A_ZIP_FILE = 0,
+	UNKNOWN,
+	PSP_GAME_DIR,
+	ISO_FILE,
+	TEXTURE_PACK,
+	SAVE_DATA,
+	FRAME_DUMP,
+	EXTRACTED_GAME,
+	SAVE_STATES,
+	PRX_PLUGIN,
+};
+
+// TODO: Rename to ArchiveContentsInfo or something.
+struct ZipFileInfo {
+	ArchiveType archiveType;
+	ZipFileContents contents = ZipFileContents::NOT_A_ZIP_FILE;
+	int numFiles = 0;
+	int stripChars = 0;  // for PSP game - how much to strip from the path.
+	int isoFileIndex = -1;  // for ISO
+	int textureIniIndex = -1;  // for textures
+	bool ignoreMetaFiles = false;
+	std::string gameTitle;  // from PARAM.SFO if available
+	std::string savedataTitle;
+	std::string savedataDetails;
+	std::string savedataDir;
+	std::string mTime;
+	std::string iniContents;
+	std::string isoFilename; // Used by SevenZ only right now.
+	s64 totalFileSize = 0;
+
+	std::string contentName;
+};
+
+ZipContainer ZipOpenPath(const Path &fileName);
+void ZipClose(ZipContainer &z);
+
+void DetectZipFileContents(zip_t *z, ZipFileInfo *info);
+bool DetectArchiveContents(VFSInterface *vfs, ZipFileInfo *info);

@@ -1,0 +1,586 @@
+import( "Utilities.msg" );
+
+int SelectDigit()
+{
+    while ( true )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        SEL_DEFKEY( PadButton.Triangle, 998 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 5 );
+        else
+            SEL_DEFKEY( PadButton.R, 5 );
+        int digit = MSG_SELECT( ModMenuName, Select0to4Dialog, 0 );
+        if ( digit < 5 ) //0 through 4
+            return digit;
+        else if ( digit == 999 )
+        {
+            return -1;
+            break;
+        }
+        else if ( digit == 998 )
+        {
+            return 998;
+        }
+        if ( digit == 5 )
+        {
+            SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+            digit = MSG_SELECT( ModMenuName, Select5to9Dialog, 0 ) + 5;
+            if ( digit < 10 )
+                return digit; //5 through 9 or back
+            else if (digit == 999 + 5)
+            {
+                digit = -1; //exit
+                break;
+            }
+        }
+    }
+    return -1;
+}
+
+int SelectNumber( int digitCount )
+{
+    int number = 0;
+
+    for ( int i = 0; i < digitCount; i++ )
+    {
+        int digit = SelectDigit();
+        if ( digit == -1 )
+        {
+            // Number should only equal negative one if we cancel
+            // before entering anything.
+            if ( i == 0 )
+            {
+                number = -1;
+                break;
+            }
+            else
+                break;
+        }
+        else if ( digit == 998 )
+        {
+           return NumberSelectFavorites();
+        }
+        number *= 10;
+        number += digit;
+    }
+    return number;
+}
+
+int NumberSelectFavorites()
+{
+    page1:
+    SET_MSG_VAR( 1, GET_COUNT( 24 ), 0 );
+    SET_MSG_VAR( 2, GET_COUNT( 25 ), 0 );
+    SET_MSG_VAR( 3, GET_COUNT( 26 ), 0 );
+    SET_MSG_VAR( 4, GET_COUNT( 27 ), 0 );
+    SET_MSG_VAR( 5, GET_COUNT( 28 ), 0 );
+    SET_MSG_VAR( 6, GET_COUNT( 29 ), 0 );
+    SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 996 );
+        else
+            SEL_DEFKEY( PadButton.R, 996 );
+    int digit = MSG_SELECT( FavoritesName, SelectFavorites, 0 );
+    if ( digit == 999 ) return -1; //Cancel
+    else if ( digit == 0 ) digit = GET_COUNT( 24 );
+    else if ( digit == 1 ) digit = GET_COUNT( 25 );
+    else if ( digit == 2 ) digit = GET_COUNT( 26 );
+    else if ( digit == 3 ) digit = GET_COUNT( 27 );
+    else if ( digit == 4 ) digit = GET_COUNT( 28 );
+    else if ( digit == 5 ) digit = GET_COUNT( 29 );
+    else if ( digit == 996 ) //Next page
+    {
+        page2:
+        SET_MSG_VAR( 1, GET_COUNT( 30 ), 0 );
+        SET_MSG_VAR( 2, GET_COUNT( 31 ), 0 );
+        SET_MSG_VAR( 3, GET_COUNT( 32 ), 0 );
+        SET_MSG_VAR( 4, GET_COUNT( 33 ), 0 );
+        SET_MSG_VAR( 5, GET_COUNT( 34 ), 0 );
+        SET_MSG_VAR( 6, GET_COUNT( 35 ), 0 );
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 996 );
+        else
+            SEL_DEFKEY( PadButton.R, 996 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 997 );
+        else
+            SEL_DEFKEY( PadButton.L, 997 );
+        digit = MSG_SELECT( FavoritesName, SelectFavorites1, 0 );
+        if ( digit == 999 ) return -1; //Cancel
+        else if ( digit == 0 ) digit = GET_COUNT( 30 );
+        else if ( digit == 1 ) digit = GET_COUNT( 31 );
+        else if ( digit == 2 ) digit = GET_COUNT( 32 );
+        else if ( digit == 3 ) digit = GET_COUNT( 33 );
+        else if ( digit == 4 ) digit = GET_COUNT( 34 );
+        else if ( digit == 5 ) digit = GET_COUNT( 35 );
+        else if ( digit == 997 ) goto page1; //Previous page
+        else if ( digit == 996 ) //Next page
+        {
+            SET_MSG_VAR( 1, GET_COUNT( 36 ), 0 );
+            SET_MSG_VAR( 2, GET_COUNT( 37 ), 0 );
+            SET_MSG_VAR( 3, GET_COUNT( 38 ), 0 );
+            SET_MSG_VAR( 4, GET_COUNT( 39 ), 0 );
+            SET_MSG_VAR( 5, GET_COUNT( 40 ), 0 );
+            SET_MSG_VAR( 6, GET_COUNT( 41 ), 0 );
+            SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 997 );
+        else
+            SEL_DEFKEY( PadButton.L, 997 );
+            digit = MSG_SELECT( FavoritesName, SelectFavorites2, 0 );
+            if ( digit == 999 ) return -1; //Cancel
+            else if ( digit == 0 ) digit = GET_COUNT( 36 );
+            else if ( digit == 1 ) digit = GET_COUNT( 37 );
+            else if ( digit == 2 ) digit = GET_COUNT( 38 );
+            else if ( digit == 3 ) digit = GET_COUNT( 39 );
+            else if ( digit == 4 ) digit = GET_COUNT( 40 );
+            else if ( digit == 5 ) digit = GET_COUNT( 41 );
+            else if ( digit == 997 ) goto page2; //Previous page
+        }
+    }
+    return digit;
+}
+
+int Select10Number()
+{
+        page1:
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 5 );
+    else
+        SEL_DEFKEY( PadButton.R, 5 );
+    int number = MSG_SELECT( ModMenuName, Select1to5Dialog, 0 ) + 1;
+    if ( number == 999 + 1 )
+        return -1;
+    else if ( number <= 5 )
+    {
+        return number;
+    }
+    else if ( number == 6 )
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        number = MSG_SELECT( ModMenuName, Select6to10Dialog, 0 ) + 6;
+        if ( number <= 10 )
+        {
+            return number;
+        }
+        else if ( number == 11 )
+        {
+            goto page1;
+        }
+        else if ( number == 999 + 6 )
+        {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+int SelectUnit()
+{
+    for ( int i = 0; i < 32; i++ )
+        SET_MSG_VAR( i, i, 4 );
+        page1:
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 5 );
+    else
+        SEL_DEFKEY( PadButton.R, 5 );
+    int unitID = MSG_SELECT( ModMenuName, UnitSelect1, 0 ) + 1;
+    if ( unitID <= 5 )
+    {
+        return unitID;
+    }
+    else if ( unitID == 999 + 1 )
+    {
+        return -1;
+    }
+    else if ( unitID == 6 ) //page 2
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        unitID = MSG_SELECT( ModMenuName, UnitSelect2, 0 ) + 6;
+        if ( unitID <= 10 )
+        {
+            return unitID;
+        }
+        else if ( unitID == 11 )
+        {
+            goto page1;
+        }
+        else if ( unitID == 999 + 6 )
+        {
+            return -1;
+        }
+    }
+    return unitID;
+}
+
+int SelectUnitNoProtag()
+{
+    for ( int i = 0; i < 32; i++ )
+        SET_MSG_VAR( i, i, 4 );
+        page1:
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 5 );
+    else
+        SEL_DEFKEY( PadButton.R, 5 );
+    int unitID = MSG_SELECT( ModMenuName, UnitSelect1, 1 ) + 1;
+    if ( unitID == 999 + 1 )
+        return -1;
+    if ( unitID <= 5 )
+        return unitID;
+    if ( unitID == 6 ) //page 2
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        unitID = MSG_SELECT( ModMenuName, UnitSelect2, 0 ) + 6;
+        if ( unitID == 999 + 6 )
+            return -1;
+        if ( unitID <= 10 )
+            return unitID;
+        if ( unitID == 11 )
+            goto page1;
+    }
+    return unitID;
+}
+
+int SelectUnitNoProtagNoFuuka()
+{
+    for ( int i = 0; i < 32; i++ )
+        SET_MSG_VAR( i, i, 4 );
+        page1:
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 5 );
+    else
+        SEL_DEFKEY( PadButton.R, 5 );
+    int unitID = MSG_SELECT( ModMenuName, UnitSelect1, 1 ) + 1;
+    if ( unitID == 999 + 1 )
+        return -1;
+    if ( unitID <= 5 )
+        return unitID;
+    if ( unitID == 6 ) //page 2
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        unitID = MSG_SELECT( ModMenuName, UnitSelect2, 1 ) + 6;
+        if ( unitID == 999 + 6 )
+            return -1;
+        if ( unitID <= 10 )
+            return unitID;
+        if ( unitID == 11 )
+            goto page1;
+    }
+    return unitID;
+}
+
+int SelectSLink()
+{
+    page1:
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 6 );
+    else
+        SEL_DEFKEY( PadButton.R, 6 );
+    int selection = MSG_SELECT( CommuDesc, CommuCharSel1, 0 ) + 1;
+    if ( selection < 7 )
+        return selection;
+    if ( selection == 7 )
+        goto page2;
+    if ( selection == 999 + 1 )
+        return -1;
+    page2:
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 6 );
+        else
+            SEL_DEFKEY( PadButton.R, 6 );
+        selection = MSG_SELECT( CommuDesc, CommuCharSel2, 0 ) + 7;
+        if ( selection < 7 + 5 )
+            return selection;
+        if ( selection == 7 + 5 )
+            goto page1;
+        if ( selection == 7 + 6 )
+            goto page3;
+        if ( selection == 999 + 7 )
+            return -1;
+    }
+    page3:
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 6 );
+        else
+            SEL_DEFKEY( PadButton.R, 6 );
+        selection = MSG_SELECT( CommuDesc, CommuCharSel3, 0 ) + 12;
+        if ( selection < 12 + 5 )
+            return selection;
+        if ( selection == 12 + 5 )
+            goto page2;
+        if ( selection == 12 + 6 )
+            goto page4;
+        if ( selection == 999 + 12 )
+            return -1;
+    }
+    page4:
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 5 );
+        else
+            SEL_DEFKEY( PadButton.L, 5 );
+        if (isPC = true)
+            SEL_DEFKEY( 11, 6 );
+        else
+            SEL_DEFKEY( PadButton.R, 6 );
+        selection = MSG_SELECT( CommuDesc, CommuCharSel4, 0 ) + 17;
+        if ( selection < 17 + 5 )
+            return selection;
+        if ( selection == 17 + 5 )
+            goto page3;
+        if ( selection == 17 + 6 )
+            goto page5;
+        if ( selection == 999 + 17 )
+            return -1;
+    }
+    page5:
+    {
+        SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 6 );
+        else
+            SEL_DEFKEY( PadButton.L, 6 );
+        selection = MSG_SELECT( CommuDesc, CommuCharSel5, 0 ) + 22;
+        if ( selection < 22 + 6 )
+            return selection;
+        if ( selection == 22 + 6 )
+            goto page4;
+        if ( selection == 999 + 22 )
+            return -1;
+    }
+    return selection;
+}
+
+void SetUpFavorites()
+{
+    MSG_WND_DSP();
+    MSG( SetUp_Favorites );
+    SET_MSG_VAR( 1, GET_COUNT( 24 ), 0 );
+    SET_MSG_VAR( 2, GET_COUNT( 25 ), 0 );
+    SET_MSG_VAR( 3, GET_COUNT( 26 ), 0 );
+    SET_MSG_VAR( 4, GET_COUNT( 27 ), 0 );
+    SET_MSG_VAR( 5, GET_COUNT( 28 ), 0 );
+    SET_MSG_VAR( 6, GET_COUNT( 29 ), 0 );
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 998 );
+    else
+        SEL_DEFKEY( PadButton.R, 998 );
+    int selection = SEL( SelectFavorites );
+    switch ( selection )
+    {
+        case 999://Cancel
+            MSG_WND_CLS();
+            break;
+        case 998://Next Page
+            SetUpFavorites1();
+            break;
+        case 0: MSG_WND_CLS(); SET_COUNT( 24, SelectNumber(4) ); break;
+        case 1: MSG_WND_CLS(); SET_COUNT( 25, SelectNumber(4) ); break;
+        case 2: MSG_WND_CLS(); SET_COUNT( 26, SelectNumber(4) ); break;
+        case 3: MSG_WND_CLS(); SET_COUNT( 27, SelectNumber(4) ); break;
+        case 4: MSG_WND_CLS(); SET_COUNT( 28, SelectNumber(4) ); break;
+        case 5: MSG_WND_CLS(); SET_COUNT( 29, SelectNumber(4) ); break;
+    }
+}
+
+void SetUpFavorites1()
+{
+    SET_MSG_VAR( 1, GET_COUNT( 30 ), 0 );
+    SET_MSG_VAR( 2, GET_COUNT( 31 ), 0 );
+    SET_MSG_VAR( 3, GET_COUNT( 32 ), 0 );
+    SET_MSG_VAR( 4, GET_COUNT( 33 ), 0 );
+    SET_MSG_VAR( 5, GET_COUNT( 34 ), 0 );
+    SET_MSG_VAR( 6, GET_COUNT( 35 ), 0 );
+    SEL_DEFKEY( PadButton.Circle, 999 );
+    if (isPC = true)
+        SEL_DEFKEY( 11, 998 );
+    else
+        SEL_DEFKEY( PadButton.R, 998 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 997 );
+        else
+            SEL_DEFKEY( PadButton.L, 997 );
+    int selection = SEL( SelectFavorites1 );
+    switch ( selection )
+    {
+        case 999://Cancel
+            MSG_WND_CLS();
+            break;
+        case 998://Next Page
+            SetUpFavorites2();
+            break;
+        case 997://Previous Page
+            MSG_WND_CLS();
+            SetUpFavorites();
+            break;
+        case 0: MSG_WND_CLS(); SET_COUNT( 30, SelectNumber(4) ); break;
+        case 1: MSG_WND_CLS(); SET_COUNT( 31, SelectNumber(4) ); break;
+        case 2: MSG_WND_CLS(); SET_COUNT( 32, SelectNumber(4) ); break;
+        case 3: MSG_WND_CLS(); SET_COUNT( 33, SelectNumber(4) ); break;
+        case 4: MSG_WND_CLS(); SET_COUNT( 34, SelectNumber(4) ); break;
+        case 5: MSG_WND_CLS(); SET_COUNT( 35, SelectNumber(4) ); break;
+    }
+}
+
+void SetUpFavorites2()
+{
+    SET_MSG_VAR( 1, GET_COUNT( 36 ), 0 );
+    SET_MSG_VAR( 2, GET_COUNT( 37 ), 0 );
+    SET_MSG_VAR( 3, GET_COUNT( 38 ), 0 );
+    SET_MSG_VAR( 4, GET_COUNT( 39 ), 0 );
+    SET_MSG_VAR( 5, GET_COUNT( 40 ), 0 );
+    SET_MSG_VAR( 6, GET_COUNT( 41 ), 0 );
+    SEL_DEFKEY( PadButton.Circle, 999 );
+        if (isPC = true)
+            SEL_DEFKEY( 10, 997 );
+        else
+            SEL_DEFKEY( PadButton.L, 997 );
+    int selection = SEL( SelectFavorites2 );
+    switch ( selection )
+    {
+        case 999://Cancel
+            MSG_WND_CLS();
+            break;
+        case 997://Previous Page
+            SetUpFavorites1();
+            break;
+        case 0: MSG_WND_CLS(); SET_COUNT( 36, SelectNumber(4) ); break;
+        case 1: MSG_WND_CLS(); SET_COUNT( 37, SelectNumber(4) ); break;
+        case 2: MSG_WND_CLS(); SET_COUNT( 38, SelectNumber(4) ); break;
+        case 3: MSG_WND_CLS(); SET_COUNT( 39, SelectNumber(4) ); break;
+        case 4: MSG_WND_CLS(); SET_COUNT( 40, SelectNumber(4) ); break;
+        case 5: MSG_WND_CLS(); SET_COUNT( 41, SelectNumber(4) ); break;
+    }
+}
+
+int SelectYesNo()
+{
+    int selection = MSG_SELECT( ModMenuName, SelectYesNo, 0 );
+    return selection;
+}
+
+int SelectNoYes()
+{
+    int selection = MSG_SELECT( ModMenuName, SelectNoYes, 0 );
+    return selection;
+}
+
+int SelectOnOff()
+{
+    int selection = MSG_SELECT( ModMenuName, SelectOnOff, 0 );
+    return selection;
+}
+
+int SelectOffOn()
+{
+    int selection = MSG_SELECT( ModMenuName, SelectOffOn, 0 );
+    return selection;
+}
+
+int SelectOnOffCheck()
+{
+    int selection = MSG_SELECT( ModMenuName, SelectOnOffCheck, 0 );
+    return selection;
+}
+
+void DisplayMessagePrompt( int messageId )
+{
+    MSG_WND_DSP();
+    MSG( messageId );
+    MSG_WND_CLS();
+}
+
+int SelectNumberPrompt( int messageId, int digits )
+{
+    MSG_WND_DSP();
+    MSG( messageId );
+    MSG_WND_CLS();
+    int i = SelectNumber( digits );
+    return i;
+}
+
+int Select10NumberPrompt( int messageId )
+{
+    MSG_WND_DSP();
+    MSG( messageId );
+    MSG_WND_CLS();
+    int i = Select10Number();
+    return i;
+}
+
+int SelectYesNoPrompt( int promptMessageId )
+{
+    MSG_WND_DSP();
+    MSG( promptMessageId );
+    int selection = SelectYesNo();
+    MSG_WND_CLS();
+    return selection;
+}
+
+int SelectNoYesPrompt( int promptMessageId )
+{
+    MSG_WND_DSP();
+    MSG( promptMessageId );
+    int selection = SelectNoYes();
+    MSG_WND_CLS();
+    return selection;
+}
+
+int SelectOnOffPrompt( int promptMessageId )
+{
+    MSG_WND_DSP();
+    MSG( promptMessageId );
+    int selection = SelectOnOff();
+    MSG_WND_CLS();
+    return selection;
+}
+
+int SelectOffOnPrompt( int promptMessageId )
+{
+    MSG_WND_DSP();
+    MSG( promptMessageId );
+    int selection = SelectOffOn();
+    MSG_WND_CLS();
+    return selection;
+}

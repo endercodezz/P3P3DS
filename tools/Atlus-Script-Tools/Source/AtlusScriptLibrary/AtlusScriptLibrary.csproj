@@ -1,0 +1,89 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>..\..\Build\Debug\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>..\..\Build\Release\</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptBaseListener.cs" />
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptBaseVisitor.cs" />
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptLexer.cs" />
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptListener.cs" />
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptParser.cs" />
+    <Compile Remove="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptVisitor.cs" />
+    <Compile Remove="MessageScriptLanguage\Compiler\Parser\MessageScriptLexer.cs" />
+    <Compile Remove="MessageScriptLanguage\Compiler\Parser\MessageScriptParser.cs" />
+    <Compile Remove="MessageScriptLanguage\Compiler\Parser\MessageScriptParserBaseListener.cs" />
+    <Compile Remove="MessageScriptLanguage\Compiler\Parser\MessageScriptParserBaseVisitor.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScript.g4" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptBaseListener.cs" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptBaseVisitor.cs" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptLexer.cs" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptListener.cs" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptParser.cs" />
+    <None Include="FlowScriptLanguage\Compiler\Parser\Grammar\FlowScriptVisitor.cs" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptLexer.cs" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptLexer.g4" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptParser.cs" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptParser.g4" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptParserBaseListener.cs" />
+    <None Include="MessageScriptLanguage\Compiler\Parser\MessageScriptParserBaseVisitor.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Charsets\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Libraries\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Libraries\EO2.json" />
+    <None Remove="Libraries\EO2\FlowScriptModules.json" />
+    <None Remove="Libraries\EO2\MessageScriptLibrary.json" />
+    <None Remove="Libraries\EO2\Modules\Common\Functions.json" />
+    <None Remove="Libraries\TraumaCenter3.json" />
+    <None Remove="Libraries\TraumaCenter3\FlowScriptModules.json" />
+    <None Remove="Libraries\TraumaCenter3\MessageScriptLibrary.json" />
+    <None Remove="Libraries\TraumaCenter3\Modules\Common\Functions.json" />
+    <None Remove="Libraries\TraumaCenter2.json" />
+    <None Remove="Libraries\TraumaCenter2\FlowScriptModules.json" />
+    <None Remove="Libraries\TraumaCenter2\MessageScriptLibrary.json" />
+    <None Remove="Libraries\TraumaCenter2\Modules\Common\Functions.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Antlr4.CodeGenerator">
+      <Version>4.6.6</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Antlr4.Runtime">
+      <Version>4.6.6</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="morelinq">
+      <Version>4.3.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.0" />
+    <PackageReference Include="System.Text.Json" Version="9.0.0" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="Libraries\TraumaCenter2\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="Libraries\TraumaCenter3\MessageScriptLibrary.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

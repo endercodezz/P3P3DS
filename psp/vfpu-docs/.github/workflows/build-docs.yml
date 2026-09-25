@@ -1,0 +1,40 @@
+name: Documentation build
+run-name: Build and deploy HTML and PDF documentation
+
+on:
+  push:
+    branches: ["master"]
+
+# Allow gh-pages updates
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  docs-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y python3-pip python3-mako python3-markdown python3-htmlmin weasyprint make
+          sudo pip3 install tatsu
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Build documentation
+        run: make docs
+      - name: Upload assets
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/output/
+
+  deploy-docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: docs-build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

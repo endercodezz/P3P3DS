@@ -1,0 +1,83 @@
+/*
+ * PSP Software Development Kit - https://github.com/pspdev
+ * -----------------------------------------------------------------------
+ * Licensed under the BSD license, see LICENSE in PSPSDK root for details.
+ *
+ * pspnand_driver.h - Definitions and interfaces to the NAND (flash) driver.
+ *
+ * Copyright (c) 2005 Marcus R. Brown <mrbrown@0xd6.org>
+ *
+ */
+
+#ifndef PSPNAND_DRIVER_H
+#define PSPNAND_DRIVER_H
+
+#include <pspkerneltypes.h>
+#include <psptypes.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int sceNandSetWriteProtect(int protectFlag);
+
+int sceNandLock(int writeFlag);
+
+void sceNandUnlock(void);
+
+int sceNandReadStatus(void);
+
+int sceNandReset(int flag);
+
+int sceNandReadId(void *buf, SceSize size);
+
+int sceNandReadPages(u32 ppn, void *buf, void *buf2, u32 count);
+
+int sceNandReadPagesRawAll(u32 ppn, void* buf, void* spare, u32 count);
+
+/*
+// sceNandWritePages
+// sceNandReadAccess
+// sceNandCalcEcc
+// sceNandVerifyEcc
+// sceNandCollectEcc
+*/
+
+int sceNandEraseBlock(u32 ppn);
+
+int sceNandWriteAccess(u32 ppn, void *buf, void *spare, int, unsigned int);
+
+int sceNandReadExtraOnly(u32 ppn, void *buf, int);
+
+int sceNandGetPageSize(void);
+
+int sceNandGetPagesPerBlock(void);
+
+int sceNandGetTotalBlocks(void);
+
+/*
+// sceNandWriteBlock
+*/
+
+int sceNandWriteBlockWithVerify(u32 ppn, void *buf, void *spare);
+
+int sceNandReadBlockWithRetry(u32 ppn, void *buf, void *buf2);
+
+/*
+// sceNandVerifyBlockWithRetry
+*/
+
+int sceNandEraseBlockWithRetry(u32 ppn);
+
+int sceNandIsBadBlock(u32 ppn);
+
+/*
+// sceNandEraseAllBlock
+// sceNandTestBlock
+*/
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* PSPNAND_DRIVER_H */

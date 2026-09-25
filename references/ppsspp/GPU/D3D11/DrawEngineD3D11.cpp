@@ -1,0 +1,516 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#include <wrl/client.h>
+
+#include "Common/Log.h"
+#include "Common/Profiler/Profiler.h"
+
+#include "Core/Config.h"
+
+#include "GPU/GPUState.h"
+#include "GPU/ge_constants.h"
+
+#include "GPU/GPUCommon.h"
+#include "GPU/Common/SplineCommon.h"
+#include "GPU/Common/TransformCommon.h"
+#include "GPU/Common/VertexDecoderCommon.h"
+#include "GPU/Common/SoftwareTransformCommon.h"
+#include "GPU/D3D11/FramebufferManagerD3D11.h"
+#include "GPU/D3D11/TextureCacheD3D11.h"
+#include "GPU/D3D11/DrawEngineD3D11.h"
+#include "GPU/D3D11/ShaderManagerD3D11.h"
+
+using namespace Microsoft::WRL;
+
+const D3D11_PRIMITIVE_TOPOLOGY d3d11prim[8] = {
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  // Points are expanded to triangles.
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  // Lines are expanded to triangles too.
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  // Lines are expanded to triangles too.
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  // Fans not supported
+	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  // Need expansion - though we could do it with geom shaders in most cases
+};
+
+enum {
+	VERTEX_PUSH_SIZE = 1024 * 1024 * 16,
+	INDEX_PUSH_SIZE = 1024 * 1024 * 4,
+};
+
+static const D3D11_INPUT_ELEMENT_DESC TransformedVertexElements[] = {
+	{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(TransformedVertex, pos), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(TransformedVertex, uv), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, offsetof(TransformedVertex, color0_32), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR", 1, DXGI_FORMAT_R8G8B8A8_UNORM, 0, offsetof(TransformedVertex, color1_32), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "NORMAL", 0, DXGI_FORMAT_R32_FLOAT, 0, offsetof(TransformedVertex, fog), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+};
+
+DrawEngineD3D11::DrawEngineD3D11(Draw::DrawContext *draw, ID3D11Device *device, ID3D11DeviceContext *context)
+	: draw_(draw),
+		device_(device),
+		context_(context),
+		inputLayoutMap_(32),
+		blendCache_(32),
+		blendCache1_(32),
+		depthStencilCache_(64),
+		rasterCache_(4) {
+	device1_ = (ID3D11Device1 *)draw->GetNativeObject(Draw::NativeObject::DEVICE_EX);
+	context1_ = (ID3D11DeviceContext1 *)draw->GetNativeObject(Draw::NativeObject::CONTEXT_EX);
+	decOptions_.expand8BitNormalsToFloat = true;
+
+	InitDeviceObjects();
+}
+
+DrawEngineD3D11::~DrawEngineD3D11() {
+	DestroyDeviceObjects();
+}
+
+void DrawEngineD3D11::InitDeviceObjects() {
+	pushVerts_ = new PushBufferD3D11(device_, VERTEX_PUSH_SIZE, D3D11_BIND_VERTEX_BUFFER);
+	pushInds_ = new PushBufferD3D11(device_, INDEX_PUSH_SIZE, D3D11_BIND_INDEX_BUFFER);
+
+	draw_->SetInvalidationCallback(std::bind(&DrawEngineD3D11::Invalidate, this, std::placeholders::_1));
+}
+
+void DrawEngineD3D11::DestroyDeviceObjects() {
+	if (draw_) {
+		draw_->SetInvalidationCallback(InvalidationCallback());
+	}
+
+	ClearInputLayoutMap();
+	delete pushVerts_;
+	delete pushInds_;
+	pushVerts_ = nullptr;
+	pushInds_ = nullptr;
+
+	// Clear state caches.
+	blendCache_.Iterate([&](const uint64_t &key, ID3D11BlendState *state) {
+		state->Release();
+	});
+	blendCache_.Clear();
+	blendCache1_.Iterate([&](const uint64_t &key, ID3D11BlendState1 *state) {
+		state->Release();
+	});
+	blendCache1_.Clear();
+	depthStencilCache_.Iterate([&](const uint64_t &key, ID3D11DepthStencilState *state) {
+		state->Release();
+	});
+	depthStencilCache_.Clear();
+	rasterCache_.Iterate([&](const uint32_t &key, ID3D11RasterizerState *state) {
+		state->Release();
+	});
+	rasterCache_.Clear();
+	inputLayoutMap_.Iterate([&](const InputLayoutKey &key, ID3D11InputLayout *state) {
+		state->Release();
+	});
+	inputLayoutMap_.Clear();
+
+	blendState_ = nullptr;
+	blendState1_ = nullptr;
+	rasterState_ = nullptr;
+	depthStencilState_ = nullptr;
+}
+
+void DrawEngineD3D11::DeviceLost() {
+	DestroyDeviceObjects();
+	draw_ = nullptr;
+}
+
+void DrawEngineD3D11::DeviceRestore(Draw::DrawContext *draw) {
+	draw_ = draw;
+	InitDeviceObjects();
+}
+
+void DrawEngineD3D11::ClearInputLayoutMap() {
+	inputLayoutMap_.Iterate([&](const InputLayoutKey &key, ID3D11InputLayout *il) {
+		il->Release();
+	});
+	inputLayoutMap_.Clear();
+}
+
+void DrawEngineD3D11::NotifyConfigChanged() {
+	DrawEngineCommon::NotifyConfigChanged();
+	ClearInputLayoutMap();
+}
+
+struct DeclTypeInfo {
+	DXGI_FORMAT type;
+	const char * name;
+};
+
+static const DeclTypeInfo VComp[] = {
+	{ DXGI_FORMAT_UNKNOWN, "NULL" }, // DEC_NONE,
+	{ DXGI_FORMAT_R32_FLOAT, "D3DDECLTYPE_FLOAT1 " },  // DEC_FLOAT_1,
+	{ DXGI_FORMAT_R32G32_FLOAT, "D3DDECLTYPE_FLOAT2 " },  // DEC_FLOAT_2,
+	{ DXGI_FORMAT_R32G32B32_FLOAT, "D3DDECLTYPE_FLOAT3 " },  // DEC_FLOAT_3,
+	{ DXGI_FORMAT_R32G32B32A32_FLOAT, "D3DDECLTYPE_FLOAT4 " },  // DEC_FLOAT_4,
+
+	{ DXGI_FORMAT_R8G8B8A8_SNORM, "UNUSED" }, // DEC_S8_3,
+
+	{ DXGI_FORMAT_R16G16B16A16_SNORM, "D3DDECLTYPE_SHORT4N	" },	// DEC_S16_3,
+	{ DXGI_FORMAT_R8G8B8A8_UNORM, "D3DDECLTYPE_UBYTE4N	" },	// DEC_U8_1,
+	{ DXGI_FORMAT_R8G8B8A8_UNORM, "D3DDECLTYPE_UBYTE4N	" },	// DEC_U8_2,
+	{ DXGI_FORMAT_R8G8B8A8_UNORM, "D3DDECLTYPE_UBYTE4N	" },	// DEC_U8_3,
+	{ DXGI_FORMAT_R8G8B8A8_UNORM, "D3DDECLTYPE_UBYTE4N	" },	// DEC_U8_4,
+
+	{ DXGI_FORMAT_UNKNOWN, "UNUSED_DEC_U16_1" },	// 	DEC_U16_1,
+	{ DXGI_FORMAT_UNKNOWN, "UNUSED_DEC_U16_2" },	// 	DEC_U16_2,
+	{ DXGI_FORMAT_R16G16B16A16_UNORM	,"D3DDECLTYPE_USHORT4N "}, // DEC_U16_3,
+	{ DXGI_FORMAT_R16G16B16A16_UNORM	,"D3DDECLTYPE_USHORT4N "}, // DEC_U16_4,
+};
+
+static void VertexAttribSetup(D3D11_INPUT_ELEMENT_DESC * VertexElement, u8 fmt, u8 offset, const char *semantic, u8 semantic_index = 0) {
+	memset(VertexElement, 0, sizeof(D3D11_INPUT_ELEMENT_DESC));
+	VertexElement->AlignedByteOffset = offset;
+	VertexElement->Format = VComp[fmt].type;
+	VertexElement->SemanticName = semantic;
+	VertexElement->SemanticIndex = semantic_index;
+}
+
+HRESULT DrawEngineD3D11::SetupDecFmtForDraw(D3D11VertexShader *vshader, const DecVtxFormat &decFmt, u32 pspFmt, ID3D11InputLayout **ppInputLayout) {
+	// TODO: Instead of one for each vshader, we can reduce it to one for each type of shader
+	// that reads TEXCOORD or not, etc. Not sure if worth it.
+	const InputLayoutKey key{ vshader, decFmt.id };
+	ID3D11InputLayout *inputLayout;
+	if (inputLayoutMap_.Get(key, &inputLayout)) {
+		*ppInputLayout = inputLayout;
+		return S_OK;
+	} else {
+		D3D11_INPUT_ELEMENT_DESC VertexElements[8];
+		D3D11_INPUT_ELEMENT_DESC *VertexElement = &VertexElements[0];
+
+		// Vertices Elements orders
+		// WEIGHT
+		if (decFmt.w0fmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.w0fmt, decFmt.w0off, "TEXCOORD", 1);
+			VertexElement++;
+		}
+
+		if (decFmt.w1fmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.w1fmt, decFmt.w1off, "TEXCOORD", 2);
+			VertexElement++;
+		}
+
+		// TC
+		if (decFmt.uvfmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.uvfmt, decFmt.uvoff, "TEXCOORD", 0);
+			VertexElement++;
+		}
+
+		// COLOR
+		if (decFmt.c0fmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.c0fmt, decFmt.c0off, "COLOR", 0);
+			VertexElement++;
+		}
+		// Never used ?
+		if (decFmt.c1fmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.c1fmt, decFmt.c1off, "COLOR", 1);
+			VertexElement++;
+		}
+
+		// NORMAL
+		if (decFmt.nrmfmt != 0) {
+			VertexAttribSetup(VertexElement, decFmt.nrmfmt, decFmt.nrmoff, "NORMAL", 0);
+			VertexElement++;
+		}
+
+		// POSITION
+		// Always
+		VertexAttribSetup(VertexElement, DecVtxFormat::PosFmt(), decFmt.posoff, "POSITION", 0);
+		VertexElement++;
+
+		// Create declaration
+		HRESULT hr = device_->CreateInputLayout(VertexElements, VertexElement - VertexElements, vshader->bytecode().data(), vshader->bytecode().size(), &inputLayout);
+		if (FAILED(hr)) {
+			ERROR_LOG(Log::G3D, "Failed to create input layout!");
+			*ppInputLayout = nullptr;
+			return hr;
+		}
+
+		// Add it to map
+		inputLayoutMap_.Insert(key, inputLayout);
+		*ppInputLayout = inputLayout;
+		return hr;
+	}
+}
+
+void DrawEngineD3D11::BeginFrame() {
+	DrawEngineCommon::BeginFrame();
+
+	pushVerts_->Reset();
+	pushInds_->Reset();
+
+	lastRenderStepId_ = -1;
+}
+
+// In D3D, we're synchronous and state carries over so all we reset here on a new step is the viewport/scissor.
+void DrawEngineD3D11::Invalidate(InvalidationCallbackFlags flags) {
+	if (flags & InvalidationCallbackFlags::RENDER_PASS_STATE) {
+		gstate_c.Dirty(DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS);
+	}
+}
+
+void DrawEngineD3D11::Flush() {
+	if (!numDrawVerts_) {
+		return;
+	}
+
+	// This is not done on every drawcall, we collect vertex data
+	// until critical state changes. That's when we draw (flush).
+
+	GEPrimitiveType prim = prevPrim_;
+
+	// Always use software for flat shading to fix the provoking index.
+	bool useHWTransform = CanUseHardwareTransform(prim) && gstate.getShadeMode() != GE_SHADE_FLAT;
+	if (clipInfoFlags_ & ClipInfoFlags::Valid) {
+		if (clipInfoFlags_ & ClipInfoFlags::SoftClipCull) {
+			useHWTransform = false;
+		}
+	}
+	if (clipInfoFlags_ != lastClipInfoFlags_) {
+		ClipInfoFlags changed = (ClipInfoFlags)((u32)clipInfoFlags_ ^ (u32)lastClipInfoFlags_);
+		if (changed & (ClipInfoFlags::DepthClampFragment | ClipInfoFlags::MinMaxZDiscard)) {
+			gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE | DIRTY_RASTER_STATE);
+		}
+		if (changed & ClipInfoFlags::FlatZ) {
+			gstate_c.Dirty(DIRTY_TEXTURE_PARAMS);
+		}
+		lastClipInfoFlags_ = clipInfoFlags_;
+	}
+
+	if (useHWTransform != lastUseHwTransform_) {
+		gstate_c.Dirty(DIRTY_VERTEXSHADER_STATE | DIRTY_FRAGMENTSHADER_STATE | DIRTY_RASTER_STATE);
+		lastUseHwTransform_ = useHWTransform;
+	}
+
+	if (useHWTransform) {
+		ID3D11Buffer *vb_ = nullptr;
+		ID3D11Buffer *ib_ = nullptr;
+
+		int vertexCount;
+		int maxIndex;
+		bool useElements;
+		DecodeVerts(dec_, decoded_);
+		DecodeIndsAndGetData(&prim, &vertexCount, &maxIndex, &useElements, false);
+		gpuStats.perFrame.numVertsDrawn += vertexCount;
+
+		bool hasColor = (lastVType_ & GE_VTYPE_COL_MASK) != GE_VTYPE_COL_NONE;
+		if (gstate.isModeThrough()) {
+			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && (hasColor || gstate.getMaterialAmbientA() == 255);
+		} else {
+			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && ((hasColor && (gstate.materialupdate & 1)) || gstate.getMaterialAmbientA() == 255) && (!gstate.isLightingEnabled() || gstate.getAmbientA() == 255);
+		}
+
+		if (gstate_c.IsDirty(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS) && !gstate.isModeClear() && gstate.isTextureMapEnabled()) {
+			gstate_c.Clean(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS);
+			TextureApplyResult textureResult = textureCache_->ApplyTexture(true);
+			textureCache_->ApplySampler(textureResult, clipInfoFlags_ & ClipInfoFlags::FlatZ, false);
+		} else if (gstate.getTextureAddress(0) == (gstate.getFrameBufRawAddress() | 0x04000000)) {
+			// This catches the case of clearing a texture. (#10957)
+			gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
+		}
+
+		// Need to ApplyDrawState after ApplyTexture because depal can launch a render pass and that wrecks the state.
+		ApplyDrawState(prim);
+		ApplyDrawStateLate(true, dynState_.stencilRef);
+
+		D3D11VertexShader *vshader;
+		D3D11FragmentShader *fshader;
+		shaderManager_->GetShaders(prim, dec_->VertexType(), &vshader, &fshader, pipelineState_, useHWTransform, clipInfoFlags_);
+		if (vshader->Failed() || fshader->Failed()) {
+			WARN_LOG_N_TIMES(d3d11shaderfail, 5, Log::G3D, "Skipping draw, shader compilation failed");
+			goto bail;
+		}
+		ID3D11InputLayout *inputLayout;
+		if (FAILED(SetupDecFmtForDraw(vshader, dec_->GetDecVtxFmt(), dec_->VertexType(), &inputLayout))) {
+			// Can't draw without an input layout - the draw would silently do nothing anyway.
+			goto bail;
+		}
+		context_->PSSetShader(fshader->GetShader(), nullptr, 0);
+		context_->VSSetShader(vshader->GetShader(), nullptr, 0);
+		shaderManager_->UpdateUniforms(framebufferManager_->UseBufferedRendering(), false);
+		shaderManager_->BindUniforms();
+
+		context_->IASetInputLayout(inputLayout);
+		UINT stride = dec_->GetDecVtxFmt().stride;
+		context_->IASetPrimitiveTopology(d3d11prim[prim]);
+
+		if (!vb_) {
+			// Push!
+			UINT vOffset;
+			int vSize = numDecodedVerts_ * dec_->GetDecVtxFmt().stride;
+			uint8_t *vptr = pushVerts_->BeginPush(context_, &vOffset, vSize);
+			memcpy(vptr, decoded_, vSize);
+			pushVerts_->EndPush(context_);
+			ID3D11Buffer *buf = pushVerts_->Buf();
+			context_->IASetVertexBuffers(0, 1, &buf, &stride, &vOffset);
+			if (useElements) {
+				UINT iOffset;
+				int iSize = 2 * vertexCount;
+				uint8_t *iptr = pushInds_->BeginPush(context_, &iOffset, iSize);
+				memcpy(iptr, decIndex_, iSize);
+				pushInds_->EndPush(context_);
+				context_->IASetIndexBuffer(pushInds_->Buf(), DXGI_FORMAT_R16_UINT, iOffset);
+				context_->DrawIndexed(vertexCount, 0, 0);
+			} else {
+				context_->Draw(vertexCount, 0);
+			}
+		} else {
+			UINT offset = 0;
+			context_->IASetVertexBuffers(0, 1, &vb_, &stride, &offset);
+			if (useElements) {
+				context_->IASetIndexBuffer(ib_, DXGI_FORMAT_R16_UINT, 0);
+				context_->DrawIndexed(vertexCount, 0, 0);
+			} else {
+				context_->Draw(vertexCount, 0);
+			}
+		}
+		if (useDepthRaster_) {
+			DepthRasterSubmitRaw(prim, dec_, dec_->VertexType(), vertexCount);
+		}
+	} else {
+		PROFILE_THIS_SCOPE("soft");
+		DecodeVerts(dec_, decoded_);
+		int vertexCount = DecodeInds();
+
+		bool hasColor = (lastVType_ & GE_VTYPE_COL_MASK) != GE_VTYPE_COL_NONE;
+		if (gstate.isModeThrough()) {
+			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && (hasColor || gstate.getMaterialAmbientA() == 255);
+		} else {
+			gstate_c.vertexFullAlpha = gstate_c.vertexFullAlpha && ((hasColor && (gstate.materialupdate & 1)) || gstate.getMaterialAmbientA() == 255) && (!gstate.isLightingEnabled() || gstate.getAmbientA() == 255);
+		}
+
+		prim = IndexGenerator::GeneralPrim((GEPrimitiveType)drawInds_[0].prim);
+		VERBOSE_LOG(Log::G3D, "Flush prim %i SW! %i verts in one go", prim, vertexCount);
+
+
+		u16 *inds = decIndex_;
+		if (gstate.getShadeMode() == GE_SHADE_FLAT) {
+			// We need to rotate the index buffer to simulate a different provoking vertex.
+			// We do this before line expansion etc.
+			IndexBufferProvokingLastToFirst(prim, inds, vertexCount);
+		}
+
+		// At this point, rect and line primitives are still preserved as such. So, it's the best time to do software depth raster.
+		// We could piggyback on the viewport transform below, but it gets complicated since it's different per-backend. Which we really
+		// should clean up one day...
+		if (useDepthRaster_) {
+			DepthRasterPredecoded(prim, decoded_, numDecodedVerts_, dec_, vertexCount);
+		}
+
+		bool textureNeedsApply = false;
+		TextureApplyResult textureResult;
+		if (gstate_c.IsDirty(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS) && !gstate.isModeClear() && gstate.isTextureMapEnabled()) {
+			gstate_c.Clean(DIRTY_TEXTURE_IMAGE | DIRTY_TEXTURE_PARAMS);
+			gstate_c.dstSquared = false;
+			textureResult = textureCache_->ApplyTexture(true);
+			textureNeedsApply = true;
+		} else if (gstate.getTextureAddress(0) == (gstate.getFrameBufRawAddress() | 0x04000000)) {
+			// This catches the case of clearing a texture. (#10957)
+			gstate_c.Dirty(DIRTY_TEXTURE_IMAGE);
+		}
+
+		SoftwareTransformResult result{};
+		SoftwareTransformParams params{};
+		params.everUsedEqualDepth = everUsedEqualDepth_;
+		params.decoded = decoded_;
+		params.transformed = transformed_;
+		params.transformedExpanded = transformedExpanded_;
+		params.allowClear = true;
+		params.allowSeparateAlphaClear = false;  // D3D11 doesn't support separate alpha clears
+		params.clipInfoFlags = clipInfoFlags_;
+
+		const SoftwareTransformAction action = RunSoftwareTransform(params, prim, dec_->VertexType(), dec_->GetDecVtxFmt(), numDecodedVerts_, VERTEX_BUFFER_MAX, vertexCount, inds, RemainingIndices(inds), &result);
+
+		// TODO: This should be after BuildDrawingParams!
+		if (textureNeedsApply) {
+			textureCache_->ApplySampler(textureResult, clipInfoFlags_ & ClipInfoFlags::FlatZ, result.pixelMapped);
+		}
+
+		// Need to ApplyDrawState after ApplyTexture because depal can launch a render pass and that wrecks the state.
+		ApplyDrawState(prim);
+		ApplyDrawStateLate(result.setStencil, result.stencilValue);
+
+		if (action == SW_DRAW_INDEXED) {
+			D3D11VertexShader *vshader;
+			D3D11FragmentShader *fshader;
+			shaderManager_->GetShaders(prim, dec_->VertexType(), &vshader, &fshader, pipelineState_, false, clipInfoFlags_);
+			if (vshader->Failed() || fshader->Failed()) {
+				WARN_LOG_N_TIMES(d3d11shaderfail, 5, Log::G3D, "Skipping draw, shader compilation failed");
+				goto bail;
+			}
+			context_->PSSetShader(fshader->GetShader(), nullptr, 0);
+			context_->VSSetShader(vshader->GetShader(), nullptr, 0);
+			shaderManager_->UpdateUniforms(framebufferManager_->UseBufferedRendering(), result.pixelMapped);
+			shaderManager_->BindUniforms();
+
+			// We really do need a vertex layout for each vertex shader (or at least check its ID bits for what inputs it uses)!
+			// Some vertex shaders ignore one of the inputs, and then the layout created from it will lack it, which will be a problem for others.
+			InputLayoutKey key{ vshader, 0xFFFFFFFF };  // Let's use 0xFFFFFFFF to signify TransformedVertex
+			ID3D11InputLayout *layout;
+			if (!inputLayoutMap_.Get(key, &layout)) {
+				ASSERT_SUCCESS(device_->CreateInputLayout(TransformedVertexElements, ARRAY_SIZE(TransformedVertexElements), vshader->bytecode().data(), vshader->bytecode().size(), &layout));
+				inputLayoutMap_.Insert(key, layout);
+			}
+			context_->IASetInputLayout(layout);
+			context_->IASetPrimitiveTopology(d3d11prim[prim]);
+
+			UINT stride = sizeof(TransformedVertex);
+			UINT vOffset = 0;
+			int vSize = result.drawVertexCount * stride;
+			uint8_t *vptr = pushVerts_->BeginPush(context_, &vOffset, vSize);
+			memcpy(vptr, result.drawBuffer, vSize);
+			pushVerts_->EndPush(context_);
+			ID3D11Buffer *buf = pushVerts_->Buf();
+			context_->IASetVertexBuffers(0, 1, &buf, &stride, &vOffset);
+			UINT iOffset;
+			int iSize = sizeof(uint16_t) * result.drawIndexCount;
+			uint8_t *iptr = pushInds_->BeginPush(context_, &iOffset, iSize);
+			memcpy(iptr, inds, iSize);
+			pushInds_->EndPush(context_);
+			context_->IASetIndexBuffer(pushInds_->Buf(), DXGI_FORMAT_R16_UINT, iOffset);
+			context_->DrawIndexed(result.drawIndexCount, 0, 0);
+			gpuStats.perFrame.numVertsDrawn += result.drawIndexCount;
+		} else if (action == SW_CLEAR) {
+			u32 clearColor = result.color;
+			float clearDepth = result.depth;
+
+			Draw::Aspect clearFlag = Draw::Aspect::NO_BIT;
+
+			if (gstate.isClearModeColorMask()) clearFlag |= Draw::Aspect::COLOR_BIT;
+			if (gstate.isClearModeAlphaMask()) clearFlag |= Draw::Aspect::STENCIL_BIT;
+			if (gstate.isClearModeDepthMask()) clearFlag |= Draw::Aspect::DEPTH_BIT;
+
+			uint8_t clearStencil = clearColor >> 24;
+			draw_->Clear(clearFlag, clearColor, clearDepth, clearStencil);
+
+			if (gstate_c.Use(GPU_USE_CLEAR_RAM_HACK) && gstate.isClearModeColorMask() && (gstate.isClearModeAlphaMask() || gstate_c.framebufFormat == GE_FORMAT_565)) {
+				int scissorX1 = gstate.getScissorX1();
+				int scissorY1 = gstate.getScissorY1();
+				int scissorX2 = gstate.getScissorX2() + 1;
+				int scissorY2 = gstate.getScissorY2() + 1;
+				framebufferManager_->ApplyClearToMemory(scissorX1, scissorY1, scissorX2, scissorY2, clearColor);
+			}
+		}
+	}
+
+bail:
+	ResetAfterDrawInline();
+	framebufferManager_->SetColorUpdated(gstate_c.skipDrawReason);
+	gpuCommon_->NotifyFlush();
+}

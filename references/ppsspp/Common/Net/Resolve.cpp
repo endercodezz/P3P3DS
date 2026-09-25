@@ -1,0 +1,736 @@
+#include "ppsspp_config.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+#include <map>
+
+#include "Common/Log.h"
+#include "Common/TimeUtil.h"
+#include "Common/StringUtils.h"
+#include "Common/Data/Encoding/Utf8.h"
+#include "Common/Net/SocketCompat.h"
+#include "Common/Net/Resolve.h"
+
+#ifndef HTTPS_NOT_AVAILABLE
+#include "ext/naett-lib/naett.h"
+// Note: PPSSPP_PLATFORM(LINUX) is also set on Android, which needs no loader.
+#if PPSSPP_PLATFORM(LINUX) && !PPSSPP_PLATFORM(ANDROID)
+// On Linux, naett goes through libcurl, which we load at runtime - so HTTPS support is
+// only known once we've tried.
+#include "ext/naett-lib/src/naett_curl.h"
+#endif
+#endif
+
+#if PPSSPP_PLATFORM(ANDROID)
+#include <jni.h>
+extern JavaVM *gJvm;
+#endif
+
+namespace net {
+
+static bool g_wsaInitialized;
+
+void Init() {
+#ifdef _WIN32
+	// WSA does its own internal reference counting, no need to keep track of if we inited or not.
+	WSADATA wsaData{};
+	if (FAILED(WSAStartup(MAKEWORD(2, 2), &wsaData))) {
+		ERROR_LOG(Log::Net, "WSAStartup failed");
+	} else {
+		g_wsaInitialized = true;
+	}
+#endif
+	// naett ignores repeat calls the same way WSAStartup does, so there's nothing to track here
+	// either. HTTPSAvailable is cheap to ask twice - on Linux it's a cached dlopen result.
+#ifndef HTTPS_NOT_AVAILABLE
+#if PPSSPP_PLATFORM(ANDROID)
+	_assert_(gJvm != nullptr);
+	naettInit(gJvm);
+#else
+	if (HTTPSAvailable()) {
+		naettInit(NULL);
+	}
+#endif
+#endif
+}
+
+bool HTTPSAvailable() {
+#ifdef HTTPS_NOT_AVAILABLE
+	return false;
+#elif PPSSPP_PLATFORM(LINUX) && !PPSSPP_PLATFORM(ANDROID)
+	return naettCurlLoad() != 0;
+#else
+	return true;
+#endif
+}
+
+void Shutdown() {
+#ifdef _WIN32
+	if (g_wsaInitialized) {
+		WSACleanup();
+	}
+#endif
+}
+
+bool HostPortExists(const std::string &host, int port, int timeout_ms) {
+	if (host.empty() || (port <= 0 || port > 65535) || timeout_ms < 0) return false;
+
+	addrinfo hints;
+	addrinfo* res = nullptr;
+
+	std::memset(&hints, 0, sizeof(hints));
+	hints.ai_socktype = SOCK_STREAM; // TCP
+	hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+
+	int gai = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res);
+	if (gai != 0) {
+		// getaddrinfo failed (DNS resolve failed or bad port)
+		return false;
+	}
+
+	bool ok = false;
+
+	for (addrinfo* p = res; p != nullptr && !ok; p = p->ai_next) {
+		// create socket
+		int sockfd =
+#ifdef _WIN32
+		(int)socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+#else
+			socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+#endif
+		if (sockfd < 0) {
+			continue;
+		}
+
+		// make non-blocking
+#ifdef _WIN32
+		unsigned long mode = 1;
+		ioctlsocket((SOCKET)sockfd, FIONBIO, &mode);
+#else
+		// On non-Windows, check if fd is too large for select()
+		if (sockfd >= FD_SETSIZE) {
+			close(sockfd);
+			continue;
+		}
+		int flags = fcntl(sockfd, F_GETFL, 0);
+		if (flags == -1) flags = 0;
+		fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+#endif
+
+		// try connect
+		int conn = connect(sockfd, p->ai_addr, (int)p->ai_addrlen);
+#ifdef _WIN32
+		if (conn == 0) {
+			ok = true; // immediate success
+		}
+		else {
+			int err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK || err == WSAEINPROGRESS) {
+				// fall through to select
+			}
+			else {
+				// immediate failure
+			}
+		}
+#else
+		if (conn == 0) {
+			ok = true; // immediate success
+		}
+		else {
+			if (errno == EINPROGRESS) {
+				// fall through to select
+			}
+			else {
+				// immediate failure
+			}
+		}
+#endif
+
+		if (!ok) {
+			// wait for writable with timeout
+			fd_set writefds;
+			FD_ZERO(&writefds);
+#ifdef _WIN32
+			FD_SET((SOCKET)sockfd, &writefds);
+#else
+			FD_SET(sockfd, &writefds);
+#endif
+
+			fd_set exceptfds;
+			FD_ZERO(&exceptfds);
+#ifdef _WIN32
+			FD_SET((SOCKET)sockfd, &exceptfds);
+#else
+			FD_SET(sockfd, &exceptfds);
+#endif
+
+			timeval tv;
+			tv.tv_sec = timeout_ms / 1000;
+			tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+			int sel = select(
+#ifdef _WIN32
+				0,
+#else
+				sockfd + 1,
+#endif
+				nullptr, &writefds, &exceptfds, &tv);
+
+			if (sel > 0) {
+				// check for error on socket
+				int sock_err = 0;
+				socklen_t len = sizeof(sock_err);
+#ifdef _WIN32
+				int ret = getsockopt((SOCKET)sockfd, SOL_SOCKET, SO_ERROR, (char*)&sock_err, &len);
+#else
+				int ret = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &sock_err, &len);
+#endif
+#ifdef _WIN32
+				bool writable = FD_ISSET(static_cast<SOCKET>(sockfd), &writefds) != 0;
+#else
+				bool writable = FD_ISSET(sockfd, &writefds) != 0;
+#endif
+
+				if (ret == 0 && sock_err == 0 && writable) {
+					ok = true;
+				}
+			}
+			// else timeout or error -> try next addr
+		}
+
+		// close socket
+#ifdef _WIN32
+		closesocket((SOCKET)sockfd);
+#else
+		close(sockfd);
+#endif
+	}
+
+	freeaddrinfo(res);
+	return ok;
+}
+
+// NOTE: Due to the nature of getaddrinfo, this can block indefinitely. Not good.
+bool DNSResolve(const std::string &host, const std::string &service, addrinfo **res, std::string &error, DNSType type) {
+#if PPSSPP_PLATFORM(SWITCH)
+	// Force IPv4 lookups.
+	if (type == DNSType::IPV6) {
+		*res = nullptr;
+		return false;
+	} else if (type == DNSType::ANY) {
+		type = DNSType::IPV4;
+	}
+#endif
+
+	addrinfo hints = {0};
+	// TODO: Might be uses to lookup other values.
+	hints.ai_socktype = SOCK_STREAM;
+#ifdef __ANDROID__
+	hints.ai_flags = AI_ADDRCONFIG;
+#else
+	// AI_V4MAPPED seems to have issues on some platforms, not sure we should include it:
+	// http://stackoverflow.com/questions/1408030/what-is-the-purpose-of-the-ai-v4mapped-flag-in-getaddrinfo
+	hints.ai_flags = /*AI_V4MAPPED |*/ AI_ADDRCONFIG;
+#endif
+	hints.ai_protocol = 0;
+	if (type == DNSType::IPV4)
+		hints.ai_family = AF_INET;
+	else if (type == DNSType::IPV6)
+		hints.ai_family = AF_INET6;
+
+	const char *servicep = service.empty() ? nullptr : service.c_str();
+
+	*res = nullptr;
+	int result = getaddrinfo(host.c_str(), servicep, &hints, res);
+	if (result == EAI_AGAIN) {
+		// Temporary failure.  Since this already blocks, let's just try once more.
+		sleep_ms(1, "dns-resolve-poll");
+		result = getaddrinfo(host.c_str(), servicep, &hints, res);
+	}
+
+	if (result != 0) {
+#ifdef _WIN32
+		error = ConvertWStringToUTF8(gai_strerror(result));
+#else
+		error = gai_strerror(result);
+#endif
+		if (*res != nullptr)
+			freeaddrinfo(*res);
+		*res = nullptr;
+		return false;
+	}
+
+	return true;
+}
+
+void DNSResolveFree(addrinfo *res) {
+	if (res)
+		freeaddrinfo(res);
+}
+
+bool GetLocalIP4List(std::vector<std::string> &IP4s) {
+	char ipstr[INET6_ADDRSTRLEN]; // We use IPv6 length since it's longer than IPv4
+// getifaddrs first appeared in glibc 2.3, On Android officially supported since __ANDROID_API__ >= 24
+#if defined(_IFADDRS_H_) || (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 3) || (__ANDROID_API__ >= 24)
+	INFO_LOG(Log::Net, "GetIPList from getifaddrs");
+	struct ifaddrs* ifAddrStruct = NULL;
+	struct ifaddrs* ifa = NULL;
+
+	getifaddrs(&ifAddrStruct);
+	if (ifAddrStruct != NULL) {
+		for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+			if (!ifa->ifa_addr) {
+				continue;
+			}
+			if (ifa->ifa_addr->sa_family == AF_INET) {
+				// is a valid IP4 Address
+				if (inet_ntop(AF_INET, &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr, ipstr, sizeof(ipstr)) != 0) {
+					IP4s.push_back(ipstr);
+				}
+			}
+			/*else if (ifa->ifa_addr->sa_family == AF_INET6) {
+				// is a valid IP6 Address
+				if (inet_ntop(AF_INET6, &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr, ipstr, sizeof(ipstr)) != 0) {
+					IP6s.push_back(ipstr);
+				}
+			}*/
+		}
+
+		freeifaddrs(ifAddrStruct);
+		return true;
+	}
+#elif defined(SIOCGIFCONF) // Better detection on Linux/UNIX/MacOS/some Android
+	INFO_LOG(Log::Net, "GetIPList from SIOCGIFCONF");
+	static struct ifreq ifreqs[32];
+	struct ifconf ifc{};
+	ifc.ifc_req = ifreqs;
+	ifc.ifc_len = sizeof(ifreqs);
+
+	int sd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sd < 0) {
+		ERROR_LOG(Log::Net, "GetIPList failed to create socket (result = %i, errno = %i)", sd, socket_errno);
+		return false;
+	}
+
+	int r = ioctl(sd, SIOCGIFCONF, (char*)&ifc);
+	if (r != 0) {
+		ERROR_LOG(Log::Net, "GetIPList failed ioctl/SIOCGIFCONF (result = %i, errno = %i)", r, socket_errno);
+		return false;
+	}
+
+	struct ifreq* item;
+	struct sockaddr* addr;
+
+	for (int i = 0; i < ifc.ifc_len / sizeof(struct ifreq); ++i)
+	{
+		item = &ifreqs[i];
+		addr = &(item->ifr_addr);
+
+		// Get the IP address
+		r = ioctl(sd, SIOCGIFADDR, item);
+		if (r != 0)
+		{
+			ERROR_LOG(Log::Net, "GetIPList failed ioctl/SIOCGIFADDR (i = %i, result = %i, errno = %i)", i, r, socket_errno);
+		}
+
+		if (ifreqs[i].ifr_addr.sa_family == AF_INET) {
+			// is a valid IP4 Address
+			if (inet_ntop(AF_INET, &((struct sockaddr_in*)addr)->sin_addr, ipstr, sizeof(ipstr)) != 0) {
+				IP4s.emplace_back(ipstr);
+			}
+		}
+		/*else if (ifreqs[i].ifr_addr.sa_family == AF_INET6) {
+			// is a valid IP6 Address
+			if (inet_ntop(AF_INET6, &((struct sockaddr_in6*)addr)->sin6_addr, ipstr, sizeof(ipstr)) != 0) {
+				IP6s.push_back(ipstr);
+			}
+		}*/
+	}
+
+	close(sd);
+	return true;
+#else // Fallback to POSIX/Cross-platform way but may not work well on Linux (ie. only shows 127.0.0.1)
+	DEBUG_LOG(Log::Net, "GetIPList from fallback method");
+	struct addrinfo hints, * res, * p;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC; // AF_INET or AF_INET6 to force version
+	hints.ai_socktype = SOCK_DGRAM;
+
+	// Get local host name
+	char szHostName[256] = "";
+	if (::gethostname(szHostName, sizeof(szHostName))) {
+		// Error handling
+	}
+
+	int status;
+	if ((status = getaddrinfo(szHostName, NULL, &hints, &res)) != 0) {
+		//fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		return false;
+	}
+	for (p = res; p != NULL; p = p->ai_next) {
+		if (p->ai_family == AF_INET) {
+			// is a valid IP4 Address
+			if (inet_ntop(p->ai_family, &(((struct sockaddr_in*)p->ai_addr)->sin_addr), ipstr, sizeof(ipstr)) != 0) {
+				IP4s.push_back(ipstr);
+			}
+		}
+		/*else if (p->ai_family == AF_INET6) {
+			// is a valid IP6 Address
+			if (inet_ntop(p->ai_family, &(((struct sockaddr_in6*)p->ai_addr)->sin6_addr), ipstr, sizeof(ipstr)) != 0) {
+				IP6s.push_back(ipstr);
+			}
+		}*/
+	}
+
+	freeaddrinfo(res); // free the linked list
+	return true;
+#endif
+	return false;
+}
+
+// IP address parser
+int inet_pton(int af, const char* src, void* dst)
+{
+	if (af == AF_INET)
+	{
+		unsigned char *ip = (unsigned char *)dst;
+		int k = 0, x = 0;
+		char ch;
+		for (int i = 0; (ch = src[i]) != 0; i++)
+		{
+			if (ch == '.')
+			{
+				ip[k++] = x;
+				if (k == 4)
+					return 0;
+				x = 0;
+			}
+			else if (ch < '0' || ch > '9')
+				return 0;
+			else
+				x = x * 10 + ch - '0';
+			if (x > 255)
+				return 0;
+		}
+		ip[k++] = x;
+		if (k != 4)
+			return 0;
+	}
+	else if (af == AF_INET6)
+	{
+		unsigned short* ip = ( unsigned short* )dst;
+		int i;
+		for (i = 0; i < 8; i++) ip[i] = 0;
+		int k = 0;
+		unsigned int x = 0;
+		char ch;
+		int marknum = 0;
+		for (i = 0; src[i] != 0; i++)
+		{
+			if (src[i] == ':')
+				marknum++;
+		}
+		for (i = 0; (ch = src[i]) != 0; i++)
+		{
+			if (ch == ':')
+			{
+				x = ((x & 0xFF00) >> 8) | ((x & 0x00FF) << 8);
+				ip[k++] = x;
+				if (k == 8)
+					return 0;
+				x = 0;
+				if (i > 0 && src[i - 1] == ':')
+					k += 7 - marknum;
+			}
+			else if (ch >= '0' && ch <= '9')
+				x = x * 16 + ch - '0';
+			else if (ch >= 'a' && ch <= 'f')
+				x = x * 16 + ch - 'a' + 10;
+			else if (ch >= 'A' && ch <= 'F')
+				x = x * 16 + ch - 'A' + 10;
+			else
+				return 0;
+			if (x > 0xFFFF)
+				return 0;
+		}
+		x = ((x & 0xFF00) >> 8) | ((x & 0x00FF) << 8);
+		ip[k++] = x;
+		if (k != 8)
+			return 0;
+	}
+	return 1;
+}
+
+// Structs for implementing DNS are available here:
+// https://web.archive.org/web/20201204080751/https://www.binarytides.com/dns-query-code-in-c-with-winsock/
+
+#define DNS_PORT 53
+#define DNS_QUERY_TYPE_A 1
+#define DNS_QUERY_CLASS_IN 1
+
+// DNS header structure
+struct DNSHeader {
+	uint16_t id;       // Identifier
+	uint16_t flags;    // Flags
+	uint16_t q_count;  // Number of questions
+	uint16_t ans_count;  // Number of answers
+	uint16_t auth_count; // Number of authority records
+	uint16_t add_count;  // Number of additional records
+};
+
+// Function to convert a domain name to DNS query format
+// http://www.tcpipguide.com/free/t_DNSNameNotationandMessageCompressionTechnique.htm
+static bool encode_domain_name(const char *domain, unsigned char *encoded, size_t max_len) {
+	const char *pos = domain;
+	unsigned char *ptr = encoded;
+	const unsigned char *end = encoded + max_len;
+
+	while (*pos) {
+		const char *start = pos;
+		while (*pos && *pos != '.') {
+			pos++;
+		}
+
+		size_t label_len = pos - start;
+		if (label_len > 63 || ptr + label_len + 1 >= end) {
+			return false;  // Label too long or buffer overflow
+		}
+
+		*ptr++ = (unsigned char)label_len;  // length field
+		memcpy(ptr, start, label_len);
+		ptr += label_len;
+
+		if (*pos == '.') {
+			pos++;
+		}
+	}
+	if (ptr >= end) {
+		return false;
+	}
+	*ptr = 0; // End of domain name
+	return true;
+}
+
+// Function to parse and print the DNS response
+static bool parse_dns_response(unsigned char *buffer, size_t response_len, uint32_t *output) {
+	if (response_len < sizeof(DNSHeader)) {
+		ERROR_LOG(Log::Net, "DNS response too short");
+		return false;
+	}
+
+	DNSHeader *dns = (DNSHeader *)buffer;
+	unsigned char *ptr = buffer + sizeof(struct DNSHeader);
+	unsigned char *end = buffer + response_len;
+
+	DEBUG_LOG(Log::Net, "DNS Response:");
+	DEBUG_LOG(Log::Net, "ID: 0x%x", ntohs(dns->id));
+	DEBUG_LOG(Log::Net, "Flags: 0x%x", ntohs(dns->flags));
+	DEBUG_LOG(Log::Net, "Questions: %d", ntohs(dns->q_count));
+	DEBUG_LOG(Log::Net, "Answers: %d", ntohs(dns->ans_count));
+	DEBUG_LOG(Log::Net, "Authority Records: %d", ntohs(dns->auth_count));
+	DEBUG_LOG(Log::Net, "Additional Records: %d", ntohs(dns->add_count));
+
+	// Skip over the question section
+	const int q_count = ntohs(dns->q_count);
+	for (int i = 0; i < q_count; i++) {
+		while (ptr < end && *ptr != 0) {
+			int jump = *ptr;
+			ptr += jump + 1;
+			if (ptr >= end) {
+				ERROR_LOG(Log::Net, "DNS response malformed (question section)");
+				return false;
+			}
+		}
+		ptr += 5; // Null byte + QTYPE (2 bytes) + QCLASS (2 bytes)
+		if (ptr > end) {
+			ERROR_LOG(Log::Net, "DNS response malformed (question section end)");
+			return false;
+		}
+	}
+
+	*output = 0;
+
+	// Parse the answer section
+	const int ans_count = ntohs(dns->ans_count);
+	for (int i = 0; i < ans_count; i++) {
+		DEBUG_LOG(Log::Net, "Answer %d:\n", i + 1);
+
+		// Skip the name (can be a pointer or a sequence)
+		if (ptr >= end) {
+			ERROR_LOG(Log::Net, "DNS response malformed (answer %d name)", i);
+			return false;
+		}
+
+		if ((*ptr & 0xC0) == 0xC0) {
+			if (ptr + 2 > end) {
+				ERROR_LOG(Log::Net, "DNS response malformed (answer %d name pointer)", i);
+				return false;
+			}
+			ptr += 2; // Pointer (2 bytes)
+		} else {
+			while (ptr < end && *ptr != 0) {
+				int jump = *ptr;
+				ptr += jump + 1;
+				if (ptr >= end) {
+					ERROR_LOG(Log::Net, "DNS response malformed (answer %d name loop)", i);
+					return false;
+				}
+			}
+			ptr++;
+		}
+
+		if (ptr + 10 > end) {
+			ERROR_LOG(Log::Net, "DNS response too short for answer %d header", i);
+			return false;
+		}
+
+		// TODO: Use a struct or something.
+		uint16_t type = ntohs(*((uint16_t *)ptr));
+		ptr += 2;
+		uint16_t clazz = ntohs(*((uint16_t *)ptr));
+		ptr += 2;
+		uint32_t ttl = ntohl(*((uint32_t *)ptr));
+		ptr += 4;
+		uint16_t data_len = ntohs(*((uint16_t *)ptr));
+		ptr += 2;
+
+		DEBUG_LOG(Log::Net, "  Type: %d", type);
+		DEBUG_LOG(Log::Net, "  Class: %d", clazz);
+		DEBUG_LOG(Log::Net, "  TTL: %u", ttl);
+		DEBUG_LOG(Log::Net, "  Data length: %d", (int)data_len);
+
+		if (ptr + data_len > end) {
+			ERROR_LOG(Log::Net, "DNS response data exceeds buffer");
+			return false;
+		}
+
+		if (type == DNS_QUERY_TYPE_A && data_len == 4) {
+			// IPv4 address
+			char ip[INET_ADDRSTRLEN];
+			inet_ntop(AF_INET, ptr, ip, sizeof(ip));
+			DEBUG_LOG(Log::Net, "  IPV4 Address: %s", ip);
+			memcpy(output, ptr, 4);
+			// Skipping further responses.
+			return true;
+		}
+
+		ptr += data_len;
+	}
+	return false;
+}
+
+// This was written by ChatGPT, although not much of that remains, after all the cleanup and fixing...
+
+// Specialized cache for the direct DNS lookups
+struct DNSCacheEntry {
+	uint32_t ipv4Address;
+};
+
+static std::map<std::string, DNSCacheEntry> g_directDNSCache;
+
+bool DirectDNSLookupIPV4(const char *dns_server_ip, const char *domain, uint32_t *ipv4_addr) {
+	if (!strlen(dns_server_ip)) {
+		WARN_LOG(Log::Net, "Direct lookup: DNS server not specified");
+		return false;
+	}
+
+	if (!strlen(domain)) {
+		ERROR_LOG(Log::Net, "Direct lookup: Can't look up an empty domain");
+		return false;
+	}
+
+	std::string key = StringFromFormat("%s:%s", dns_server_ip, domain);
+
+	auto iter = g_directDNSCache.find(key);
+	if (iter != g_directDNSCache.end()) {
+		INFO_LOG(Log::Net, "Returning cached response from direct DNS request for '%s' to DNS server '%s", domain, dns_server_ip);
+		*ipv4_addr = iter->second.ipv4Address;
+		return true;
+	}
+
+	SOCKET sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	// Create UDP socket
+	if (sockfd == INVALID_SOCKET) {
+		ERROR_LOG(Log::Net, "Socket creation for direct DNS failed");
+		return false;
+	}
+
+#ifndef _WIN32
+	// On non-Windows, we can't use select() if fd >= FD_SETSIZE
+	// For DNS, just set a socket timeout instead
+	struct timeval timeout;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+		WARN_LOG(Log::Net, "Failed to set socket timeout for DNS query");
+	}
+#else
+	// Windows version
+	DWORD timeout = 5000; // 5 seconds
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+		WARN_LOG(Log::Net, "Failed to set socket timeout for DNS query");
+	}
+#endif
+
+	struct sockaddr_in server_addr{};
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(DNS_PORT);
+
+	if (net::inet_pton(AF_INET, dns_server_ip, &server_addr.sin_addr) <= 0) {
+		ERROR_LOG(Log::Net,"Invalid DNS server IP address %s", dns_server_ip);
+		closesocket(sockfd);
+		return false;
+	}
+
+	// Build DNS query
+	unsigned char buffer[1024]{};
+	struct DNSHeader *dns = (struct DNSHeader *)buffer;
+	dns->id = htons(0x1234);  // Random ID
+	dns->flags = htons(0x0100); // Standard query
+	dns->q_count = htons(1);    // One question
+
+	unsigned char *qname = buffer + sizeof(DNSHeader);
+	size_t qname_space = sizeof(buffer) - sizeof(DNSHeader) - 4;  // Reserve 4 bytes for qtype and qclass
+	if (!encode_domain_name(domain, qname, qname_space)) {
+		ERROR_LOG(Log::Net, "Domain name too long or invalid: %s", domain);
+		closesocket(sockfd);
+		return false;
+	}
+
+	unsigned char *qinfo = qname + strlen((const char *)qname) + 1;
+	*((uint16_t *)qinfo) = htons(DNS_QUERY_TYPE_A); // Query type: A
+	*((uint16_t *)(qinfo + 2)) = htons(DNS_QUERY_CLASS_IN); // Query class: IN
+
+	// Send DNS query
+	size_t query_len = (qinfo + 4) - buffer;
+	if (sendto(sockfd, (const char *)buffer, (int)query_len, 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+		ERROR_LOG(Log::Net, "Failed to send DNS query");
+		closesocket(sockfd);
+		return false;
+	}
+
+	// Receive DNS response
+	socklen_t server_len = sizeof(server_addr);
+	int response_len = recvfrom(sockfd, (char *)buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &server_len);
+	if (response_len < 0) {
+		ERROR_LOG(Log::Net, "Failed to receive DNS response (timeout or error)");
+		closesocket(sockfd);
+		return false;
+	}
+
+	// Close socket
+	closesocket(sockfd);
+
+	// Done communicating, time to parse.
+	if (!parse_dns_response(buffer, (size_t)response_len, ipv4_addr)) {
+		return false;
+	}
+
+	g_directDNSCache[key] = DNSCacheEntry{ *ipv4_addr };
+	return true;
+}
+
+}  // namespace net

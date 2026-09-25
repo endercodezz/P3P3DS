@@ -1,0 +1,76 @@
+# Build output
+/out/
+/build/
+CMakeUserPresets.json
+
+# Build directories created outside /out/ (per-stage trees use names like b457_perf)
+b*_perf/
+cmake-build-*/
+
+# Binary build artifacts, wherever they land
+*.exe
+*.dll
+*.lib
+*.obj
+*.exp
+*.iobj
+*.ipdb
+*.res
+*.tlog
+
+# Copyrighted game data.  Never publish: the PSP executable, its decrypted ELF
+# and save data are the user's own dumped media, not part of this source tree.
+PSP_DATA/
+SAVEDATA/
+*.ELF
+*.elf
+*.iso
+*.cso
+EBOOT.BIN
+DATA.BIN
+PARAM.SFO
+*.PBP
+*.prx
+*.ovl
+overlay_*.bin
+
+# Output the game produces when run: screenshots and audio dumps
+*.bmp
+*.wav
+
+# User-owned game data and reverse-engineering workspace
+/profiles/*/game/
+/profiles/*/analysis/
+/profiles/*/progress/
+/profiles/*/captures/
+# The MHP3rd AOT corpora are derived from the user's executable
+/profiles/mhp3rd/generated/
+/profiles/mhp3rd/overlays/
+
+# Local dumps next to the repository root
+/dump/
+
+# Generated scratch output
+*.generated
+*.tmp
+*.log
+*.pdb
+*.ilk
+
+# Editor and agent tooling
+.claude/
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
+
+# Signing keys (the Android release key): never committed
+/keys/

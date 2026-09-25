@@ -1,0 +1,268 @@
+// Copyright (c) 2013- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#include "ppsspp_config.h"
+
+#include <algorithm>
+
+#include "UI/Theme.h"
+
+#include "Common/Data/Format/IniFile.h"
+#include "Common/File/DirListing.h"
+#include "Common/Log/LogManager.h"
+#include "Common/File/VFS/VFS.h"
+#include "Common/Data/Text/I18n.h"
+#include "Common/Render/Text/draw_text.h"
+#include "Core/Config.h"
+
+#include "Common/UI/View.h"
+#include "Common/UI/Context.h"
+#include "Core/System.h"
+
+struct ThemeInfo {
+	std::string name;
+
+	uint32_t uItemStyleFg = 0xFFFFFFFF;
+	uint32_t uItemStyleBg = 0x55000000;
+	uint32_t uItemFocusedStyleFg = 0xFFFFFFFF;
+	uint32_t uItemFocusedStyleBg = 0xFFEDC24C;
+	uint32_t uItemDownStyleFg = 0xFFFFFFFF;
+	uint32_t uItemDownStyleBg = 0xFFBD9939;
+	uint32_t uItemDisabledStyleFg = 0x80EEEEEE;
+	uint32_t uItemDisabledStyleBg = 0x55000000;
+
+	uint32_t uHeaderStyleFg = 0xFFFFFFFF;
+	uint32_t uHeaderStyleBg = 0x00000000;
+	uint32_t uInfoStyleFg = 0xFFFFFFFF;
+	uint32_t uInfoStyleBg = 0x00000000;
+	uint32_t uPopupStyleFg = 0xFFFFFFFF;
+	uint32_t uPopupStyleBg = 0xFF5E4D1F;
+	uint32_t uPopupTitleStyleFg = 0xFFFFFFFF;
+	uint32_t uPopupTitleStyleBg = 0x00000000;  // default to invisible
+	uint32_t uTooltipStyleFg = 0xFFFFFFFF;
+	uint32_t uTooltipStyleBg = 0xC0303030;
+	uint32_t uCollapsibleHeaderStyleFg = 0xFFFFFFFF;
+	uint32_t uCollapsibleHeaderStyleBg = 0x55000000;
+	uint32_t uBackgroundColor = 0xFF754D24;
+	uint32_t uScrollbarColor = 0x80FFFFFF;
+	uint32_t uPopupSliderColor = 0xFFFFFFFF;
+	uint32_t uPopupSliderFocusedColor = 0xFFEDC24C;
+
+	bool operator == (const std::string &other) {
+		return name == other;
+	}
+	bool operator == (const ThemeInfo &other) {
+		return name == other.name;
+	}
+};
+
+static UI::Theme ui_theme;
+static std::vector<ThemeInfo> themeInfos;
+
+static void LoadThemeInfo(const std::vector<Path> &directories) {
+	themeInfos.clear();
+	ThemeInfo def{};
+	def.name = "Default";
+	themeInfos.push_back(def);
+
+	// This will update the theme if already present, as such default in assets/theme will get priority if exist
+	auto appendTheme = [&](const ThemeInfo &info) {
+		auto beginErase = std::remove(themeInfos.begin(), themeInfos.end(), info.name);
+		if (beginErase != themeInfos.end()) {
+			themeInfos.erase(beginErase, themeInfos.end());
+		}
+		themeInfos.push_back(info);
+	};
+
+	for (const auto &d : directories) {
+		std::vector<File::FileInfo> fileInfo;
+		g_VFS.GetFileListing(d.c_str(), &fileInfo, "ini:");
+
+		if (fileInfo.empty()) {
+			File::GetFilesInDir(d, &fileInfo, "ini:");
+		}
+
+		for (const auto &f : fileInfo) {
+			IniFile ini;
+			bool success = false;
+			if (f.isDirectory) {
+				continue;
+			}
+
+			Path name(f.fullName);
+			Path path = d;
+			// Hack around Android VFS path bug. really need to redesign this.
+			if (name.ToString().substr(0, 7) == "assets/") {
+				name = Path(name.ToString().substr(7));
+			}
+			if (path.ToString().substr(0, 7) == "assets/") {
+				path = Path(path.ToString().substr(7));
+			}
+
+			if (ini.LoadFromVFS(g_VFS, name.ToString()) || ini.Load(f.fullName)) {
+				success = true;
+			}
+
+			if (!success)
+				continue;
+
+			// Alright, let's loop through the sections and see if any is a theme.
+			for (size_t i = 0; i < ini.Sections().size(); i++) {
+				Section &section = *(ini.Sections()[i].get());
+
+				if (section.name().empty()) {
+					continue;
+				}
+
+				ThemeInfo info;
+				info.name = section.name();
+				section.Get("Name", &info.name);
+
+				section.Get("ItemStyleFg", &info.uItemStyleFg);
+				section.Get("ItemStyleBg", &info.uItemStyleBg);
+				section.Get("ItemFocusedStyleFg", &info.uItemFocusedStyleFg);
+				section.Get("ItemFocusedStyleBg", &info.uItemFocusedStyleBg);
+				section.Get("ItemDownStyleFg", &info.uItemDownStyleFg);
+				section.Get("ItemDownStyleBg", &info.uItemDownStyleBg);
+				section.Get("ItemDisabledStyleFg", &info.uItemDisabledStyleFg);
+				section.Get("ItemDisabledStyleBg", &info.uItemDisabledStyleBg);
+
+				section.Get("HeaderStyleFg", &info.uHeaderStyleFg);
+				section.Get("HeaderStyleBg", &info.uHeaderStyleBg);
+				section.Get("InfoStyleFg", &info.uInfoStyleFg);
+				section.Get("InfoStyleBg", &info.uInfoStyleBg);
+				section.Get("PopupStyleFg", &info.uPopupStyleFg);  // Backwards compat
+				section.Get("PopupStyleBg", &info.uPopupStyleBg);
+				section.Get("TooltipStyleFg", &info.uTooltipStyleFg);  // Backwards compat
+				section.Get("TooltipStyleBg", &info.uTooltipStyleBg);
+				info.uPopupTitleStyleFg = info.uItemStyleFg;
+				section.Get("PopupTitleStyleFg", &info.uPopupTitleStyleFg);
+				section.Get("PopupTitleStyleBg", &info.uPopupTitleStyleBg);
+				info.uCollapsibleHeaderStyleFg = info.uInfoStyleFg;
+				info.uCollapsibleHeaderStyleBg = info.uInfoStyleBg;
+				section.Get("CollapsibleHeaderStyleFg", &info.uCollapsibleHeaderStyleFg);  // Backwards compat
+				section.Get("CollapsibleHeaderStyleBg", &info.uCollapsibleHeaderStyleBg);
+				section.Get("BackgroundColor", &info.uBackgroundColor);
+				section.Get("ScrollbarColor", &info.uScrollbarColor);
+				section.Get("PopupSliderColor", &info.uPopupSliderColor);
+				section.Get("PopupSliderFocusedColor", &info.uPopupSliderFocusedColor);
+
+				appendTheme(info);
+			}
+		}
+	}
+}
+
+static UI::Style MakeStyle(uint32_t fg, uint32_t bg) {
+	UI::Style s;
+	s.background = UI::Drawable(bg);
+	s.fgColor = fg;
+	return s;
+}
+
+void UpdateTheme() {
+	// First run, get the default in at least
+	if (themeInfos.empty()) {
+		ReloadAllThemeInfo();
+	}
+
+	int defaultThemeIndex = -1;
+	int selectedThemeIndex = -1;
+	for (int i = 0; i < themeInfos.size(); ++i) {
+		if (themeInfos[i].name == "Default") {
+			defaultThemeIndex = i;
+		}
+		if (themeInfos[i].name == g_Config.sThemeName) {
+			selectedThemeIndex = i;
+		}
+	}
+
+	// Reset to Default if not found
+	if (selectedThemeIndex < 0 || selectedThemeIndex >= themeInfos.size()) {
+		g_Config.sThemeName = "Default";
+		selectedThemeIndex = defaultThemeIndex;
+		if (selectedThemeIndex < 0) {
+			_dbg_assert_(false);
+			// No themes? Bad.
+			return;
+		}
+	}
+
+	// Desktop font override support
+	auto des = GetI18NCategory(I18NCat::DESKTOPUI);
+	std::string_view fontOverride = des->T("Font", "");
+	if (fontOverride == "Font") {
+		fontOverride = "";
+	}
+	if (!fontOverride.empty()) {
+		SetFontNameOverride(FontFamily::SansSerif, fontOverride);
+	}
+
+	ui_theme.uiFontTiny = FontStyle(FontFamily::SansSerif, 14, FontStyleFlags::Default);
+	ui_theme.uiFontSmall = FontStyle(FontFamily::SansSerif, 17, FontStyleFlags::Default);
+	ui_theme.uiFont = FontStyle(FontFamily::SansSerif, 22, FontStyleFlags::Default);
+	ui_theme.uiFontBig = FontStyle(FontFamily::SansSerif, 28, FontStyleFlags::Bold);
+	ui_theme.uiFontCode = FontStyle(FontFamily::Fixed, 14, FontStyleFlags::Default);
+
+	ui_theme.checkOn = ImageID("I_CHECKEDBOX");
+	ui_theme.checkOff = ImageID("I_UNCHECKEDBOX");
+	ui_theme.whiteImage = ImageID("I_SOLIDWHITE");
+	ui_theme.sliderKnob = ImageID("I_CIRCLE");
+	ui_theme.dropShadow4Grid = ImageID("I_DROP_SHADOW");
+
+	const ThemeInfo &themeInfo = themeInfos[selectedThemeIndex];
+
+	// Actual configurable themes setting start here
+	ui_theme.itemStyle = MakeStyle(themeInfo.uItemStyleFg, themeInfo.uItemStyleBg);
+	ui_theme.itemFocusedStyle = MakeStyle(themeInfo.uItemFocusedStyleFg, themeInfo.uItemFocusedStyleBg);
+	ui_theme.itemDownStyle = MakeStyle(themeInfo.uItemDownStyleFg, themeInfo.uItemDownStyleBg);
+	ui_theme.itemDisabledStyle = MakeStyle(themeInfo.uItemDisabledStyleFg, themeInfo.uItemDisabledStyleBg);
+
+	ui_theme.headerStyle = MakeStyle(themeInfo.uHeaderStyleFg, themeInfo.uHeaderStyleBg);
+	ui_theme.collapsibleHeaderStyle = MakeStyle(themeInfo.uCollapsibleHeaderStyleFg, themeInfo.uCollapsibleHeaderStyleBg);
+	ui_theme.infoStyle = MakeStyle(themeInfo.uInfoStyleFg, themeInfo.uInfoStyleBg);
+
+	ui_theme.popupStyle = MakeStyle(themeInfo.uPopupStyleFg, themeInfo.uPopupStyleBg);
+	ui_theme.popupTitleStyle = MakeStyle(themeInfo.uPopupTitleStyleFg, themeInfo.uPopupTitleStyleBg);
+
+	ui_theme.tooltipStyle = MakeStyle(themeInfo.uTooltipStyleFg, themeInfo.uTooltipStyleBg);
+
+	ui_theme.backgroundColor = themeInfo.uBackgroundColor;
+	ui_theme.scrollbarColor = themeInfo.uScrollbarColor;
+
+	ui_theme.popupSliderColor = themeInfo.uPopupSliderColor;
+	ui_theme.popupSliderFocusedColor = themeInfo.uPopupSliderFocusedColor;
+}
+
+const UI::Theme *GetTheme() {
+	return &ui_theme;
+}
+
+void ReloadAllThemeInfo() {
+	std::vector<Path> directories;
+	directories.push_back(Path("themes"));  // For VFS
+	directories.push_back(GetSysDirectory(DIRECTORY_CUSTOM_THEMES));
+	LoadThemeInfo(directories);
+}
+
+std::vector<std::string> GetThemeInfoNames() {
+	std::vector<std::string> names;
+	for (const auto &info : themeInfos) {
+		names.push_back(info.name);
+	}
+	return names;
+}

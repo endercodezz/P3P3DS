@@ -1,0 +1,49 @@
+[game]
+name = "Monster Hunter Portable 3rd HD Ver."
+disc_id = "NPJB-40001"
+# The PS3 HD release embeds a PSP UMD image; its PARAM.SFO reports this title
+# while the game code still uses the ULJM05800 save-data identifier.
+psp_disc_id = "NPJB40001"
+save_id = "ULJM05800DAT"
+region = "NTSC-J"
+module = "MonsterHunterPortable3rd"
+module_version = "1.1"
+# The load image (0x08804000..0x0A285200 including BSS) exceeds classic 32 MiB
+# user RAM, so the runtime is created with 64 MiB.
+ram_mb = 64
+load_base = "0x08804000"
+entry = "0x0882170C"
+gp = "0x08A2A680"
+
+[input]
+# Encrypted PSP_GAME/SYSDIR/EBOOT.BIN from the user's own disc. The installer
+# (host/install) prepares the executable from it; developers may also supply
+# one prepared outside the project.
+encrypted_eboot_sha256 = "79e25f3512d56e0f7bf5c48351d7d0d255269675ffc8811ac5599322bb66945e"
+# Decrypted ELF expected by this profile.
+expected_sha256 = "55c0598436c0753b04331f8e95d406f832d9217806e3a896fed0e88b33637d8c"
+executable = "game/EBOOT.ELF"
+game_root = "game/PSP_GAME/USRDIR"
+
+[output]
+analysis_dir = "analysis"
+generated_dir = "generated"
+
+[overlays]
+# Code overlays are loaded at runtime from USRDIR/DATA.BIN into fixed slots.
+# Several overlays share a slot, so each needs its own AOT corpus and the
+# runtime must select the corpus of the overlay that is currently loaded.
+slots = [
+  "0x0A001780", # demo_sub, game_sub
+  "0x0A055E80", # P_m*/P_v* map overlays (154)
+  "0x0A05E600", # *_task mode overlays (game, lobby, demo, ...)
+  "0x0A1BB000", # em*m0 monsters, result
+  "0x0A1EFE80", # em*m1
+  "0x0A224D00", # em*m2
+  "0x0A239780", # em*m3
+  "0x0A24E200", # we*player00 weapons
+  "0x0A25BA80", # we*player01
+  "0x0A269300", # we*player02
+  "0x0A276B80", # we*player03, tutorialm1
+  "0x0A284400", # P_v00 and village map overlays
+]

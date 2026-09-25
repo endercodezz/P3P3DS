@@ -1,0 +1,162 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <string>
+#include <string_view>
+#include <vector>
+#include <mutex>
+#include <memory>
+
+#include "Core/FileSystems/FileSystem.h"
+
+class MetaFileSystem : public IHandleAllocator, public IFileSystem {
+private:
+	s32 current;
+	struct MountPoint {
+		std::string prefix;
+		std::shared_ptr<IFileSystem> system;
+		// Optional subdirectory inside the filesystem to treat as the root for this mount.
+		// Example: mounting "ms0:" with subDir "/PSP/GAME" will map "ms0:/file"
+		// to the underlying filesystem path "/PSP/GAME/file".
+		std::string subDir;
+
+		bool operator == (const MountPoint &other) const {
+			return prefix == other.prefix && system == other.system && subDir == other.subDir;
+		}
+	};
+
+	// The order of this vector is meaningful - lookups are always a linear search from the start.
+	std::vector<MountPoint> fileSystems;
+
+	std::map<int, std::string> currentDir;
+
+	std::string startingDirectory;
+	mutable std::recursive_mutex lock;  // must be recursive. TODO: fix that
+
+	// For the UMD host0 hack.
+	bool host0Mapped_ = false;
+
+	// Assumes the lock is held
+	void Reset() {
+		// This used to be 6, probably an attempt to replicate PSP handles.
+		// However, that's an artifact of using psplink anyway...
+		current = 1;
+		startingDirectory.clear();
+	}
+
+public:
+	MetaFileSystem() {
+		Reset();
+	}
+
+	// Will replace the existing mount if already exists. Mount with an optional sub-directory inside the filesystem to treat as the root.
+	void Mount(std::string_view prefix, std::shared_ptr<IFileSystem> system, std::string_view subDir = std::string_view());
+	void UnmountAll();
+	void Unmount(std::string_view prefix);
+
+	// Would like to make this const, but...
+	std::vector<MountPoint> &GetMounts() {
+		return fileSystems;
+	}
+
+	// The pointer returned from these are for temporary usage only. Do not store.
+	IFileSystem *GetSystem(std::string_view prefix);
+	IFileSystem *GetSystemFromFilename(std::string_view filename);
+	IFileSystem *GetHandleOwner(u32 handle) const;
+	FileSystemFlags FlagsFromFilename(std::string_view filename) {
+		IFileSystem *sys = GetSystemFromFilename(filename);
+		return sys ? sys->Flags() : FileSystemFlags::NONE;
+	}
+
+	void ThreadEnded(int threadID);
+	void Shutdown();
+
+	std::string GetCurrentDirForThread(int threadID) const;
+
+	u32 GetNewHandle() override {
+		u32 res = current++;
+		if (current < 0) {
+			// Some code assumes it'll never become 0.
+			current = 1;
+		}
+		return res;
+	}
+	void FreeHandle(u32 handle) override {}
+
+	void DoState(PointerWrap &p) override;
+
+	int MapFilePath(std::string_view inpath, std::string *outpath, MountPoint **system);
+
+	inline int MapFilePath(std::string_view inpath, std::string *outpath, IFileSystem **system) {
+		MountPoint *mountPoint = nullptr;
+		int error = MapFilePath(inpath, outpath, &mountPoint);
+		if (error == 0) {
+			*system = mountPoint->system.get();
+			return error;
+		}
+
+		return error;
+	}
+
+	std::string_view NormalizePrefix(std::string_view prefix) const;
+
+	std::vector<PSPFileInfo> GetDirListing(std::string_view path, bool *exists = nullptr) override;
+	int      OpenFile(std::string filename, FileAccess access, const char *devicename = nullptr) override;
+	void     CloseFile(u32 handle) override;
+	size_t   ReadFile(u32 handle, u8 *pointer, s64 size) override;
+	size_t   ReadFile(u32 handle, u8 *pointer, s64 size, int &usec) override;
+	size_t   WriteFile(u32 handle, const u8 *pointer, s64 size) override;
+	size_t   WriteFile(u32 handle, const u8 *pointer, s64 size, int &usec) override;
+	size_t   SeekFile(u32 handle, s32 position, FileMove type) override;
+	PSPFileInfo GetFileInfo(std::string filename) override;
+	PSPFileInfo GetFileInfoByHandle(u32 handle) override;
+	bool     OwnsHandle(u32 handle) override { return false; }
+	inline size_t GetSeekPos(u32 handle) {
+		return SeekFile(handle, 0, FILEMOVE_CURRENT);
+	}
+
+	virtual int ChDir(const std::string &dir);
+
+	bool MkDir(const std::string &dirname) override;
+	bool RmDir(const std::string &dirname) override;
+	int  RenameFile(const std::string &from, const std::string &to) override;
+	bool RemoveFile(const std::string &filename) override;
+	bool SetFileWritable(const std::string &filename, bool writable) override;
+	int  Ioctl(u32 handle, u32 cmd, u32 indataPtr, u32 inlen, u32 outdataPtr, u32 outlen, int &usec) override;
+	PSPDevType DevType(u32 handle) override;
+	FileSystemFlags Flags() const override { return FileSystemFlags::NONE; }
+	u64  FreeDiskSpace(const std::string &path) override;
+
+	// Convenience helper - returns < 0 on failure.
+	int ReadEntireFile(const std::string &filename, std::vector<u8> &data, bool quiet = false);
+
+	void SetStartingDirectory(std::string_view dir) {
+		std::lock_guard<std::recursive_mutex> guard(lock);
+		startingDirectory = dir;
+	}
+
+	int64_t ComputeRecursiveDirectorySize(std::string_view dirPath);
+
+	bool ComputeRecursiveDirSizeIfFast(const std::string &path, int64_t *size) override;
+
+	void Describe(char *buf, size_t size) const override { snprintf(buf, size, "Meta"); }
+
+private:
+	int64_t RecursiveSize(std::string_view dirPath);
+};

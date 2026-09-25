@@ -1,0 +1,44 @@
+# This is the output of the instruction perf test
+# (run by davidgfnet on a PSP-1000)
+
+>>>>>>> Memory latency performance tests <<<<<<
+Memory latency for sequential accesses (buf size 8192): 3.039715
+Memory latency for sequential accesses (buf size 16384): 3.095886
+Memory latency for sequential accesses (buf size 32768): 6.407503
+Memory latency for sequential accesses (buf size 65536): 6.402481
+Memory latency for sequential accesses (buf size 131072): 6.401926
+Memory latency for sequential accesses (buf size 262144): 6.400516
+Memory latency for sequential accesses (buf size 524288): 6.400298
+Memory latency for sequential accesses (buf size 1048576): 6.399961
+Memory latency for sequential accesses (buf size 2097152): 6.403811
+Memory latency for sequential accesses (buf size 4194304): 6.398651
+Memory latency for random accesses (buf size 8192): 3.039179
+Memory latency for random accesses (buf size 16384): 3.249829
+Memory latency for random accesses (buf size 32768): 39.171982
+Memory latency for random accesses (buf size 65536): 56.325180
+Memory latency for random accesses (buf size 131072): 64.789154
+Memory latency for random accesses (buf size 262144): 68.586517
+Memory latency for random accesses (buf size 524288): 70.482117
+Memory latency for random accesses (buf size 1048576): 71.711266
+Memory latency for random accesses (buf size 2097152): 72.218048
+Memory latency for random accesses (buf size 4194304): 72.464783
+Memory throughput for sequential (LW) accesses (buf size 8192): 1.038049 (3.853384 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 16384): 1.088483 (3.674838 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 32768): 4.526475 (0.883690 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 65536): 4.526137 (0.883756 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 131072): 4.523756 (0.884221 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 262144): 4.522525 (0.884462 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 524288): 4.520719 (0.884815 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 1048576): 4.522942 (0.884380 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 2097152): 4.521493 (0.884664 bytes/cycle)
+Memory throughput for sequential (LW) accesses (buf size 4194304): 4.520282 (0.884901 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 8192): 1.067523 (14.987961 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 16384): 2.467705 (6.483757 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 32768): 8.205307 (1.949957 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 65536): 8.090981 (1.977511 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 131072): 8.030561 (1.992389 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 262144): 8.002417 (1.999396 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 524288): 7.986896 (2.003282 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 1048576): 7.979988 (2.005016 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 2097152): 7.978639 (2.005355 bytes/cycle)
+Memory throughput for sequential (LV.Q) accesses (buf size 4194304): 7.974709 (2.006343 bytes/cycle)

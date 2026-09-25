@@ -1,0 +1,314 @@
+// Copyright (c) 2016- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#include <string>
+#include "Common/Log.h"
+#include "Common/StringUtils.h"
+#include "Common/GPU/Vulkan/VulkanContext.h"
+#include "Common/Data/Text/Parsers.h"
+#include "Core/Config.h"
+#include "Core/FrameTiming.h"
+#include "GPU/Vulkan/VulkanUtil.h"
+
+// Disable this on x64 android, causes problems.
+
+#if defined(_DEBUG) && !(PPSSPP_PLATFORM(ANDROID) && PPSSPP_ARCH(AMD64))
+static constexpr bool g_Validate = true;
+#else
+static constexpr bool g_Validate = false;
+#endif
+
+using namespace PPSSPP_VK;
+
+const VkComponentMapping VULKAN_4444_SWIZZLE = { VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B };
+const VkComponentMapping VULKAN_1555_SWIZZLE = { VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_A };
+const VkComponentMapping VULKAN_565_SWIZZLE = { VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_IDENTITY };
+const VkComponentMapping VULKAN_8888_SWIZZLE = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+
+static constexpr BindingType g_bindingTypes[] = {
+	BindingType::STORAGE_IMAGE_COMPUTE,
+	BindingType::STORAGE_BUFFER_COMPUTE,
+	BindingType::STORAGE_BUFFER_COMPUTE,
+	BindingType::STORAGE_IMAGE_COMPUTE,
+	BindingType::UNIFORM_BUFFER_COMPUTE,
+};
+
+VkPresentModeKHR ConfigPresentModeToVulkan(Draw::DrawContext *draw) {
+	g_frameTiming.ComputePresentMode(draw, false);
+	Draw::PresentMode presentMode = g_frameTiming.PresentMode();
+	switch (presentMode) {
+	case Draw::PresentMode::IMMEDIATE:
+		return VK_PRESENT_MODE_IMMEDIATE_KHR;
+	case Draw::PresentMode::MAILBOX:
+		return VK_PRESENT_MODE_MAILBOX_KHR;
+	case Draw::PresentMode::FIFO:
+	default:
+		return VK_PRESENT_MODE_FIFO_KHR;
+	}
+}
+
+// TODO: Share this between backends.
+static VulkanInitFlags VulkanInitFlagsFromConfig() {
+	VulkanInitFlags flags = (VulkanInitFlags)0;
+
+	if (g_Validate) {
+		flags |= VulkanInitFlags::VALIDATE;
+	}
+	if (g_Config.bVulkanDisableImplicitLayers) {
+		flags |= VulkanInitFlags::DISABLE_IMPLICIT_LAYERS;
+	}
+	return flags;
+}
+
+void InitVulkanCreateInfoFromConfig(VulkanContext::CreateInfo *info) {
+	Version gitVer(PPSSPP_GIT_VERSION);
+	info->app_name = "PPSSPP";
+	info->app_ver = gitVer.ToInteger();
+	info->flags = VulkanInitFlagsFromConfig();
+	info->customDriver = g_Config.sCustomDriver;
+}
+
+VkShaderModule CompileShaderModule(VulkanContext *vulkan, VkShaderStageFlagBits stage, const char *code, std::string *error) {
+	std::vector<uint32_t> spirv;
+	bool success = GLSLtoSPV(stage, code, GLSLVariant::VULKAN, spirv, error);
+	if (!error->empty()) {
+		if (success) {
+			ERROR_LOG(Log::G3D, "Warnings in shader compilation!");
+		} else {
+			ERROR_LOG(Log::G3D, "Error in shader compilation!");
+		}
+		ERROR_LOG(Log::G3D, "Messages: %s", error->c_str());
+		ERROR_LOG(Log::G3D, "Shader source:\n%s", LineNumberString(code).c_str());
+		OutputDebugStringUTF8("Messages:\n");
+		OutputDebugStringUTF8(error->c_str());
+		OutputDebugStringUTF8(LineNumberString(code).c_str());
+		return VK_NULL_HANDLE;
+	} else {
+		VkShaderModule module;
+		if (vulkan->CreateShaderModule(spirv, &module, stage == VK_SHADER_STAGE_VERTEX_BIT ? "system_vs" : "system_fs")) {
+			return module;
+		} else {
+			return VK_NULL_HANDLE;
+		}
+	}
+}
+
+VulkanComputeShaderManager::VulkanComputeShaderManager(VulkanContext *vulkan) : vulkan_(vulkan), pipelines_(8) {}
+VulkanComputeShaderManager::~VulkanComputeShaderManager() {}
+
+void VulkanComputeShaderManager::InitDeviceObjects(Draw::DrawContext *draw) {
+	VkPipelineCacheCreateInfo pc{ VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+	VkResult res = vkCreatePipelineCache(vulkan_->GetDevice(), &pc, nullptr, &pipelineCache_);
+	_assert_(VK_SUCCESS == res);
+
+	VkDescriptorSetLayoutBinding bindings[ARRAY_SIZE(g_bindingTypes)] = {};
+	bindings[0].descriptorCount = 1;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[0].binding = 0;
+	bindings[1].descriptorCount = 1;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[1].binding = 1;
+	bindings[2].descriptorCount = 1;
+	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[2].binding = 2;
+	bindings[3].descriptorCount = 1;
+	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[3].binding = 3;
+	bindings[4].descriptorCount = 1;
+	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[4].binding = 4;
+
+	VkDevice device = vulkan_->GetDevice();
+
+	VkDescriptorSetLayoutCreateInfo dsl = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+	dsl.bindingCount = ARRAY_SIZE(bindings);
+	dsl.pBindings = bindings;
+	res = vkCreateDescriptorSetLayout(device, &dsl, nullptr, &descriptorSetLayout_);
+	_assert_(VK_SUCCESS == res);
+
+	for (int i = 0; i < ARRAY_SIZE(frameData_); i++) {
+		frameData_[i].descPool.Create(vulkan_, g_bindingTypes, ARRAY_SIZE(g_bindingTypes), 4096);
+		frameData_[i].descPoolUsed = false;
+	}
+
+	VkPushConstantRange push = {};
+	push.offset = 0;
+	push.size = 16;
+	push.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+	VkPipelineLayoutCreateInfo pl = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pl.pPushConstantRanges = &push;
+	pl.pushConstantRangeCount = 1;
+	VkDescriptorSetLayout setLayouts[1] = { descriptorSetLayout_ };
+	pl.setLayoutCount = ARRAY_SIZE(setLayouts);
+	pl.pSetLayouts = setLayouts;
+	pl.flags = 0;
+	res = vkCreatePipelineLayout(device, &pl, nullptr, &pipelineLayout_);
+	_assert_(VK_SUCCESS == res);
+}
+
+void VulkanComputeShaderManager::DestroyDeviceObjects() {
+	for (int i = 0; i < ARRAY_SIZE(frameData_); i++) {
+		frameData_[i].descPool.Destroy();
+	}
+	if (descriptorSetLayout_) {
+		vulkan_->Delete().QueueDeleteDescriptorSetLayout(descriptorSetLayout_);
+	}
+	pipelines_.Iterate([&](const PipelineKey &key, VkPipeline pipeline) {
+		// Can be null if pipeline creation failed - we cache those too, to avoid retrying.
+		if (pipeline != VK_NULL_HANDLE) {
+			vulkan_->Delete().QueueDeletePipeline(pipeline);
+		}
+	});
+	pipelines_.Clear();
+
+	if (pipelineLayout_) {
+		vulkan_->Delete().QueueDeletePipelineLayout(pipelineLayout_);
+	}
+	if (pipelineCache_ != VK_NULL_HANDLE) {
+		vulkan_->Delete().QueueDeletePipelineCache(pipelineCache_);
+	}
+}
+
+VkDescriptorSet VulkanComputeShaderManager::GetDescriptorSet(VkImageView image, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, VkBuffer buffer2, VkDeviceSize offset2, VkDeviceSize range2, VkImageView image2, VkBuffer cbuffer, VkDeviceSize cbufferSize) {
+	int curFrame = vulkan_->GetCurFrame();
+	FrameData &frameData = frameData_[curFrame];
+	frameData.descPoolUsed = true;
+	VkDescriptorSet desc;
+	frameData.descPool.Allocate(&desc, 1, &descriptorSetLayout_);
+	_assert_(desc != VK_NULL_HANDLE);
+
+	VkWriteDescriptorSet writes[5]{};
+	int n = 0;
+	VkDescriptorImageInfo imageInfo[2] = {};
+	VkDescriptorBufferInfo bufferInfo[3] = {};
+	if (image) {
+		imageInfo[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo[0].imageView = image;
+		imageInfo[0].sampler = VK_NULL_HANDLE;
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].dstBinding = 0;
+		writes[n].pImageInfo = &imageInfo[0];
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[n].dstSet = desc;
+		n++;
+	}
+	if (buffer) {
+		bufferInfo[0].buffer = buffer;
+		bufferInfo[0].offset = offset;
+		bufferInfo[0].range = range;
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].dstBinding = 1;
+		writes[n].pBufferInfo = &bufferInfo[0];
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		writes[n].dstSet = desc;
+		n++;
+	}
+	if (buffer2) {
+		bufferInfo[1].buffer = buffer2;
+		bufferInfo[1].offset = offset2;
+		bufferInfo[1].range = range2;
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].dstBinding = 2;
+		writes[n].pBufferInfo = &bufferInfo[1];
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		writes[n].dstSet = desc;
+		n++;
+	}
+	if (image2) {
+		imageInfo[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo[1].imageView = image2;
+		imageInfo[1].sampler = VK_NULL_HANDLE;
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].dstBinding = 3;
+		writes[n].pImageInfo = &imageInfo[1];
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[n].dstSet = desc;
+		n++;
+	}
+	if (cbuffer) {
+		bufferInfo[2].buffer = cbuffer;
+		bufferInfo[2].offset = 0;
+		bufferInfo[2].range = cbufferSize;
+		writes[n].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[n].dstBinding = 4;
+		writes[n].pBufferInfo = &bufferInfo[2];
+		writes[n].descriptorCount = 1;
+		writes[n].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[n].dstSet = desc;
+		n++;
+	}
+	vkUpdateDescriptorSets(vulkan_->GetDevice(), n, writes, 0, nullptr);
+	return desc;
+}
+
+VkPipeline VulkanComputeShaderManager::GetPipeline(VkShaderModule cs, const char *tag) {
+	PipelineKey key{ cs };
+	VkPipeline pipeline = VK_NULL_HANDLE;
+	if (pipelines_.Get(key, &pipeline)) {
+		return pipeline;
+	}
+
+	VkComputePipelineCreateInfo pci{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+	pci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	pci.stage.module = cs;
+	pci.stage.pName = "main";
+	pci.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	pci.layout = pipelineLayout_;
+	pci.flags = 0;
+
+	VkResult res = vkCreateComputePipelines(vulkan_->GetDevice(), pipelineCache_, 1, &pci, nullptr, &pipeline);
+	if (res != VK_SUCCESS) {
+		ERROR_LOG(Log::G3D, "Failed to create compute pipeline from shader module (%s)", tag);
+		_dbg_assert_msg_(false, "Failed to create compute pipeline from shader module (%s)", tag);
+		// Insert a null pipeline so we don't retry every time, and don't fall through to the
+		// insert below - inserting the same key twice asserts in DenseHashMap.
+		pipelines_.Insert(key, VK_NULL_HANDLE);
+		return VK_NULL_HANDLE;
+	}
+
+	pipelines_.Insert(key, pipeline);
+	return pipeline;
+}
+
+void VulkanComputeShaderManager::ClearPipelines() {
+	pipelines_.Iterate([&](const PipelineKey &key, VkPipeline pipeline) {
+		// Can be null if pipeline creation failed - we cache those too, to avoid retrying.
+		if (pipeline != VK_NULL_HANDLE) {
+			vulkan_->Delete().QueueDeletePipeline(pipeline);
+		}
+	});
+	pipelines_.Clear();
+}
+
+void VulkanComputeShaderManager::BeginFrame() {
+	int curFrame = vulkan_->GetCurFrame();
+	FrameData &frame = frameData_[curFrame];
+	if (frame.descPoolUsed) {
+		frame.descPool.Reset();
+		frame.descPoolUsed = false;
+	}
+}

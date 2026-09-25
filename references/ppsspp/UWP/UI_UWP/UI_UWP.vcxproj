@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5fac15bd-7397-4512-99d5-66cdc03af5b7}</ProjectGuid>
+    <Keyword>StaticLibrary</Keyword>
+    <RootNamespace>UI_UWP</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <WindowsTargetPlatformMinVersion>10.0.19041.0</WindowsTargetPlatformMinVersion>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../..;../../ext/native;../../Common;../../ext;$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'ARM64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_ARM64_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE=1;%(ClCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../..;../../ext/native;../../Common;../../ext;$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\UI\AdhocServerScreen.h" />
+    <ClInclude Include="..\..\UI\AudioCommon.h" />
+    <ClInclude Include="..\..\UI\Background.h" />
+    <ClInclude Include="..\..\UI\BackgroundAudio.h" />
+    <ClInclude Include="..\..\UI\BaseScreens.h" />
+    <ClInclude Include="..\..\UI\ChatScreen.h" />
+    <ClInclude Include="..\..\UI\ControlMappingScreen.h" />
+    <ClInclude Include="..\..\UI\CustomButtonMappingScreen.h" />
+    <ClInclude Include="..\..\UI\CwCheatScreen.h" />
+    <ClInclude Include="..\..\UI\DebugOverlay.h" />
+    <ClInclude Include="..\..\UI\DeveloperToolsScreen.h" />
+    <ClInclude Include="..\..\UI\DevScreens.h" />
+    <ClInclude Include="..\..\UI\DiscordIntegration.h" />
+    <ClInclude Include="..\..\UI\DisplayLayoutScreen.h" />
+    <ClInclude Include="..\..\UI\DriverManagerScreen.h" />
+    <ClInclude Include="..\..\UI\EmuScreen.h" />
+    <ClInclude Include="..\..\UI\GameBrowser.h" />
+    <ClInclude Include="..\..\UI\GameInfoCache.h" />
+    <ClInclude Include="..\..\UI\GamepadEmu.h" />
+    <ClInclude Include="..\..\UI\GameScreen.h" />
+    <ClInclude Include="..\..\UI\GameSettingsScreen.h" />
+    <ClInclude Include="..\..\UI\GPUDriverTestScreen.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImConsole.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImDebugger.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImDisasmView.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImGe.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImJitViewer.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImMemView.h" />
+    <ClInclude Include="..\..\UI\ImDebugger\ImStructViewer.h" />
+    <ClInclude Include="..\..\UI\InstallPkgScreen.h" />
+    <ClInclude Include="..\..\UI\FirmwareScreen.h" />
+    <ClInclude Include="..\..\UI\InstallUpdateScreen.h" />
+    <ClInclude Include="..\..\UI\InstallZipScreen.h" />
+    <ClInclude Include="..\..\UI\JitCompareScreen.h" />
+    <ClInclude Include="..\..\UI\JoystickHistoryView.h" />
+    <ClInclude Include="..\..\UI\LoadStateConfirmScreen.h" />
+    <ClInclude Include="..\..\UI\MiscViews.h" />
+    <ClInclude Include="..\..\UI\SystemInfoScreen.h" />
+    <ClInclude Include="..\..\UI\TabbedDialogScreen.h" />
+    <ClInclude Include="..\..\UI\RetroAchievementScreens.h" />
+    <ClInclude Include="..\..\UI\Theme.h" />
+    <ClInclude Include="..\..\UI\MainScreen.h" />
+    <ClInclude Include="..\..\UI\MemStickScreen.h" />
+    <ClInclude Include="..\..\UI\MiscScreens.h" />
+    <ClInclude Include="..\..\UI\IAPScreen.h" />
+    <ClInclude Include="..\..\UI\OnScreenDisplay.h" />
+    <ClInclude Include="..\..\UI\PauseScreen.h" />
+    <ClInclude Include="..\..\UI\ProfilerDraw.h" />
+    <ClInclude Include="..\..\UI\RemoteISOScreen.h" />
+    <ClInclude Include="..\..\UI\ReportScreen.h" />
+    <ClInclude Include="..\..\UI\SavedataScreen.h" />
+    <ClInclude Include="..\..\UI\Store.h" />
+    <ClInclude Include="..\..\UI\TiltAnalogSettingsScreen.h" />
+    <ClInclude Include="..\..\UI\TouchControlLayoutScreen.h" />
+    <ClInclude Include="..\..\UI\TouchControlVisibilityScreen.h" />
+    <ClInclude Include="..\..\UI\UIAtlas.h" />
+    <ClInclude Include="..\..\UI\UploadScreen.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="targetver.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\UI\AdhocServerScreen.cpp" />
+    <ClCompile Include="..\..\UI\AudioCommon.cpp" />
+    <ClCompile Include="..\..\UI\Background.cpp" />
+    <ClCompile Include="..\..\UI\BackgroundAudio.cpp" />
+    <ClCompile Include="..\..\UI\BaseScreens.cpp" />
+    <ClCompile Include="..\..\UI\ChatScreen.cpp" />
+    <ClCompile Include="..\..\UI\ControlMappingScreen.cpp" />
+    <ClCompile Include="..\..\UI\CustomButtonMappingScreen.cpp" />
+    <ClCompile Include="..\..\UI\CwCheatScreen.cpp" />
+    <ClCompile Include="..\..\UI\DebugOverlay.cpp" />
+    <ClCompile Include="..\..\UI\DeveloperToolsScreen.cpp" />
+    <ClCompile Include="..\..\UI\DevScreens.cpp" />
+    <ClCompile Include="..\..\UI\DiscordIntegration.cpp" />
+    <ClCompile Include="..\..\UI\DisplayLayoutScreen.cpp" />
+    <ClCompile Include="..\..\UI\DriverManagerScreen.cpp" />
+    <ClCompile Include="..\..\UI\EmuScreen.cpp" />
+    <ClCompile Include="..\..\UI\GameBrowser.cpp" />
+    <ClCompile Include="..\..\UI\GameInfoCache.cpp" />
+    <ClCompile Include="..\..\UI\GamepadEmu.cpp" />
+    <ClCompile Include="..\..\UI\GameScreen.cpp" />
+    <ClCompile Include="..\..\UI\GameSettingsScreen.cpp" />
+    <ClCompile Include="..\..\UI\GPUDriverTestScreen.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImConsole.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImDebugger.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImDisasmView.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImGe.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImJitViewer.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImMemView.cpp" />
+    <ClCompile Include="..\..\UI\ImDebugger\ImStructViewer.cpp" />
+    <ClCompile Include="..\..\UI\InstallPkgScreen.cpp" />
+    <ClCompile Include="..\..\UI\FirmwareScreen.cpp" />
+    <ClCompile Include="..\..\UI\InstallUpdateScreen.cpp" />
+    <ClCompile Include="..\..\UI\InstallZipScreen.cpp" />
+    <ClCompile Include="..\..\UI\JitCompareScreen.cpp" />
+    <ClCompile Include="..\..\UI\JoystickHistoryView.cpp" />
+    <ClCompile Include="..\..\UI\LoadStateConfirmScreen.cpp" />
+    <ClCompile Include="..\..\UI\MiscViews.cpp" />
+    <ClCompile Include="..\..\UI\SystemInfoScreen.cpp" />
+    <ClCompile Include="..\..\UI\TabbedDialogScreen.cpp" />
+    <ClCompile Include="..\..\UI\SimpleDialogScreen.cpp" />
+    <ClCompile Include="..\..\UI\RetroAchievementScreens.cpp" />
+    <ClCompile Include="..\..\UI\Theme.cpp" />
+    <ClCompile Include="..\..\UI\MainScreen.cpp" />
+    <ClCompile Include="..\..\UI\MemStickScreen.cpp" />
+    <ClCompile Include="..\..\UI\MiscScreens.cpp" />
+    <ClCompile Include="..\..\UI\IAPScreen.cpp" />
+    <ClCompile Include="..\..\UI\NativeApp.cpp" />
+    <ClCompile Include="..\..\UI\OnScreenDisplay.cpp" />
+    <ClCompile Include="..\..\UI\PauseScreen.cpp" />
+    <ClCompile Include="..\..\UI\ProfilerDraw.cpp" />
+    <ClCompile Include="..\..\UI\RemoteISOScreen.cpp" />
+    <ClCompile Include="..\..\UI\ReportScreen.cpp" />
+    <ClCompile Include="..\..\UI\SavedataScreen.cpp" />
+    <ClCompile Include="..\..\UI\Store.cpp" />
+    <ClCompile Include="..\..\UI\TiltAnalogSettingsScreen.cpp" />
+    <ClCompile Include="..\..\UI\TouchControlLayoutScreen.cpp" />
+    <ClCompile Include="..\..\UI\TouchControlVisibilityScreen.cpp" />
+    <ClCompile Include="..\..\UI\UIAtlas.cpp" />
+    <ClCompile Include="..\..\UI\UploadScreen.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CommonUWP\CommonUWP.vcxproj">
+      <Project>{acb316ca-3ecb-48e5-be0a-91e72d5b0f12}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\lua\lua.vcxproj">
+      <Project>{3cea9e74-a31d-4044-a378-ed2e485931f2}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\rcheevos_UWP\rcheevos_UWP.vcxproj">
+      <Project>{4c9d52d0-310a-4347-8991-e3788cb22169}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

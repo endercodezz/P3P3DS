@@ -1,0 +1,259 @@
+#include <cstring>
+#include <set>
+
+#include "ppsspp_config.h"
+
+#include "Common/Net/HTTPClient.h"
+#include "Common/Net/URL.h"
+
+#include "Common/File/PathBrowser.h"
+#include "Common/File/FileUtil.h"
+#include "Common/File/DirListing.h"
+#include "Common/StringUtils.h"
+#include "Common/TimeUtil.h"
+#include "Common/Log.h"
+#include "Common/Thread/ThreadUtil.h"
+
+#if PPSSPP_PLATFORM(ANDROID)
+#include "android/jni/app-android.h"
+#endif
+
+static bool LoadRemoteFileList(const Path &url, std::string_view userAgent, bool *cancel, std::vector<File::FileInfo> &files) {
+	_dbg_assert_(url.Type() == PathType::HTTP);
+
+	http::Client http(nullptr);
+	Buffer result;
+	int code = 500;
+	std::vector<std::string> responseHeaders;
+
+	http.SetUserAgent(userAgent);
+
+	Url baseURL(url.ToString());
+	if (!baseURL.Valid()) {
+		return false;
+	}
+
+	// Start by requesting the list of files from the server.
+	if (http.Resolve(baseURL.Host().c_str(), baseURL.Port())) {
+		if (http.Connect(2, 20.0, cancel)) {
+			http::RequestParams req(baseURL.Resource(), "text/plain, text/html; q=0.9, */*; q=0.8");
+			net::RequestProgress progress(cancel);
+			code = http.GET(req, &result, responseHeaders, &progress);
+			http.Disconnect();
+		}
+	}
+
+	if (code != 200 || (cancel && *cancel)) {
+		return false;
+	}
+
+	std::string listing;
+	std::vector<std::string> items;
+	result.TakeAll(&listing);
+
+	constexpr std::string_view ContentTypeHeader = "Content-Type:";
+	std::string contentType;
+	for (const std::string &header : responseHeaders) {
+		if (startsWithNoCase(header, ContentTypeHeader)) {
+			contentType = header.substr(ContentTypeHeader.size());
+			// Strip any whitespace (TODO: maybe move this to stringutil?)
+			contentType.erase(0, contentType.find_first_not_of(" \t\r\n"));
+			contentType.erase(contentType.find_last_not_of(" \t\r\n") + 1);
+		}
+	}
+
+	// TODO: Technically, "TExt/hTml    ; chaRSet    =    Utf8" should pass, but "text/htmlese" should not.
+	// But unlikely that'll be an issue.
+	bool parseHtml = startsWithNoCase(contentType, "text/html");
+	bool parseText = startsWithNoCase(contentType, "text/plain");
+
+	if (parseText) {
+		// Plain text format - easy.
+		SplitString(listing, '\n', items);
+	} else if (parseHtml) {
+		// Try to extract from an automatic webserver directory listing...
+		GetQuotedStrings(listing, items);
+	} else {
+		ERROR_LOG(Log::IO, "Unsupported Content-Type: %s", contentType.c_str());
+		return false;
+	}
+	Path basePath(baseURL.ToString());
+	for (auto &item : items) {
+		// Apply some workarounds.
+		if (item.empty())
+			continue;
+		if (item.back() == '\r') {
+			item.pop_back();
+			if (item.empty())
+				continue;
+		}
+		if (item == baseURL.Resource())
+			continue;
+
+		File::FileInfo info;
+		if (item.back() == '/') {
+			item.pop_back();
+			if (item.empty())
+				continue;
+			info.isDirectory = true;
+		} else {
+			info.isDirectory = false;
+		}
+		info.name = item;
+		info.fullName = basePath / item;
+		info.exists = true;
+		info.size = 0;
+		info.isWritable = false;
+		files.push_back(info);
+	}
+
+	return !files.empty();
+}
+
+PathBrowser::~PathBrowser() {
+	{
+		std::unique_lock<std::mutex> guard(pendingLock_);
+		pendingCancel_ = true;
+		pendingStop_ = true;
+		pendingCond_.notify_all();
+	}
+	if (pendingThread_.joinable()) {
+		pendingThread_.join();
+	}
+}
+
+void PathBrowser::SetPath(const Path &path) {
+	std::lock_guard<std::mutex> guard(pendingLock_);
+	path_ = path;
+	ApplyRestriction();
+	HandlePath();
+}
+
+void PathBrowser::RestrictToRoot(const Path &root) {
+	VERBOSE_LOG(Log::IO, "Restricting to root: %s", root.c_str());
+	std::lock_guard<std::mutex> guard(pendingLock_);
+	restrictedRoot_ = root;
+}
+
+void PathBrowser::HandlePath() {
+	if (!path_.empty() && path_.ToString()[0] == '!') {
+		if (pendingActive_) {
+			pendingCancel_ = true;
+			pendingPath_.clear();
+		}
+		ready_ = true;
+		return;
+	}
+
+	ready_ = false;
+	pendingActive_ = true;
+	pendingCancel_ = false;
+	pendingFiles_.clear();
+	pendingPath_ = path_;
+	pendingCond_.notify_all();
+
+	if (pendingThread_.joinable())
+		return;
+
+	pendingThread_ = std::thread([this] {
+		SetCurrentThreadName("PathBrowser");
+
+		AndroidJNIThreadContext jniContext;  // destructor detaches
+
+		std::unique_lock<std::mutex> guard(pendingLock_);
+		std::vector<File::FileInfo> results;
+		Path lastPath("NONSENSE THAT WONT EQUAL A PATH");
+		while (!pendingStop_) {
+			while (lastPath == pendingPath_ && !pendingCancel_) {
+				pendingCond_.wait(guard);
+			}
+			if (pendingStop_) {
+				break;
+			}
+			lastPath = pendingPath_;
+			if (lastPath.Type() == PathType::HTTP) {
+				std::string userAgentCopy = userAgent_;
+				guard.unlock();
+				results.clear();
+				bool tempSuccess = LoadRemoteFileList(lastPath, userAgentCopy, &pendingCancel_, results);
+				guard.lock();
+				success_ = tempSuccess;
+			} else if (lastPath.empty()) {
+				results.clear();
+				success_ = true;
+			} else {
+				guard.unlock();
+				results.clear();
+				bool tempSuccess = File::GetFilesInDir(lastPath, &results, nullptr);
+				guard.lock();
+				success_ = tempSuccess;
+				if (!success_) {
+					WARN_LOG(Log::IO, "PathBrowser: Failed to list directory: %s", lastPath.c_str());
+				}
+			}
+
+			if (pendingPath_ == lastPath) {
+				if (success_ && !pendingCancel_) {
+					pendingFiles_ = results;
+				}
+				pendingPath_.clear();
+				lastPath.clear();
+				ready_ = true;
+			}
+		}
+	});
+}
+
+bool PathBrowser::GetListing(std::vector<File::FileInfo> &fileInfo, const char *extensionFilter, bool *cancel) {
+	std::unique_lock<std::mutex> guard(pendingLock_);
+	while (!ready_ && (!cancel || !*cancel)) {
+		// In case cancel changes, just sleep. TODO: Replace with condition variable.
+		guard.unlock();
+		sleep_ms(50, "pathbrowser-poll");
+		guard.lock();
+	}
+
+	fileInfo = ApplyFilter(pendingFiles_, extensionFilter, "");
+	return true;
+}
+
+void PathBrowser::ApplyRestriction() {
+	if (!path_.StartsWith(restrictedRoot_) && !startsWith(path_.ToString(), "!")) {
+		WARN_LOG(Log::IO, "Applying path restriction: %s (%s didn't match)", restrictedRoot_.c_str(), path_.c_str());
+		path_ = restrictedRoot_;
+	}
+}
+
+bool PathBrowser::CanNavigateUp() const {
+	std::unique_lock<std::mutex> guard(pendingLock_);
+	if (path_ == restrictedRoot_) {
+		return false;
+	}
+	return path_.CanNavigateUp();
+}
+
+void PathBrowser::NavigateUp() {
+	_dbg_assert_(CanNavigateUp());
+
+	std::unique_lock<std::mutex> guard(pendingLock_);
+	path_ = path_.NavigateUp();
+	ApplyRestriction();
+}
+
+// TODO: Support paths like "../../hello"
+void PathBrowser::Navigate(std::string_view path) {
+	std::unique_lock<std::mutex> guard(pendingLock_);
+	if (path == ".") {
+		// Same directory, nothing to do.
+		return;
+	}
+	if (path == "..") {
+		path_ = path_.NavigateUp();
+	} else if (path.size() >= 2 && path[1] == ':' && path_.IsRoot()) {
+		path_ = Path(path);
+	} else {
+		path_ = path_ / path;
+	}
+	ApplyRestriction();
+	HandlePath();
+}

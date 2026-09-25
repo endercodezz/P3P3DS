@@ -1,0 +1,25 @@
+// Entry point of one overlay library, configured from the overlay's meta.txt by
+// profiles/mhp3rd/CMakeLists.txt. Everything else in the library is psp_recomp
+// output carrying the @MHP3RD_OVERLAY_PREFIX@ symbol prefix.
+#define MHP3RD_OVERLAY_MODULE 1
+#include "overlay_module.hpp"
+
+#include "psprecomp/runtime.hpp"
+
+namespace psprecomp {
+void register_@MHP3RD_OVERLAY_PREFIX@_functions(Runtime &runtime);
+}
+
+namespace {
+
+constexpr mhp3rd::OverlayModuleInfo kInfo{mhp3rd::kOverlayAbiVersion, @MHP3RD_OVERLAY_BASE@u,
+                                          @MHP3RD_OVERLAY_SIZE@u, @MHP3RD_OVERLAY_CODE_SIZE@u,
+                                          @MHP3RD_OVERLAY_HASH@ull, "@MHP3RD_OVERLAY_NAME@"};
+
+} // namespace
+
+const mhp3rd::OverlayModuleInfo *mhp3rd_overlay_info() { return &kInfo; }
+
+void mhp3rd_register_overlay(psprecomp::Runtime &runtime) {
+    psprecomp::register_@MHP3RD_OVERLAY_PREFIX@_functions(runtime);
+}

@@ -1,0 +1,135 @@
+#pragma once
+
+#include <cmath>
+
+struct Point2D {
+	Point2D() : x(0.0f), y(0.0f) {}
+	Point2D(float x_, float y_) : x(x_), y(y_) {}
+
+	float x;
+	float y;
+
+	float distanceTo(const Point2D &other) const {
+		float dx = other.x - x, dy = other.y - y;
+		return sqrtf(dx*dx + dy*dy);
+	}
+
+	bool operator ==(const Point2D &other) const {
+		return x == other.x && y == other.y;
+	}
+
+	/*
+	FocusMove directionTo(const Point &other) const {
+		int angle = atan2f(other.y - y, other.x - x) / (2 * M_PI) - 0.125;
+
+	}*/
+};
+
+// Moved here from UI, it has general uses too.
+enum Orientation {
+	ORIENT_HORIZONTAL,
+	ORIENT_VERTICAL,
+};
+
+// Possibly, we'll add a mode for the book-style dual screen phones later.
+// TODO: Find a better home for this!
+enum class DeviceOrientation {
+	Landscape = 0,
+	Portrait = 1,
+};
+
+// Workaround for X header, ugh.
+#undef Opposite
+
+inline constexpr Orientation Opposite(Orientation o) {
+	return (o == ORIENT_HORIZONTAL) ? ORIENT_VERTICAL : ORIENT_HORIZONTAL;
+}
+
+// Resolved bounds on screen after layout.
+struct Bounds {
+	Bounds() : x(0.0f), y(0.0f), w(0.0f), h(0.0f) {}
+	Bounds(float x_, float y_, float w_, float h_) : x(x_), y(y_), w(w_), h(h_) {}
+
+	static Bounds FromCenter(float x_, float y_, float radius) {
+		return Bounds(x_ - radius, y_ - radius, radius * 2.0f, radius * 2.0f);
+	}
+
+	static Bounds FromCenterWH(float x_, float y_, float w, float h) {
+		return Bounds(x_ - w * 0.5f, y_ - h * 0.5f, w, h);
+	}
+
+	float GetSize(Orientation o) const {
+		return (o == ORIENT_HORIZONTAL) ? w : h;
+	}
+
+	bool Contains(float px, float py) const {
+		return (px >= x && py >= y && px < x + w && py < y + h);
+	}
+
+	bool Intersects(const Bounds &other) const {
+		return !(x > other.x2() || x2() < other.x || y > other.y2() || y2() < other.y);
+	}
+
+	void Clip(const Bounds &clipTo) {
+		if (x < clipTo.x) {
+			w -= clipTo.x - x;
+			x = clipTo.x;
+		}
+		if (y < clipTo.y) {
+			h -= clipTo.y - y;
+			y = clipTo.y;
+		}
+		if (x2() > clipTo.x2()) {
+			w = clipTo.x2() - x;
+		}
+		if (y2() > clipTo.y2()) {
+			h = clipTo.y2() - y;
+		}
+	}
+
+	float x2() const { return x + w; }
+	float y2() const { return y + h; }
+	float centerX() const { return x + w * 0.5f; }
+	float centerY() const { return y + h * 0.5f; }
+	float radius() const {
+		return ((w > h) ? w : h) * 0.5f;
+	}
+	Point2D Center() const {
+		return Point2D(centerX(), centerY());
+	}
+	[[nodiscard]]
+	Bounds Expand(float amount) const {
+		return Bounds(x - amount, y - amount, w + amount * 2, h + amount * 2);
+	}
+	[[nodiscard]]
+	Bounds Expand(float xAmount, float yAmount) const {
+		return Bounds(x - xAmount, y - yAmount, w + xAmount * 2, h + yAmount * 2);
+	}
+	[[nodiscard]]
+	Bounds Expand(float left, float top, float right, float bottom) const {
+		return Bounds(x - left, y - top, w + left + right, h + top + bottom);
+	}
+	[[nodiscard]]
+	Bounds Offset(float xAmount, float yAmount) const {
+		return Bounds(x + xAmount, y + yAmount, w, h);
+	}
+	[[nodiscard]]
+	Bounds Inset(float left, float top, float right, float bottom) const {
+		return Bounds(x + left, y + top, w - left - right, h - bottom - top);
+	}
+	[[nodiscard]]
+	Bounds Inset(float xAmount, float yAmount) const {
+		return Bounds(x + xAmount, y + yAmount, w - xAmount * 2, h - yAmount * 2);
+	}
+
+	float AspectRatio() const {
+		return w / h;
+	}
+
+	float x;
+	float y;
+	float w;
+	float h;
+};
+
+

@@ -1,0 +1,15 @@
+import( "../original/h14_07.bf" );
+import( "../ModMenu.flow" );
+
+global bool isFieldBf;
+
+void f014_007_shortcut_hook()
+{
+    isFieldBf = false;
+    ModMenuInit();
+}
+
+void CallOriginalSquareMenu()
+{
+    f014_007_shortcut_unhooked();
+} 

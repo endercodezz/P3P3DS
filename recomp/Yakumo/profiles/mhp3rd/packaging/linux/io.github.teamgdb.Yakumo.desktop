@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Yakumo
+GenericName=Native port of Monster Hunter Portable 3rd HD Ver.
+Comment=Play Monster Hunter Portable 3rd HD Ver. natively from your own disc image
+Exec=yakumo
+Icon=io.github.teamgdb.Yakumo
+Terminal=false
+Categories=Game;ActionGame;
+Keywords=Monster Hunter;MHP3rd;PSP;recompilation;
+StartupNotify=true

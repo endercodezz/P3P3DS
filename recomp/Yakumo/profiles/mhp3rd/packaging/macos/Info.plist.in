@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Yakumo</string>
+	<key>CFBundleIconFile</key>
+	<string>Yakumo</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.teamgdb.yakumo</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Yakumo</string>
+	<key>CFBundleDisplayName</key>
+	<string>Yakumo</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@SHORT_VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@BUNDLE_VERSION@</string>
+	<key>CFBundleGetInfoString</key>
+	<string>Yakumo @VERSION@</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Yakumo @VERSION@. MIT License. Includes no game assets.</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>@MINIMUM_SYSTEM_VERSION@</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.action-games</string>
+	<key>LSSupportsGameMode</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Yakumo connects to ad hoc servers and to other players on your network for multiplayer.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Yakumo reads your disc image and saves you choose from the Desktop folder.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Yakumo reads your disc image and saves you choose from the Documents folder.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Yakumo reads your disc image and saves you choose from the Downloads folder.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Yakumo reads your disc image and saves you choose from removable drives.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Yakumo reads your disc image and saves you choose from network drives.</string>
+</dict>
+</plist>

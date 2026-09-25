@@ -1,0 +1,117 @@
+/*
+ * PSP Software Development Kit - https://github.com/pspdev
+ * -----------------------------------------------------------------------
+ * Licensed under the BSD license, see LICENSE in PSPSDK root for details.
+ *
+ * pspsyscon.h - Interface to sceSyscon_driver.
+ *
+ * Copyright (c) 2006 James F
+ *
+ */
+
+#ifndef PSPSYSCON_H
+#define PSPSYSCON_H
+
+#include <pspkerneltypes.h>
+
+/** @defgroup Syscon Interface to the sceSyscon_driver library.
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** @addtogroup Syscon Interface to the sceSyscon_driver library. */
+/**@{*/
+
+/**
+  * Force the PSP to go into standby.
+  */
+void sceSysconPowerStandby(void);
+
+/**
+ * Reset the PSP.
+ *
+ * @param unk1 - Unknown, pass 1.
+ * @param unk2 - Unknown, pass 1.
+ */
+void sceSysconResetDevice(int unk1, int unk2);
+
+#define SCE_LED_POWER 1
+#define LED_ON 1
+#define LED_OFF 0
+/**
+ * Control an LED.
+ *
+ * @param SceLED - The led to toggle (only SCE_LED_POWER).
+ * @param state - Whether to turn on or off.
+ */
+int sceSysconCtrlLED(int SceLED, int state);
+
+/**
+ * Control the remote control power.
+ *
+ * @param power - 1 is on, 0 is off.
+ * 
+ * @return < 0 on error.
+ */
+int sceSysconCtrlHRPower(int power);
+
+/**
+ * Get the headphone connection status.
+ * @return 1 if the headphone is connected, 0 if the headphone is disconnected.
+ */
+s8 sceSysconGetHPConnect(void);
+
+int sceSysconSetHPConnectCallback(void (*)(int), int unk0);
+
+int sceSysconSetHRPowerCallback(void (*)(int), int unk0);
+
+/**
+ * Get the PSP's Pommel version.
+ * @param version - A pointer to an int to receive the Pommel version into.
+ */
+int sceSysconGetPommelVersion(int* version);
+
+/**
+ * Get the PSP's Baryon version.
+ * @param version - A pointer to an int to receive the Baryon version into.
+ */
+int sceSysconGetBaryonVersion(int* version);
+
+/**
+ * Get the PSP's Polestar version.
+ * @param version - A pointer to an int to receive the Polestar version into.
+ */
+int sceSysconGetPolestarVersion(int* version);
+
+/**
+ * Get the baryon timestamp string.
+ * @param timeStamp A pointer to a string at least 12 bytes long.
+ */
+int sceSysconGetTimeStamp(s8 *timeStamp);
+
+int sceSysconReceiveSetParam(int n, u8 *buf);
+
+
+/**
+ * Controls power supply to the USB accessory port (PSP Cam, GPS, etc.).
+ * @param power 1 to turn on, 0 to turn off
+ * @return 0 if success, < 0 otherwise
+ */
+int sceSysconCtrlUsbPower(u8 power);
+
+/**
+ * Gets the power status of the USB accessory port (PSP Cam, GPS, etc.).
+ * @return 1 if powered on, 0 otherwise
+ */
+u8 sceSysconGetUsbPowerCtrl(void);
+
+
+/**@}*/
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

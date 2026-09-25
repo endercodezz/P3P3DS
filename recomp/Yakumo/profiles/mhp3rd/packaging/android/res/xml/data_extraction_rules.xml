@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The same as backup_rules.xml, for Android 12 and later: cloud backups and
+     transfers to a new device keep the saves and the settings only. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="ms0/PSP/SAVEDATA/" />
+        <include domain="file" path="settings.ini" />
+        <exclude domain="file" path="ms0/PSP/SAVEDATA/ULJM05800DAT/" />
+        <exclude domain="file" path="ms0/PSP/SAVEDATA/.backup/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="ms0/PSP/SAVEDATA/" />
+        <include domain="file" path="settings.ini" />
+        <exclude domain="file" path="ms0/PSP/SAVEDATA/ULJM05800DAT/" />
+        <exclude domain="file" path="ms0/PSP/SAVEDATA/.backup/" />
+    </device-transfer>
+</data-extraction-rules>

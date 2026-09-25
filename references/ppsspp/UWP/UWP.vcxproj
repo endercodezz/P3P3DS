@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props" Condition="Exists('packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props')" />
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Gold|ARM64">
+      <Configuration>UWP Gold</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Gold|x64">
+      <Configuration>UWP Gold</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{01D7D581-09A3-4A26-94BD-A7C529B29329}</ProjectGuid>
+    <Keyword>DirectXApp</Keyword>
+    <RootNamespace>UWP</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <WindowsTargetPlatformMinVersion>10.0.19041.0</WindowsTargetPlatformMinVersion>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <ProjectName>PPSSPP_UWP</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' or '$(Configuration)' == 'UWP Gold'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ImageContentTask.props" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\MeshContentTask.props" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ShaderGraphContentTask.props" />
+  </ImportGroup>
+  <ImportGroup>
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+    <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+    <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
+    <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <PackageCertificateKeyFile>PPSSPP_UWP_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+    <GenerateTestArtifacts>True</GenerateTestArtifacts>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/ARM64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\arm; $(VCInstallDir)\lib\arm</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy AssetsNormal\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/ARM64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\arm; $(VCInstallDir)\lib\arm</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy AssetsNormal\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'UWP Gold|ARM64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/ARM64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\arm; $(VCInstallDir)\lib\arm</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>GOLD;NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy PackageGold.appxmanifest Package.appxmanifest /Y
+				copy AssetsGold\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/x64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\amd64; $(VCInstallDir)\lib\amd64</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy AssetsNormal\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/x64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\amd64; $(VCInstallDir)\lib\amd64</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy AssetsNormal\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'UWP Gold|x64'">
+    <Link>
+      <AdditionalDependencies>xinputuap.lib;libavcodec.a;libavformat.a;libavutil.a;libswresample.a;libswscale.a;d2d1.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib; %(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../ffmpeg/Windows10/x64/lib;%(AdditionalLibraryDirectories); $(VCInstallDir)\lib\store\amd64; $(VCInstallDir)\lib\amd64</AdditionalLibraryDirectories>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <ClCompile>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>..;../ext/native;../ext/snappy;$(ProjectDir);$(IntermediateOutputPath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
+      <PreprocessorDefinitions>GOLD;NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <PreBuildEvent>
+      <Command>
+				copy PackageGold.appxmanifest Package.appxmanifest /Y
+				copy AssetsGold\*.* Assets /Y
+				../Windows/git-version-gen.cmd
+				EXIT 0
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+      <FileType>Document</FileType>
+    </AppxManifest>
+    <None Include="PackageGold.appxmanifest">
+      <SubType>Designer</SubType>
+      <FileType>Document</FileType>
+    </None>
+    <Image Include="Assets\StoreLogo.png">
+      <DeploymentContent>True</DeploymentContent>
+    </Image>
+    <Image Include="Assets\LockScreenLogo.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\SplashScreen.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\Square150x150Logo.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\Square44x44Logo.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+    <Image Include="Assets\Wide310x150Logo.scale-200.png">
+      <DeploymentContent>true</DeploymentContent>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\ppsspp_config.h" />
+    <ClInclude Include="..\Windows\InputDevice.h" />
+    <ClInclude Include="..\Windows\XinputDevice.h" />
+    <ClInclude Include="App.h" />
+    <ClInclude Include="Common\DeviceResources.h" />
+    <ClInclude Include="NKCodeFromWindowsSystem.h" />
+    <ClInclude Include="PPSSPP_UWPMain.h" />
+    <ClInclude Include="Common\DirectXHelper.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="UWPHelpers\InputHelpers.h" />
+    <ClInclude Include="UWPUtil.h" />
+    <ClInclude Include="XAudioSoundStream.h" />
+    <ClInclude Include="UWPHelpers\StorageAccess.h" />
+    <ClInclude Include="UWPHelpers\StorageAsync.h" />
+    <ClInclude Include="UWPHelpers\StorageManager.h" />
+    <ClInclude Include="UWPHelpers\StoragePickers.h" />
+    <ClInclude Include="UWPHelpers\LaunchItem.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\git-version.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Windows\InputDevice.cpp" />
+    <ClCompile Include="..\Windows\XinputDevice.cpp" />
+    <ClCompile Include="App.cpp" />
+    <ClCompile Include="Common\DeviceResources.cpp" />
+    <ClCompile Include="NKCodeFromWindowsSystem.cpp" />
+    <ClCompile Include="PPSSPP_UWPMain.cpp" />
+    <ClCompile Include="UWPHelpers\StorageAccess.cpp" />
+    <ClCompile Include="UWPHelpers\StorageAsync.cpp" />
+    <ClCompile Include="UWPHelpers\StorageManager.cpp" />
+    <ClCompile Include="UWPHelpers\StoragePickers.cpp" />
+    <ClCompile Include="UWPHelpers\LaunchItem.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="UWPHelpers\InputHelpers.cpp" />
+    <ClCompile Include="XAudioSoundStream.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\Assets\*.png">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Image>
+    <Image Include="..\Assets\ui_images\*.png">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\ui_images\%(Filename)%(Extension)</Link>
+    </Image>
+    <Image Include="..\Assets\ui_images\*.svg">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\ui_images\%(Filename)%(Extension)</Link>
+    </Image>
+    <Image Include="..\Assets\debugger\favicon.ico">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\%(Filename)%(Extension)</Link>
+    </Image>
+    <Image Include="..\Assets\*.zim">
+      <DeploymentContent>true</DeploymentContent>
+      <FileType>Document</FileType>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Image>
+    <None Include="..\Assets\upload\*.*">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\upload\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\.nojekyll">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\*.json">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\index.html">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\static\css\*.css">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\css\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\static\css\*.map">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\css\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\static\js\*.js">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\js\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\static\js\*.map">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\js\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\debugger\static\media\*.svg">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\media\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\*.meta">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\themes\*.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\themes\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\compat.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\*.wav">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\flash0\font\*.pgf">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\flash0\font\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\redump.csv">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\infra-dns.json">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\adhoc-servers.json">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\knownfuncs.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\langregion.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\lang\*.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\lang\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\shaders\defaultshaders.ini">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\shaders\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\shaders\*.fsh">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\shaders\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\shaders\*.csh">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\shaders\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="..\Assets\shaders\*.vsh">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\shaders\%(Filename)%(Extension)</Link>
+    </None>
+    <None Include="packages.config" />
+    <None Include="PPSSPP_UWP_TemporaryKey.pfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Armips_UWP\Armips_UWP.vcxproj">
+      <Project>{75286959-e7a2-4cbe-8b95-bf05c9c540ff}</Project>
+    </ProjectReference>
+    <ProjectReference Include="CommonUWP\CommonUWP.vcxproj">
+      <Project>{acb316ca-3ecb-48e5-be0a-91e72d5b0f12}</Project>
+    </ProjectReference>
+    <ProjectReference Include="CoreUWP\CoreUWP.vcxproj">
+      <Project>{40b76674-02de-40ef-889b-fad1489685e7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="glslang_UWP\glslang_UWP.vcxproj">
+      <Project>{d326891e-ece4-4b94-b5e7-8aa0a8e8ecbc}</Project>
+    </ProjectReference>
+    <ProjectReference Include="GPU_UWP\GPU_UWP.vcxproj">
+      <Project>{5d271429-c288-4534-98af-94475d940058}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libkirk_UWP\libkirk_UWP.vcxproj">
+      <Project>{2f911c05-b341-4291-8bf5-09edecbdd5f5}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libzstd_UWP\libzstd_UWP.vcxproj">
+      <Project>{75286959-e7a2-4cbe-8b95-bf05c9c540fe}</Project>
+    </ProjectReference>
+    <ProjectReference Include="lua\lua.vcxproj">
+      <Project>{3cea9e74-a31d-4044-a378-ed2e485931f2}</Project>
+    </ProjectReference>
+    <ProjectReference Include="SPIRVCross_UWP\SPIRVCross_UWP.vcxproj">
+      <Project>{2b2d16bd-1d37-46af-a3f8-552900951b26}</Project>
+    </ProjectReference>
+    <ProjectReference Include="UI_UWP\UI_UWP.vcxproj">
+      <Project>{5fac15bd-7397-4512-99d5-66cdc03af5b7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="zlib_UWP\zlib_UWP.vcxproj">
+      <Project>{ddf90203-0aae-4f38-b589-2e9637658ce6}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Assets\debugger\static\js\*.txt">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\debugger\static\js\%(Filename)%(Extension)</Link>
+    </Text>
+    <Text Include="..\Assets\gamecontrollerdb.txt">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="..\Assets\Roboto_Condensed-Regular.ttf">
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Font>
+    <Font Include="..\Assets\Roboto_Condensed-Bold.ttf">
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Font>
+    <Font Include="..\Assets\Roboto_Condensed-Italic.ttf">
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Font>
+    <Font Include="..\Assets\Roboto_Condensed-Light.ttf">
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Font>
+    <Font Include="..\Assets\Inconsolata-Regular.ttf">
+      <Link>Content\%(Filename)%(Extension)</Link>
+    </Font>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ImageContentTask.targets" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\MeshContentTask.targets" />
+    <Import Project="$(VSINSTALLDIR)\Common7\IDE\Extensions\Microsoft\VsGraphics\ShaderGraphContentTask.targets" />
+    <Import Project="packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.props'))" />
+    <Error Condition="!Exists('packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Windows.CppWinRT.2.0.250303.1\build\native\Microsoft.Windows.CppWinRT.targets'))" />
+  </Target>
+</Project>

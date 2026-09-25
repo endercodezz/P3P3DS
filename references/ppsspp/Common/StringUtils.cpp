@@ -1,0 +1,592 @@
+// Copyright (C) 2003 Dolphin Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official SVN repository and contact information can be found at
+// http://code.google.com/p/dolphin-emu/
+
+#include <cstring>
+#include <unordered_set>
+#include "ppsspp_config.h"
+
+#ifdef _WIN32
+#include "Common/CommonWindows.h"
+#endif
+
+#if PPSSPP_PLATFORM(SWITCH)
+#define _GNU_SOURCE
+#include <cstdio>
+#endif
+
+#include <cstdarg>
+
+#include <string>
+#include <sstream>
+
+#include <algorithm>
+#include <iomanip>
+#include <cctype>
+
+#include "Common/Buffer.h"
+#include "Common/StringUtils.h"
+
+size_t truncate_cpy(char *dest, size_t destSize, const char *src) {
+	size_t len = strlen(src);
+	if (len >= destSize - 1) {
+		memcpy(dest, src, destSize - 1);
+		len = destSize - 1;
+	} else {
+		memcpy(dest, src, len);
+	}
+	dest[len] = '\0';
+	return len;
+}
+
+size_t truncate_cpy(char *dest, size_t destSize, std::string_view src) {
+	if (src.size() > destSize - 1) {
+		memcpy(dest, src.data(), destSize - 1);
+		dest[destSize - 1] = 0;
+		return destSize - 1;
+	} else {
+		memcpy(dest, src.data(), src.size());
+		dest[src.size()] = 0;
+		return src.size();
+	}
+}
+
+long parseHexLong(const std::string &s) {
+	long value = 0;
+
+	if (s.substr(0,2) == "0x") {
+		//s = s.substr(2);
+	}
+	value = strtoul(s.c_str(),0, 0);
+	return value;
+}
+
+long parseLong(std::string s) {
+	long value = 0;
+	if (s.substr(0,2) == "0x") {
+		s = s.substr(2);
+		value = strtol(s.c_str(),NULL, 16);
+	} else {
+		value = strtol(s.c_str(),NULL, 10);
+	}
+	return value;
+}
+
+bool containsNoCase(std::string_view haystack, std::string_view needle) {
+	auto pred = [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); };
+	auto found = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), pred);
+	return found != haystack.end();
+}
+
+int CountChar(std::string_view haystack, char needle) {
+	int count = 0;
+	for (int i = 0; i < (int)haystack.size(); i++) {
+		if (haystack[i] == needle) {
+			count++;
+		}
+	}
+	return count;
+}
+
+std::string SanitizeString(std::string_view input, StringRestriction restriction, int minLength, int maxLength) {
+	if (restriction == StringRestriction::None) {
+		return std::string(input);
+	}
+	// First, remove any chars not in A-Za-z0-9_-. This will effectively get rid of any Unicode char, emojis etc too.
+	std::string sanitized;
+	sanitized.reserve(input.size());
+	bool lastWasLineBreak = false;
+	for (char c : input) {
+		switch (restriction) {
+		case StringRestriction::None:
+			sanitized.push_back(c);
+			break;
+		case StringRestriction::AlphaNumDashUnderscore:
+			if ((c >= 'A' && c <= 'Z') ||
+				(c >= 'a' && c <= 'z') ||
+				(c >= '0' && c <= '9') || c == '-' || c == '_') {
+				// Allowed chars.
+				sanitized.push_back(c);
+			}
+			break;
+		case StringRestriction::FileName:
+			if ((c >= 'A' && c <= 'Z') ||
+				(c >= 'a' && c <= 'z') ||
+				(c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
+				sanitized.push_back(c);
+			} else {
+				sanitized.push_back('_');
+			}
+			break;
+		case StringRestriction::NoLineBreaksOrSpecials:
+			if ((uint8_t)c >= 32) {
+				sanitized.push_back(c);
+				lastWasLineBreak = false;
+			} else if (c == 10 || c == 13) {
+				// Collapse line breaks/feeds to single spaces.
+				if (!lastWasLineBreak) {
+					sanitized.push_back(' ');
+					lastWasLineBreak = true;
+				}
+			}
+			break;
+		case StringRestriction::ConvertToUnixEndings:  // Strips off carriage returns, keeps line feeds.
+			if (c != '\r') {
+				sanitized.push_back(c);
+			}
+			break;
+		}
+	}
+
+	if (minLength > 0) {
+		if ((int)sanitized.size() < minLength) {
+			// Just reject it by returning an empty string, as we can't really
+			// conjure up new characters here.
+			return std::string();
+		}
+	}
+
+	if (maxLength >= 0) {
+		// TODO: Cut at whole UTF-8 chars!
+		if ((int)sanitized.size() > maxLength) {
+			sanitized.resize(maxLength);
+		}
+	}
+
+	if (restriction == StringRestriction::NoLineBreaksOrSpecials) {
+		// Additionally, cut off the string if we find an overlong UTF-8 character, such as in Jak & Daxter's title.
+		size_t pos = sanitized.find("\xc0\x80");
+		if (pos != (size_t)std::string::npos) {
+			sanitized.resize(pos);
+		}
+	}
+	return sanitized;
+}
+
+bool CharArrayFromFormatV(char* out, int outsize, const char* format, va_list args)
+{
+	int writtenCount = vsnprintf(out, outsize, format, args);
+
+	if (writtenCount > 0 && writtenCount < outsize)
+	{
+		out[writtenCount] = '\0';
+		return true;
+	}
+	else
+	{
+		out[outsize - 1] = '\0';
+		return false;
+	}
+}
+
+std::string LineNumberString(const std::string &str) {
+	std::stringstream input(str);
+	std::stringstream output;
+	std::string line;
+
+	int lineNumber = 1;
+	while (std::getline(input, line)) {
+		output << std::setw(4) << lineNumber++ << ":  " << line << std::endl;
+	}
+
+	return output.str();
+}
+
+std::string IndentString(const std::string &str, std::string_view sep, bool skipFirst) {
+	std::stringstream input(str);
+	std::stringstream output;
+	std::string line;
+
+	bool doIndent = !skipFirst;
+	while (std::getline(input, line)) {
+		if (doIndent) {
+			output << sep;
+		}
+		doIndent = true;
+		output << line << "\n";
+	}
+
+	return output.str();
+}
+
+std::string_view StripPrefix(std::string_view prefix, std::string_view s) {
+	if (startsWith(s, prefix)) {
+		return s.substr(prefix.size(), s.size() - prefix.size());
+	} else {
+		return s;
+	}
+}
+
+std::string_view KeepAfterLast(std::string_view s, char c) {
+	size_t pos = s.rfind(c);
+	if (pos != std::string_view::npos) {
+		return s.substr(pos + 1);
+	} else {
+		return s;
+	}
+}
+
+std::string_view KeepIncludingLast(std::string_view s, char c) {
+	size_t pos = s.rfind(c);
+	if (pos != std::string_view::npos) {
+		return s.substr(pos);
+	} else {
+		return s;
+	}
+}
+
+void SkipSpace(const char **ptr) {
+	while (**ptr && isspace(**ptr)) {
+		(*ptr)++;
+	}
+}
+
+void DataToHexString(const uint8_t *data, size_t size, std::string *output, bool lineBreaks) {
+	Buffer buffer;
+	for (size_t i = 0; i < size; i++) {
+		if (i && !(i & 15) && lineBreaks)
+			buffer.Printf("\n");
+		buffer.Printf("%02x ", data[i]);
+	}
+	buffer.TakeAll(output);
+}
+
+void DataToHexString(int indent, uint32_t startAddr, const uint8_t* data, size_t size, std::string *output) {
+	Buffer buffer;
+	size_t i = 0;
+	for (; i < size; i++) {
+		if (i && !(i & 15)) {
+			buffer.Printf(" ");
+			for (size_t j = i - 16; j < i; j++) {
+				buffer.Printf("%c", ((data[j] < 0x20) || (data[j] > 0x7e)) ? 0x2e : data[j]);
+			}
+			buffer.Printf("\n");
+		}
+		if (!(i & 15))
+			buffer.Printf("%*s%08x  ", indent, "", (u32)(startAddr + i));
+		buffer.Printf("%02x ", data[i]);
+	}
+	if (size & 15) {
+		size_t padded_size = ((size - 1) | 15) + 1;
+		for (size_t j = size; j < padded_size; j++) {
+			buffer.Printf("   ");
+		}
+	}
+	if (size > 0) {
+		buffer.Printf(" ");
+		for (size_t j = (size - 1ULL) & ~UINT64_C(0xF); j < size; j++) {
+			buffer.Printf("%c", ((data[j] < 0x20) || (data[j] > 0x7e)) ? 0x2e : data[j]);
+		}
+	}
+	buffer.TakeAll(output);
+}
+
+std::string StringFromFormat(const char* format, ...) {
+	va_list args;
+	std::string temp;
+#ifdef _WIN32
+	int required = 0;
+
+	va_start(args, format);
+	required = _vscprintf(format, args);
+	// Using + 2 to be safe between MSVC versions.
+	// In MSVC 2015 and later, vsnprintf counts the trailing zero (per c++11.)
+	temp.resize(required + 2);
+	if (vsnprintf(&temp[0], required + 1, format, args) < 0) {
+		temp.resize(0);
+	} else {
+		temp.resize(required);
+	}
+	va_end(args);
+#else
+	char *buf = nullptr;
+
+	va_start(args, format);
+	if (vasprintf(&buf, format, args) < 0)
+		buf = nullptr;
+	va_end(args);
+
+	if (buf != nullptr) {
+		temp = buf;
+		free(buf);
+	}
+#endif
+	return temp;
+}
+
+std::string StringFromInt(int value) {
+	char temp[16];
+	snprintf(temp, sizeof(temp), "%d", value);
+	return temp;
+}
+
+// Turns "  hej " into "hej". Also handles tabs and line breaks.
+std::string_view StripSpaces(std::string_view str) {
+	const size_t s = str.find_first_not_of(" \t\r\n");
+	if (std::string::npos != s)
+		return str.substr(s, str.find_last_not_of(" \t\r\n") - s + 1);
+	else
+		return "";
+}
+
+// "\"hello\"" is turned to "hello"
+// This one assumes that the string has already been space stripped in both
+// ends, as done by StripSpaces above, for example.
+std::string_view StripQuotes(std::string_view s) {
+	if (s.size() && '\"' == s[0] && '\"' == *s.rbegin())
+		return s.substr(1, s.size() - 2);
+	else
+		return s;
+}
+
+// NOTE: str must live at least as long as all uses of output.
+void SplitString(std::string_view str, const char delim, std::vector<std::string_view> &output) {
+	size_t next = 0;
+	for (size_t pos = 0, len = str.length(); pos < len; ++pos) {
+		if (str[pos] == delim) {
+			output.emplace_back(str.substr(next, pos - next));
+			// Skip the delimiter itself.
+			next = pos + 1;
+		}
+	}
+
+	if (next == 0) {
+		output.push_back(str);
+	} else if (next < str.length()) {
+		output.emplace_back(str.substr(next));
+	}
+}
+
+bool SplitStringOnce(std::string_view str, std::string_view *firstPart, std::string_view *secondPart, char delim) {
+	size_t pos = str.find(delim);
+	if (pos == std::string_view::npos) {
+		return false;
+	}
+	*firstPart = str.substr(0, pos);
+	*secondPart = str.substr(pos + 1);
+	return true;
+}
+
+void SplitString(std::string_view str, const char delim, std::vector<std::string> &output, bool trimOutput) {
+	size_t next = 0;
+	size_t pos = 0;
+	while (pos < str.length()) {
+		size_t delimPos = str.find(delim, pos);
+		if (delimPos == std::string_view::npos) {
+			break;
+		}
+		output.emplace_back(str.substr(next, delimPos - next));
+		if (trimOutput) {
+			output.back() = StripSpaces(output.back());
+		}
+		next = delimPos + 1;
+		pos = delimPos + 1;
+	}
+
+	if (next == 0) {
+		output.emplace_back(str);
+	} else if (next < str.length()) {
+		output.emplace_back(str.substr(next));
+	} else {
+		return;
+	}
+	if (trimOutput) {
+		output.back() = StripSpaces(output.back());
+	}
+}
+
+static std::string ApplyHtmlEscapes(std::string_view str_view) {
+	struct Repl {
+		const char *a;
+		const char *b;
+	};
+
+	static const Repl replacements[] = {
+		{ "&amp;", "&" },
+		// Easy to add more cases.
+	};
+
+	std::string str(str_view);
+	for (const Repl &r : replacements) {
+		str = ReplaceAll(str, r.a, r.b);
+	}
+	return str;
+}
+
+// Meant for HTML listings and similar, so supports some HTML escapes.
+void GetQuotedStrings(std::string_view str, std::vector<std::string> &output) {
+	size_t next = 0;
+	bool even = 0;
+	for (size_t pos = 0, len = str.length(); pos < len; ++pos) {
+		if (str[pos] == '\"' || str[pos] == '\'') {
+			if (even) {
+				//quoted text
+				output.emplace_back(ApplyHtmlEscapes(str.substr(next, pos - next)));
+				even = 0;
+			} else {
+				//non quoted text
+				even = 1;
+			}
+			// Skip the delimiter itself.
+			next = pos + 1;
+		}
+	}
+}
+
+// TODO: this is quite inefficient.
+std::string ReplaceAll(std::string_view input, std::string_view src, std::string_view dest) {
+	size_t pos = 0;
+
+	std::string result(input);
+	if (src == dest)
+		return result;
+
+	// TODO: Don't mutate the input, just append stuff to the output instead.
+	while (true) {
+		pos = result.find(src, pos);
+		if (pos == std::string_view::npos)
+			break;
+		result.replace(pos, src.size(), dest);
+		pos += dest.size();
+	}
+	return result;
+}
+
+std::string UnescapeMenuString(std::string_view input, char *shortcutChar) {
+	size_t len = input.length();
+	std::string output;
+	output.reserve(len);
+	bool escaping = false;
+	bool escapeFound = false;
+	for (size_t i = 0; i < len; i++) {
+		if (input[i] == '&') {
+			if (escaping) {
+				output.push_back(input[i]);
+				escaping = false;
+			} else {
+				escaping = true;
+			}
+		} else {
+			output.push_back(input[i]);
+			if (escaping && shortcutChar && !escapeFound) {
+				*shortcutChar = input[i];
+				escapeFound = true;
+			}
+			escaping = false;
+		}
+	}
+	return output;
+}
+
+std::string ApplySafeSubstitutions(std::string_view format, std::string_view string1, std::string_view string2, std::string_view string3, std::string_view string4) {
+	size_t formatLen = format.length();
+	std::string output;
+	output.reserve(formatLen + 20);
+	for (size_t i = 0; i < formatLen; i++) {
+		char c = format[i];
+		if (c != '%') {
+			output.push_back(c);
+			continue;
+		}
+		if (i >= formatLen - 1) {
+			break;
+		}
+		switch (format[i + 1]) {
+		case '1':
+			output += string1; i++;
+			break;
+		case '2':
+			output += string2; i++;
+			break;
+		case '3':
+			output += string3; i++;
+			break;
+		case '4':
+			output += string4; i++;
+			break;
+		}
+	}
+	return output;
+}
+
+std::string ApplySafeSubstitutions(std::string_view format, int i1, int i2, int i3, int i4) {
+	size_t formatLen = format.length();
+	std::string output;
+	output.reserve(formatLen + 20);
+	for (size_t i = 0; i < formatLen; i++) {
+		char c = format[i];
+		if (c != '%') {
+			output.push_back(c);
+			continue;
+		}
+		if (i >= formatLen - 1) {
+			break;
+		}
+		switch (format[i + 1]) {
+		case '1':
+			output += StringFromInt(i1); i++;
+			break;
+		case '2':
+			output += StringFromInt(i2); i++;
+			break;
+		case '3':
+			output += StringFromInt(i3); i++;
+			break;
+		case '4':
+			output += StringFromInt(i4); i++;
+			break;
+		}
+	}
+	return output;
+}
+
+void MakeUnique(std::vector<std::string> &v) {
+	std::unordered_set<std::string> seen;
+	std::vector<std::string> result;
+	result.reserve(v.size()); // minimize reallocations
+	for (const auto &s : v) {
+		if (seen.insert(s).second) {
+			// insert returns {iterator, bool}
+			// bool == true if it was newly inserted (didn't already exist)
+			result.push_back(s);
+		}
+	}
+	v.swap(result);
+}
+
+size_t SplitSearch(std::string_view needle, std::string_view part1, std::string_view part2) {
+	if (part1.find(needle) != std::string_view::npos) {
+		// Easy case, found in part1.
+		return part1.find(needle);
+	}
+	size_t part1Size = part1.size();
+	size_t maxOverlap = std::min(needle.size() - 1, part1Size);
+	for (size_t overlap = maxOverlap; overlap > 0; overlap--) {
+		if (part1.substr(part1Size - overlap) == needle.substr(0, overlap)) {
+			// Found an overlap.
+			size_t remaining = needle.size() - overlap;
+			if (part2.substr(0, remaining) == needle.substr(overlap)) {
+				return part1Size - overlap;
+			}
+		}
+	}
+	// Now, check if it's found in part2 instead.
+	size_t posInPart2 = part2.find(needle);
+	if (posInPart2 != std::string_view::npos) {
+		return part1Size + posInPart2;
+	}
+	return std::string_view::npos;
+}

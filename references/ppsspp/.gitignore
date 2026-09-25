@@ -1,0 +1,154 @@
+# For MSVC
+*.lastcodeanalysissucceeded
+*.pdb
+*.ilk
+*.obj
+*.pch
+*.log
+*.dll
+*.rar
+*.exe
+*.map
+*.lib
+*.user
+*.sdf
+*.ncb
+*.opensdf
+*.suo
+*.aps
+*.exp
+*.qdact
+controls.ini
+desktop.ini
+Debug
+Release
+Windows/.vs
+Windows/x64
+Windows/ARM
+Windows/ARM64
+Windows/ipch
+Windows/bin-release
+Windows/win-version.h
+Windows/win-version-*.tmp
+ext/_Output
+android/lint.xml
+PPSSPPWindows64.exe.manifest
+PPSSPPWindows.exe.manifest
+PPSSPPWindowsARM64.exe.manifest
+PPSSPPWindowsARM.exe.manifest
+PPSSPPDebug64.exe.manifest
+PPSSPPDebug.exe.manifest
+PPSSPPDebugARM64.exe.manifest
+PPSSPPDebugARM.exe.manifest
+assets/flash0
+assets/flash1
+assets/flash2
+assets/flash3
+UWP/icph
+UWP/*.ipch
+UWP/Content/*
+!UWP/Content/.empty
+UWP/.vs
+.vs
+.vscode
+
+# For Mac
+.DS_Store
+PPSSPPSDL.app
+include/glslang/build_info.h
+
+# For ppsspp.ini, etc.
+ppsspp.ini
+imgui.ini
+PPSSPPControls.dat
+
+# Frametest output (see frametests.py)
+out/
+
+# Gradle/Android Studio
+.gradle
+.idea
+*.iml
+build
+/build*/
+versionname.txt
+versioncode.txt
+android/.cxx
+
+# Temp file used by jenkins windows build (TODO: remove)
+desc.txt
+
+Logs
+Memstick
+/memstick*
+Cheats
+
+/git-version.cpp
+/git-version-*.tmp
+
+.pspsh.hist
+__testoutput.txt
+__testerror.txt
+__testfinish.txt
+__testfailure.bmp
+__testcompare.png
+vt_ref.bmp
+GameLogNotes.txt
+screenshots
+font_atlas.zim.png
+asciifont_atlas.zim.png
+ppge_atlas.zim.png
+local.properties
+r.sh
+Windows/compileData*
+Windows/*.ipch
+Windows/imgui.ini
+imgui.ini
+
+# debug file
+ui_atlas_gen.png
+buttons_rasterized.png
+
+# For vim
+*.swp
+tags
+*.ctags
+
+# Other VCS
+.bzr/
+.bzrignore
+
+# Debian build
+debian/files
+debian/ppsspp.substvars
+debian/ppsspp/
+
+# Libretro build
+*.o
+*.tmp
+*.a
+
+# YouCompleteMe file
+.ycm_extra_conf.pyc
+
+# RenderDoc
+*.rdc
+
+# CMake stuff
+CMakeFiles
+CMakeUserPresets.json
+compile_commands.json
+
+# Clangd 
+.cache/
+build
+libretro/obj/local
+
+ppsspp_retroachievements.dat
+RACache
+RAPrefs_PPSSPP.cfg
+
+# For CLion
+cmake-build-*/
+
+/.vscode/

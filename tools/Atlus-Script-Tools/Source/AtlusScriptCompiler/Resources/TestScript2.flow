@@ -1,0 +1,377 @@
+// Import the MessageScript into the script
+// The compiler will insert constant variables for each of the 
+// window identifiers.
+import( "TestScript2.msg" );
+
+function( 0x0000 ) void SYNC(); 
+
+// Stalls execution of the script for the specified amount of frames
+function( 0x0001 ) void WAIT( int frameCount ); 
+
+// Prints integer to TTY log
+function( 0x0002 ) void PUT( int value ); 
+
+// Prints string to TTY log
+function( 0x0003 ) void PUTS( string value ); 
+
+// Displays a specified dialog message to the opened dialog window
+function( 0x0005 ) void MSG( int messageId, int param1 ); 
+
+// Display dialog window
+function( 0x0022 ) void MSG_WND_DSP();  
+
+// Close dialog window
+function( 0x0023 ) void MSG_WND_CLS();
+
+// Initializes a dialog option selection sequence
+function( 0x0024 ) int SEL( int messageId ); 
+
+// Initiate field load
+function( 0x1000 ) void CALL_FIELD( int param0, int param1, int param2, int param3 ); 
+
+// Constants can be defined with the const modifier
+const int FLD_SCRIPT_TIMING_BEFORE_LOAD	= 0;
+const int FLD_SCRIPT_TIMING_UNKNOWN_1 	= 1;
+const int FLD_SCRIPT_TIMING_UNKNOWN_2	= 2;
+const int FLD_SCRIPT_TIMING_UNKNOWN_3	= 3;
+const int FLD_SCRIPT_TIMING_AFTER_LOAD	= 4;
+
+// Returns in which phase the field script was called
+function( 0x1001 ) int FLD_GET_SCRIPT_TIMING(); 
+
+// Initialize a boss fight.
+// The id maps to a procedure in field/script/boss.bf
+function( 0x10d0 ) void FLD_START_BOSS( int bossId ); 
+
+// Returns if the specified bit id is set
+function( 0x000c ) bool BIT_CHK( int id );
+
+// Sets the specified bit to on
+function( 0x000d ) void BIT_ON( int id );
+
+// Sets the specified bit to off
+function( 0x000e ) void BIT_OFF( int id ); 
+
+// Get the resource handle of a player character
+function( 0x1003 ) int FLD_PC_GET_RESHND( int param0 ); 
+
+// Sets the translation of a model
+function( 0x108f ) void FLD_MODEL_SET_TRANSLATE( int modelHandle, float x, float y, float z, int param4 );
+
+// Sets the scale of a model
+function( 0x1301 ) void FLD_MODEL_SET_SCALE( int modelHandle, float scale );
+
+// Returns if the specified button is pressed
+function( 0x007a ) bool PAD_CHK_PRESS( PadButton button );
+
+// Plays a specified bgm. Maps directly to the ids from the OST gamerip.
+function( 0x005c ) void BGM( int bgmId );
+
+// Can define static variable but can't initialize it outside of a procedure.
+// Guaranteed to keep its value between scripts, given that no other script uses the same index,
+// but not to be initialized to zero in the case of multiple custom scripts that were compiled seperately being active.
+// In this case we use it to prevent the script from running when the level is reloaded.
+static bool sHasRun;
+
+function( 0x11e3 ) void FLD_WAIT( int frameCount );
+
+// You can define enum values and refer to them like so
+// If you don't give them values they'll be given them automatically starting from 0
+enum PadButton
+{
+	Select,
+	LStick,
+	RStick,
+	Start,
+	Up,
+	Right,
+	Down,
+	Left,
+	L1,
+	R1,
+	L2,
+	R2,
+	Triangle,
+	Circle,
+	X,
+	Square,
+	Any
+}
+
+void Main()
+{ 
+	// You can use static variables instead of the BIT_* functions, but for a script
+	// that runs only a couple of times instead of every frame it'd rely on undefined 
+	// behaviour considering that we're referencing sHasRun before it's assigned a value, 
+	// and hoping it's initialized to 0.
+	// However, unless one of our own custom scripts both referenced the same static variable
+	// this should be fine.
+	// I just used it here for the sake of example.
+	
+	if ( FLD_GET_SCRIPT_TIMING() != FLD_SCRIPT_TIMING_AFTER_LOAD || BIT_CHK( 0 ) /* sHasRun */ )
+		return;
+	
+	// Wait a bit before showing the window
+	FLD_WAIT( 25 );
+
+	// Display dialog window
+	MSG_WND_DSP(); 
+	MSG( HelloDialog, 0 ); 
+	int selection = SEL( 1 );
+	MSG_WND_CLS(); 
+	
+	switch ( selection )
+	{
+		case 0:
+			int playerResHandle = FLD_PC_GET_RESHND( 0 );		
+			FLD_MODEL_SET_SCALE( playerResHandle, 2f );
+			break;
+			
+		case 1:
+			CALL_FIELD( 0, 2, 0, 0 );
+			break;
+			
+		case 2:
+			StartBossrushMode();
+			break;
+			
+		case 3:
+			StartTeleportMode();
+			break;
+			
+		case 4:
+			StartButtonTestMode();
+			break;
+			
+		case 5:
+			StartSoundTestMode();
+			break;
+			
+		default:
+			break;
+	}
+
+	BIT_ON( 0 );
+	//sHasRun = true;
+}
+
+void StartBossrushMode()
+{
+	// Display the dialog window
+	MSG_WND_DSP(); 
+
+	// Display dialog
+	MSG( BossRushModeDialog, 0 ); 
+    
+    // Select boss
+    int bossId = SelectBoss();
+	
+	// Print which boss id we chose
+	PUTS( "StartBossrushMode: Select boss id:" );
+	PUT( bossId );
+    
+    // Start boss fight
+    FLD_START_BOSS( bossId );
+    
+    // Close the dialog window
+	MSG_WND_CLS(); 
+}
+
+int SelectBoss()
+{
+    for ( int i = 0; i < 22; i = i + 1 )
+	{
+		// Print which index we're on
+		PUTS( "SelectBoss: index:" );
+		PUT( i );
+		
+		int selection = SEL( i + SelectBoss0 );
+		
+		if ( selection == 4 ) // previous
+		{
+			// Continue increments i by 1, so to counter that
+			// we subtract an additional 1 from i to go to the previous
+			// iteration
+			
+			if ( i != 0 )
+				i = i - 2;
+			
+			continue;
+		}
+		else if ( selection == 5 ) // next
+		{
+			continue;
+		}
+		
+		return selection + ( i * 4 ); 
+	}
+	
+	return 0;
+}
+
+void StartTeleportMode()
+{
+	int playerResHandle = FLD_PC_GET_RESHND( 0 );
+	
+	PUTS( "StartTeleportMode: playerResHandle =" );
+	PUT( playerResHandle );
+
+	while ( !PAD_CHK_PRESS( PadButton.Triangle ) ) // while triangle isn't pressed
+	{
+		if ( PAD_CHK_PRESS( PadButton.Any ) ) // if any button is pressed
+		{
+			float x = 0f;
+			float y = 0f;
+			float z = 0f;
+			float multiplier = 1f;
+			bool anyValueSet = false;
+
+			if ( PAD_CHK_PRESS( PadButton.X ) ) 
+				multiplier = 2f;
+
+			if ( PAD_CHK_PRESS( PadButton.Up ) ) 
+			{
+				y = y + ( 2000f * multiplier );
+				anyValueSet = true;
+			}
+
+			if ( PAD_CHK_PRESS( PadButton.Right ) ) 
+			{
+				x = x + ( 2000f * multiplier );
+				anyValueSet = true;
+			}
+
+			if ( PAD_CHK_PRESS( PadButton.Down ) ) 
+			{
+				y = y - ( 2000f * multiplier );
+				anyValueSet = true;
+			}
+
+			if ( PAD_CHK_PRESS( PadButton.Left ) ) 
+			{
+				x = x - ( 2000f * multiplier );
+				anyValueSet = true;
+			}
+
+			if ( anyValueSet )
+				FLD_MODEL_SET_TRANSLATE( playerResHandle, x, y, z, playerResHandle );
+		}
+		
+		// Waiting for some frames is important
+		// because otherwise the game won't have time to do other things
+		WAIT( 5 );
+	}
+}
+
+// This procedure is left over from when I tested which buttons mapped to which
+void StartButtonTestMode()
+{
+	while ( true )
+	{
+		if ( PAD_CHK_PRESS( 0 ) ) 
+			PUTS( "Button 0 is pressed" );
+
+		if ( PAD_CHK_PRESS( 1 ) ) 
+			PUTS( "Button 1 is pressed" );
+
+		if ( PAD_CHK_PRESS( 2 ) ) 
+			PUTS( "Button 2 is pressed" );
+
+		if ( PAD_CHK_PRESS( 3 ) ) 
+			PUTS( "Button 3 is pressed" );
+
+		if ( PAD_CHK_PRESS( 4 ) ) 
+			PUTS( "Button 4 is pressed" );
+
+		if ( PAD_CHK_PRESS( 5 ) ) 
+			PUTS( "Button 5 is pressed" );
+
+		if ( PAD_CHK_PRESS( 6 ) ) 
+			PUTS( "Button 6 is pressed" );
+
+		if ( PAD_CHK_PRESS( 7 ) ) 
+			PUTS( "Button 7 is pressed" );
+
+		if ( PAD_CHK_PRESS( 8 ) ) 
+			PUTS( "Button 8 is pressed" );
+
+		if ( PAD_CHK_PRESS( 9 ) ) 
+			PUTS( "Button 9 is pressed" );
+
+		if ( PAD_CHK_PRESS( 10 ) ) 
+			PUTS( "Button 10 is pressed" );
+
+		if ( PAD_CHK_PRESS( 11 ) ) 
+			PUTS( "Button 11 is pressed" );
+
+		if ( PAD_CHK_PRESS( 12 ) ) 
+			PUTS( "Button 12 is pressed" );
+
+		if ( PAD_CHK_PRESS( 13 ) ) 
+			PUTS( "Button 13 is pressed" );
+
+		if ( PAD_CHK_PRESS( 14 ) ) 
+			PUTS( "Button 14 is pressed" );
+
+		if ( PAD_CHK_PRESS( 15 ) ) 
+			PUTS( "Button 15 is pressed" );
+
+		if ( PAD_CHK_PRESS( 16 ) ) 
+			PUTS( "Button 16 is pressed" );
+
+		WAIT( 5 );
+	}
+}
+
+void StartSoundTestMode()
+{
+	// Display the dialog window
+	MSG_WND_DSP(); 
+
+	// Display dialog
+	MSG( SelectBgmDialog, 0 ); 
+
+	// Have the user select 3 digits
+	int digit1 = SelectDigit();
+	int digit2 = SelectDigit();
+	int digit3 = SelectDigit();
+
+	// Debugging values
+	PUTS( "SelectBgm: digits: " );
+	PUT( digit1 );
+	PUT( digit2 );
+	PUT( digit3 );
+
+	int bgmId = ( digit1 * 100 ) + ( digit2 * 10 ) + digit3;
+
+	PUTS( "SelectBgm: bgmId: " );
+	PUT( bgmId );
+
+	// Play bgm
+	BGM( bgmId );
+
+	// Close the dialog window
+	MSG_WND_CLS(); 
+}
+
+int SelectDigit()
+{
+	while ( true )
+	{
+		int firstSelection = SEL( Select0to4Dialog );
+		if ( firstSelection == 5 ) // higher
+		{
+			int secondSelection = SEL( Select5to9Dialog );
+			if ( secondSelection == 5 ) // lower
+			  continue;
+
+			return secondSelection + 5;
+		}
+
+		return firstSelection;
+	}
+	
+	return 0;
+}
+
+

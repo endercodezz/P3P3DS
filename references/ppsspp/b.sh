@@ -1,0 +1,161 @@
+#!/bin/bash
+CMAKE=1
+
+# Check arguments
+while test $# -gt 0
+do
+	case "$1" in
+		--ios) CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/ios.cmake ${CMAKE_ARGS}"
+			TARGET_OS=iOS
+			;;
+		--ios-xcode) CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/ios.cmake -DIOS_PLATFORM=OS -GXcode ${CMAKE_ARGS}"
+			TARGET_OS=iOS-xcode
+			;;
+		--fat) CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64 ${CMAKE_ARGS}"
+			;;
+		--x64) CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=x86_64 ${CMAKE_ARGS}"
+			;;
+		--arm64) CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 ${CMAKE_ARGS}"
+			;;
+		--no-png) CMAKE_ARGS="-DUSE_SYSTEM_LIBPNG=OFF ${CMAKE_ARGS}"
+			;;
+		--no-sdl2) CMAKE_ARGS="-DUSE_SYSTEM_LIBSDL2=OFF ${CMAKE_ARGS}"
+			;;
+		--rpi-armv6)
+			CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/raspberry.armv6.cmake ${CMAKE_ARGS}"
+			;;
+		--rpi)
+			CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/raspberry.armv7.cmake ${CMAKE_ARGS}"
+			;;
+		--rpi64)
+			CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/raspberry.armv8.cmake ${CMAKE_ARGS}"
+			;;
+		--loongarch64)
+			CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/loongarch64-linux-gnu.cmake -DHEADLESS=ON -DHEADLESS_CROSS=ON -DUSE_SYSTEM_LIBPNG=OFF -DUSE_SYSTEM_LIBSDL2=OFF ${CMAKE_ARGS}"
+			TARGET_OS=loongarch64
+			CROSS_STUB_CC=loongarch64-linux-gnu-gcc-14
+			;;
+		--riscv64)
+			CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/riscv64-linux-gnu.cmake -DHEADLESS=ON -DHEADLESS_CROSS=ON -DUSE_SYSTEM_LIBPNG=OFF -DUSE_SYSTEM_LIBSDL2=OFF ${CMAKE_ARGS}"
+			TARGET_OS=riscv64
+			CROSS_STUB_CC=riscv64-linux-gnu-gcc-14
+			;;
+		--android) CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=android/android.toolchain.cmake ${CMAKE_ARGS}"
+			TARGET_OS=Android
+			PACKAGE=1
+			;;
+		--simulator) echo "Simulator mode enabled"
+			CMAKE_ARGS="-DSIMULATOR=ON ${CMAKE_ARGS}"
+			;;
+		--release)
+			CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release ${CMAKE_ARGS}"
+			;;
+		--debug)
+			CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug ${CMAKE_ARGS}"
+			;;
+		--build)
+			# Compatibility flag: build is the default action of this script.
+			;;
+		--reldebug)
+			CMAKE_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo ${CMAKE_ARGS}"
+			;;
+		--headless) echo "Headless mode enabled"
+			CMAKE_ARGS="-DHEADLESS=ON ${CMAKE_ARGS}"
+			;;
+		--atlas-tool) echo "Atlas tool enabled"
+			CMAKE_ARGS="-DATLAS_TOOL=ON ${CMAKE_ARGS}"
+			;;
+		--libretro) echo "Build Libretro core"
+			CMAKE_ARGS="-DLIBRETRO=ON ${CMAKE_ARGS}"
+			;;
+		--libretro_android) echo "Build Libretro Android core"
+		        CMAKE_ARGS="-DLIBRETRO=ON -DCMAKE_TOOLCHAIN_FILE=${NDK}/build/cmake/android.toolchain.cmake -DANDROID_ABI=${APP_ABI} ${CMAKE_ARGS}"
+			;;
+		--unittest) echo "Build unittest"
+			CMAKE_ARGS="-DUNITTEST=ON ${CMAKE_ARGS}"
+			;;
+		--no-package) echo "Packaging disabled"
+			PACKAGE=0
+			;;
+		--clang) echo "Clang enabled"
+			export CC=/usr/bin/clang
+			export CXX=/usr/bin/clang++
+			;;
+		--sanitize) echo "Enabling address-sanitizer if available"
+			CMAKE_ARGS="-DUSE_ASAN=ON ${CMAKE_ARGS}"
+			;;
+		--sanitizeub) echo "Enabling ub-sanitizer if available"
+			CMAKE_ARGS="-DUSE_UBSAN=ON ${CMAKE_ARGS}"
+			;;
+		--gold) echo "Gold build enabled"
+			CMAKE_ARGS="-DGOLD=ON ${CMAKE_ARGS}"
+			;;
+		--alderlake) echo "Alderlake opt"
+			CMAKE_ARGS="-DCMAKE_C_FLAGS=\"-march=alderlake\" -DCMAKE_CPP_FLAGS=\"-march=alderlake\""
+			;;
+		--no_mmap) echo "Disable mmap"
+			CMAKE_ARGS="-DUSE_NO_MMAP=ON ${CMAKE_ARGS}"
+			;;
+   		--gles) echo "Using GLES/EGL"
+                	CMAKE_ARGS="-DUSING_GLES2=ON -DUSING_EGL=ON ${CMAKE_ARGS}"
+                	;;
+		*) MAKE_OPT="$1 ${MAKE_OPT}"
+			;;
+	esac
+	shift
+done
+
+if [ ! -z "$TARGET_OS" ]; then
+	echo "Building for $TARGET_OS"
+	BUILD_DIR="$(tr [A-Z] [a-z] <<< build-"$TARGET_OS")"
+else
+	echo "Building for native host."
+	BUILD_DIR="build"
+fi
+
+CORES_COUNT=4
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        CORES_COUNT="$(nproc)"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+        CORES_COUNT="$(sysctl -n hw.physicalcpu)"
+fi
+
+# Strict errors. Any non-zero return exits this script
+set -e
+
+echo Building with $CORES_COUNT threads
+
+mkdir -p ${BUILD_DIR}
+
+# For the headless cross targets, build a comprehensive GL/GLX stub into
+# <build>/stublibs/libGL.so so GLEW's static archive can resolve its symbols
+# via PLT entries (a direct branch to address 0 overflows the relocation).
+# This stub is always (re)generated to pick up any new needed symbols.
+if [ ! -z "$CROSS_STUB_CC" ]; then
+	STUB_DIR=${BUILD_DIR}/stublibs
+	STUB_GL=${STUB_DIR}/libGL.so
+	mkdir -p "${STUB_DIR}"
+	STUB_C=$(mktemp /tmp/gl_stub_XXXXXX.c)
+	echo "/* ${TARGET_OS} GL/GLX stub - cross-compilation only */" > "$STUB_C"
+	# Collect all T (exported) symbols from GL/GLX libs, deduplicate, emit stubs
+	HOST_MULTIARCH=$(gcc -print-multiarch 2>/dev/null || dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null)
+	{
+		for lib in /usr/lib/$HOST_MULTIARCH/libGL.so.1 \
+		           /usr/lib/$HOST_MULTIARCH/libGLX.so.0 \
+		           /usr/lib/$HOST_MULTIARCH/libGLdispatch.so.0; do
+			[ -f "$lib" ] && nm -D "$lib" 2>/dev/null | awk '/^[0-9a-f]+ T /{ print $3 }'
+		done
+		# Always include the minimal GLX symbols GLEW directly references
+		printf '%s\n' glXGetProcAddressARB glXGetClientString glXQueryVersion \
+		              glBindTexture glGetString glGetIntegerv
+	} | sort -u | awk '{ print "void "$1"(void){}" }' >> "$STUB_C"
+	$CROSS_STUB_CC -shared -fPIC -Wno-implicit-function-declaration \
+		-o "${STUB_GL}" "$STUB_C"
+	rm "$STUB_C"
+fi
+
+pushd ${BUILD_DIR}
+
+cmake $CMAKE_ARGS ..
+make -j$CORES_COUNT $MAKE_OPT
+popd

@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Ninja wrapper that CMake installs as CMAKE_MAKE_PROGRAM (see cmake/BuildLock.cmake).
+
+Two Ninja processes in one build directory both append to .ninja_deps with
+colliding record ids, and Ninja then throws the log away from the first bad
+record on, which rebuilds everything after it. This wrapper:
+
+1. takes an exclusive flock on <build dir>/.build_lock, waiting if another
+   build holds it, and execs Ninja with the locked descriptor inherited, so the
+   lock lives exactly as long as Ninja (and its compile jobs) do. Killing
+   `cmake --build` or a script around it does not release the lock while its
+   Ninja is still running, and a dead Ninja never leaves a stale lock;
+2. before a build, checks .ninja_deps the way Ninja loads it and, if a record
+   is damaged, repairs the log with `ninja -t recompact`, which keeps every
+   record before the damage instead of losing the whole file.
+
+Commands that Ninja runs itself (the CMake regeneration step, or a nested
+`cmake --build` of the same directory) see PSPRECOMP_BUILD_LOCKS and do not try
+to take the lock their own parent already holds.
+"""
+
+import fcntl
+import os
+import struct
+import subprocess
+import sys
+import time
+
+REAL_NINJA = "@PSPRECOMP_REAL_NINJA@"
+LOCK_NAME = ".build_lock"  # not .ninja_lock: Ninja uses that name for its own purposes
+HELD_ENV = "PSPRECOMP_BUILD_LOCKS"
+
+
+def parse(args):
+    """Return (build dir, is a build) for a Ninja command line."""
+    build_dir = "."
+    is_build = True
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        value = None
+        if arg in ("-C", "-f", "-j", "-k", "-l", "-d", "-t", "-w") and i + 1 < len(args):
+            value = args[i + 1]
+            i += 1
+        elif len(arg) > 2 and arg[:2] in ("-C", "-t"):
+            value = arg[2:]
+        if arg.startswith("-C") and value:
+            build_dir = os.path.join(build_dir, value)
+        elif arg.startswith("-t"):
+            return build_dir, False  # everything after the tool name belongs to the tool
+        elif arg == "-n":
+            is_build = False
+        i += 1
+    return build_dir, is_build
+
+
+def check_deps_log(path):
+    """First reason Ninja would reject .ninja_deps (as in DepsLog::Load), or None."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except FileNotFoundError:
+        return None
+    sig = b"# ninjadeps\n"
+    if len(data) < len(sig) + 4 or not data.startswith(sig) \
+            or struct.unpack_from("<i", data, len(sig))[0] != 4:
+        return "bad signature or version"
+    off, nodes, end = len(sig) + 4, 0, len(data)
+    while off != end:
+        if off + 4 > end:
+            return f"partial record at byte {off}"
+        size, = struct.unpack_from("<I", data, off)
+        is_deps, size = size >> 31, size & 0x7FFFFFFF
+        if size > (1 << 19) - 1 or off + 4 + size > end:
+            return f"truncated record at byte {off}"
+        if is_deps:
+            if size % 4 or size < 12:
+                return f"bad deps record at byte {off}"
+            ids = struct.unpack_from(f"<{size // 4 - 3}i", data, off + 16)
+            if ids and (min(ids) < 0 or max(ids) >= nodes):
+                return f"deps record with an unknown node at byte {off}"
+        else:
+            if size < 4 or ~struct.unpack_from("<I", data, off + size)[0] & 0xFFFFFFFF != nodes:
+                return f"path record id mismatch at byte {off}"
+            nodes += 1
+        off += 4 + size
+    return None
+
+
+def main():
+    args = sys.argv[1:]
+    if any(a in ("--version", "-h", "--help") for a in args):
+        os.execv(REAL_NINJA, [REAL_NINJA] + args)
+    build_dir, is_build = parse(args)
+    key = os.path.realpath(build_dir)
+    held = [p for p in os.environ.get(HELD_ENV, "").split(os.pathsep) if p]
+    if key not in held:
+        fd = os.open(os.path.join(build_dir, LOCK_NAME), os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            sys.stderr.write(f"ninja: another build is running in {key}; waiting for it to finish\n")
+            sys.stderr.flush()
+            started = time.monotonic()
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            sys.stderr.write(f"ninja: waited {time.monotonic() - started:.1f} s\n")
+        os.set_inheritable(fd, True)
+        os.environ[HELD_ENV] = os.pathsep.join(held + [key])
+        if is_build:
+            damage = check_deps_log(os.path.join(build_dir, ".ninja_deps"))
+            if damage:
+                sys.stderr.write(f"ninja: {key}/.ninja_deps is damaged ({damage}); "
+                                 "repairing it with 'ninja -t recompact'\n")
+                sys.stderr.flush()
+                subprocess.run([REAL_NINJA, "-C", build_dir, "-t", "recompact"], check=False)
+    os.execv(REAL_NINJA, [REAL_NINJA] + args)
+
+
+if __name__ == "__main__":
+    main()

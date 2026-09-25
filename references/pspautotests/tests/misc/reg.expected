@@ -1,0 +1,30 @@
+[x] Registry test
+00000000 = sceRegOpenRegistry(bad) -> handle 00000000
+00000000 = sceRegOpenRegistry(/system) -> handle 00000000
+80082716 = sceRegOpenCategory() -> handle ffffffff
+80082716 = sceRegOpenCategory(/) -> handle ffffffff
+80082715 = sceRegOpenCategory(badreg, DATA/FONT) -> handle ffffffff
+80082718 = sceRegOpenCategory(DATA/FANT (bad)) -> handle ffffffff
+00000000 = sceRegOpenCategory(DATA/FONT)
+00000000 = sceRegGetKeysNum(fontCategory) -> 3
+keyname 0: path_name
+STR - path_name                   -   13 : flash0:/font
+keyname 1: num_fonts
+INT - num_fonts                   -    4 : 18
+keyname 2: PROPERTY
+DIR - PROPERTY                    size=00000000
+00000000 = sceRegOpenCategory(CONFIG/PREMO)
+00000000 = sceRegGetKeyInfoByName(CONFIG/PREMO, guide_page, 2, 4)
+00000000 = sceRegGetKeyInfoByName(CONFIG/PREMO, ps3_mac, 4, 6)
+00000000 = sceRegGetKeyValueByName(CONFIG/PREMO, guide_page, 00000001, 4)
+00000000 = sceRegGetKeyValueByName(CONFIG/PREMO, guide_page, deadbeee, 1)
+00000000 = sceRegGetKeyValueByName(CONFIG/PREMO, guide_page, cafebabe00000001, 8)
+80082715 = sceRegCloseRegistry(1337)
+00000000 = sceRegCloseRegistry(regHandle)
+00000000 = sceRegGetCategoryNumAtRoot(regHandle) -> 4
+00000000 = sceRegGetCategoryListAtRoot(regHandle, keyData, 4)
+root category 0: REGISTRY
+root category 1: CONFIG
+root category 2: DATA
+root category 3: SYSPROFILE
+00000000 = sceRegGetCategoryListAtRoot(regHandle, keyData, 5)

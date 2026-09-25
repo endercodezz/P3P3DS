@@ -1,0 +1,225 @@
+define pcodeop vcmp_s;
+define pcodeop vcmp_p;
+define pcodeop vcmp_t;
+define pcodeop vcmp_q;
+:vcmp.s vd_cmp, vs_s, vt_s        is prime=27 & vop3 = 0 & vc1 = 0 & vc0 = 0 & vd_cmp & vs_s & vs & vt_s & vt {
+    local op1:4 = vs;
+    local op2:4 = vt;
+    local cmpOp:1 = vd_cmp:1 & 0xf:1;
+    CC = vcmp_s(cmpOp, op1, op2);
+}
+:vcmp.p vd_cmp, vs_p, vt_p        is prime=27 & vop3 = 0 & vc1 = 0 & vc0 = 1 & vd_cmp & vs_p & vs & vt_p & vt {
+    local op1:8 = vfpuReadP(vs);
+    local op2:8 = vfpuReadP(vt);
+    local cmpOp:1 = vd_cmp:1 & 0xf:1;
+    CC = vcmp_p(cmpOp, op1, op2);
+}
+:vcmp.t vd_cmp, vs_t, vt_t        is prime=27 & vop3 = 0 & vc1 = 1 & vc0 = 0 & vd_cmp & vs_t & vs & vt_t & vt {
+    local op1:12 = vfpuReadT(vs);
+    local op2:12 = vfpuReadT(vt);
+    local cmpOp:1 = vd_cmp:1 & 0xf:1;
+    CC = vcmp_t(cmpOp, op1, op2);
+}
+:vcmp.q vd_cmp, vs_q, vt_q        is prime=27 & vop3 = 0 & vc1 = 1 & vc0 = 1 & vd_cmp & vs_q & vs & vt_q & vt {
+    local op1:16 = vfpuReadQ(vs);
+    local op2:16 = vfpuReadQ(vt);
+    local cmpOp:1 = vd_cmp:1 & 0xf:1;
+    CC = vcmp_q(cmpOp, op1, op2);
+}
+
+# FIXME: this doesn't correctly model the behaviour for read only registers and registers outside control register range (unlikely to be in normal code?)
+:vmfvc vd_s, VfpuCtl              is prime=52 & vop3 = 0 & vt = 80 & vd_s & VfpuCtl {
+    vd_s = VfpuCtl;
+}
+:vmtvc vs_s, VfpuCtl              is prime=52 & vop3 = 0 & vt = 81 & vs_s & VfpuCtl {
+    VfpuCtl = vs_s;
+}
+
+define pcodeop vcst_s;
+define pcodeop vcst_p;
+define pcodeop vcst_t;
+define pcodeop vcst_q;
+:vcst.s vd_s, vt_cst              is prime=52 & vop3 = 0 & vtop2 = 3 & vc1 = 0 & vc0 = 0 & vd_s & vd & vt_cst {
+    vd = vcst_s(vt_cst:1);
+}
+
+:vcst.p vd_p, vt_cst              is prime=52 & vop3 = 0 & vtop2 = 3 & vc1 = 0 & vc0 = 1 & vd_p & vd & vt_cst {
+    local result:8 = vcst_p(vt_cst:1);
+    vfpuWriteP(vd, result[0,32], result[32,32]);
+}
+
+:vcst.t vd_t, vt_cst              is prime=52 & vop3 = 0 & vtop2 = 3 & vc1 = 1 & vc0 = 0 & vd_t & vd & vt_cst {
+    local result:12 = vcst_t(vt_cst:1);
+    vfpuWriteT(vd, result[0,32], result[32,32], result[64,32]);
+}
+
+:vcst.q vd_q, vt_cst              is prime=52 & vop3 = 0 & vtop2 = 3 & vc1 = 1 & vc0 = 1 & vd_q & vd & vt_cst {
+    local result:16 = vcst_q(vt_cst:1);
+    vfpuWriteQ(vd, result[0,32], result[32,32], result[64,32], result[96,32]);
+}
+
+define pcodeop vpfxs;
+define pcodeop vpfxt;
+define pcodeop vpfxd;
+:vpfxs [Vpfxst0, Vpfxst1, Vpfxst2, Vpfxst3]     is prime=55 & vop2 = 0 & Vpfxst0 & Vpfxst1 & Vpfxst2 & Vpfxst3  {
+    SPFX = vpfxs(Vpfxst0, Vpfxst1, Vpfxst2, Vpfxst3);
+}
+:vpfxt [Vpfxst0, Vpfxst1, Vpfxst2, Vpfxst3]     is prime=55 & vop2 = 1 & Vpfxst0 & Vpfxst1 & Vpfxst2 & Vpfxst3 {
+    TPFX = vpfxt(Vpfxst0, Vpfxst1, Vpfxst2, Vpfxst3);
+}
+:vpfxd [Vpfxd0, Vpfxd1, Vpfxd2, Vpfxd3]         is prime=55 & vop2 = 2 & Vpfxd0 & Vpfxd1 & Vpfxd2 & Vpfxd3 {
+    DPFX = vpfxd(Vpfxd0, Vpfxd1, Vpfxd2, Vpfxd3);
+}
+
+define pcodeop viim_s;
+define pcodeop vfim_s;
+:viim.s vt_s, immed               is prime=55 & vop3 = 6 & vt_s & vt & immed {
+    vt = viim_s(immed:4);
+}
+:vfim.s vt_s, immed               is prime=55 & vop3 = 7 & vt_s & vt & immed {
+    vt = vfim_s(immed:4);
+}
+
+define pcodeop vrot_s;
+define pcodeop vrot_p;
+define pcodeop vrot_t;
+define pcodeop vrot_q;
+:vrot.s vd_s, vs_s, [VfpuRot0]                               is prime=60 & vop3 = 7 & vtop2 = 1 & vc1 = 0 & vc0 = 0 & vd_s & vd & vs_s & vs & VfpuRot0 {
+    vd = vrot_s(vs, VfpuRot0);
+}
+:vrot.p vd_p, vs_s, [VfpuRot0, VfpuRot1]                     is prime=60 & vop3 = 7 & vtop2 = 1 & vc1 = 0 & vc0 = 1 & vd_p & vd & vs_s & vs & VfpuRot0 & VfpuRot1 {
+    local result:8 = vrot_p(vs, VfpuRot0, VfpuRot1);
+    vfpuWriteP(vd, result[0,32], result[32,32]);
+}
+:vrot.t vd_t, vs_s, [VfpuRot0, VfpuRot1, VfpuRot2]           is prime=60 & vop3 = 7 & vtop2 = 1 & vc1 = 1 & vc0 = 0 & vd_t & vd & vs_s & vs & VfpuRot0 & VfpuRot1 & VfpuRot2 {
+    local result:12 = vrot_t(vs, VfpuRot0, VfpuRot1, VfpuRot2);
+    vfpuWriteT(vd, result[0,32], result[32,32], result[64,32]);
+}
+:vrot.q vd_q, vs_s, [VfpuRot0, VfpuRot1, VfpuRot2, VfpuRot3] is prime=60 & vop3 = 7 & vtop2 = 1 & vc1 = 1 & vc0 = 1 & vd_q & vd & vs_s & vs & VfpuRot0 & VfpuRot1 & VfpuRot2 & VfpuRot3 {
+    local result:16 = vrot_q(vs, VfpuRot0, VfpuRot1, VfpuRot2, VfpuRot3);
+    vfpuWriteQ(vd, result[0,32], result[32,32], result[64,32], result[96,32]);
+}
+
+:vflush                           is prime=63 {
+}
+
+:bvf VfpuCC, Rel16                is prime=18 & copop = 8 & vndtf = 0 & VfpuCC & Rel16 {
+    tmp:1 = VfpuCC;
+    delayslot(1);
+    if (tmp != 0) goto inst_next;
+    goto Rel16;
+}
+
+:bvfl VfpuCC, Rel16               is prime=18 & copop = 8 & vndtf = 2 & VfpuCC & Rel16 {
+    tmp:1 = VfpuCC;
+    if (tmp != 0) goto inst_next;
+    delayslot(1);
+    goto Rel16;
+}
+
+:bvt VfpuCC, Rel16                is prime=18 & copop = 8 & vndtf = 1 & VfpuCC & Rel16 {
+    tmp:1 = VfpuCC;
+    delayslot(1);
+    if (tmp == 0) goto inst_next;
+    goto Rel16;
+}
+
+:bvtl VfpuCC, Rel16               is prime=18 & copop = 8 & vndtf = 3 & VfpuCC & Rel16 {
+    tmp:1 = VfpuCC;
+    if (tmp == 0) goto inst_next;
+    delayslot(1);
+    goto Rel16;
+}
+
+:mfv rt, vd_s                     is prime=18 & copop = 3 & vc0 = 0 & rt & vd_s & vd {
+    rt = vd;
+}
+
+:mfvc rt, VfpuCtl                 is prime=18 & copop = 3 & vc0 != 0 & rt & VfpuCtl {
+    rt = VfpuCtl;
+}
+
+:mtv rt, vd_s                     is prime=18 & copop = 7 & vc0 = 0 & rt & vd_s & vd {
+    vd = rt;
+}
+
+:mtvc rt, VfpuCtl                 is prime=18 & copop = 7 & vc0 != 0 & rt & VfpuCtl {
+    VfpuCtl = rt;
+}
+
+:lv.s VfpuMemS, OFF_VBASE         is prime=50 & OFF_VBASE & VfpuMemS {
+    VfpuMemS = *[ram]:4 OFF_VBASE;
+}
+
+:lvl.q VfpuMemQ, OFF_VBASE        is prime=53 & bit1=0 & OFF_VBASE & VfpuMemQ & vmq_h {
+    local tmp:4 = (OFF_VBASE >> 2) & 3;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 3:1, *[ram]:4 (OFF_VBASE));
+    if (tmp == 0) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 2:1, *[ram]:4 (OFF_VBASE - 4));
+    if (tmp == 1) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 1:1, *[ram]:4 (OFF_VBASE - 8));
+    if (tmp == 2) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 0:1, *[ram]:4 (OFF_VBASE - 12));
+  <done>
+}
+
+:lvr.q VfpuMemQ, OFF_VBASE        is prime=53 & bit1=1 & OFF_VBASE & VfpuMemQ & vmq_h {
+    local tmp:4 = 3 - ((OFF_VBASE >> 2) & 3);
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 0:1, *[ram]:4 (OFF_VBASE));
+    if (tmp == 0) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 1:1, *[ram]:4 (OFF_VBASE + 4));
+    if (tmp == 1) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 2:1, *[ram]:4 (OFF_VBASE + 8));
+    if (tmp == 2) goto <done>;
+    vfpuLoadQPart(VfpuMemQ, vmq_h:1, 3:1, *[ram]:4 (OFF_VBASE + 12));
+  <done>
+}
+:lv.q VfpuMemQ, OFF_VBASE         is prime=54 & bit1=0 & OFF_VBASE & VfpuMemQ & vmq_h {
+    vfpuLoadQ(VfpuMemQ, vmq_h:1, *[ram]:4 OFF_VBASE, *[ram]:4 (OFF_VBASE+4), *[ram]:4 (OFF_VBASE+8), *[ram]:4 (OFF_VBASE+12));
+}
+
+:lv.q VfpuMemQ, OFF_VBASE, "wb"   is prime=54 & bit1=1 & OFF_VBASE & VfpuMemQ & vmq_h {
+    vfpuLoadQ(VfpuMemQ, vmq_h:1, *[ram]:4 OFF_VBASE, *[ram]:4 (OFF_VBASE+4), *[ram]:4 (OFF_VBASE+8), *[ram]:4 (OFF_VBASE+12));
+}
+
+:sv.s VfpuMemS, OFF_VBASE         is prime=58 & OFF_VBASE & VfpuMemS {
+    *[ram]:4 OFF_VBASE = VfpuMemS:4;
+}
+
+:svl.q VfpuMemQ, OFF_VBASE        is prime=61 & bit1=0 & OFF_VBASE & VfpuMemQ & vmq_h {
+    local tmp:4 = (OFF_VBASE >> 2) & 3;
+    *[ram]:4 (OFF_VBASE)      = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 3:1);
+    if (tmp == 0) goto <done>;
+    *[ram]:4 (OFF_VBASE - 4)  = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 2:1);
+    if (tmp == 1) goto <done>;
+    *[ram]:4 (OFF_VBASE - 8)  = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 1:1);
+    if (tmp == 2) goto <done>;
+    *[ram]:4 (OFF_VBASE - 12) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 0:1);
+  <done>
+}
+
+:svr.q VfpuMemQ, OFF_VBASE        is prime=61 & bit1=1 & OFF_VBASE & VfpuMemQ & vmq_h {
+    local tmp:4 = 3 - ((OFF_VBASE >> 2) & 3);
+    *[ram]:4 (OFF_VBASE)       = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 0:1);
+    if (tmp == 0) goto <done>;
+    *[ram]:4 (OFF_VBASE + 4)   = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 1:1);
+    if (tmp == 1) goto <done>;
+    *[ram]:4 (OFF_VBASE + 8)   = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 2:1);
+    if (tmp == 2) goto <done>;
+    *[ram]:4 (OFF_VBASE + 12)  = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 3:1);
+  <done>
+}
+
+:sv.q VfpuMemQ, OFF_VBASE         is prime=62 & bit1=0 & OFF_VBASE & VfpuMemQ & vmq_h {
+    *[ram]:4 OFF_VBASE = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 0:1);
+    *[ram]:4 (OFF_VBASE+4) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 1:1);
+    *[ram]:4 (OFF_VBASE+8) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 2:1);
+    *[ram]:4 (OFF_VBASE+12) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 3:1);
+}
+
+:sv.q VfpuMemQ, OFF_VBASE, "wb"   is prime=62 & bit1=1 & OFF_VBASE & VfpuMemQ & vmq_h {
+    *[ram]:4 OFF_VBASE = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 0:1);
+    *[ram]:4 (OFF_VBASE+4) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 1:1);
+    *[ram]:4 (OFF_VBASE+8) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 2:1);
+    *[ram]:4 (OFF_VBASE+12) = vfpuSaveQPart(VfpuMemQ, vmq_h:1, 3:1);
+}

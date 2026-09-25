@@ -1,0 +1,502 @@
+**** MP3Test: sample.mp3
+sample.mp3: mp3StreamEnd = 0001658c
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00001a40 00000000
+0=sceMp3NotifyAddStreamData: 00001a40
+80671103=sceMp3GetMaxOutputSample()  (preinit)
+0=sceMp3Init: 00000000
+Version: 0000000300000480/1152=sceMp3GetMaxOutputSample()  (pcmbuf=4608)
+0=sceMp3GetLoopNum: ffffffff
+0=sceMp3GetFrameNum: 000000da
+0=sceMp3SetLoopNum(0)
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00000480
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00000900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00000d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00001200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00001680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00001b00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00001f80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00002400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00002880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00001a40
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00002d00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00003180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00003600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00003a80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00003f00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00004380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00004800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00004c80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00002760
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00005100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00005580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00005a00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00005e80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00006300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00006780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00006c00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00007080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00003480
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00007500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00007980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00007e00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00008280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00008700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00008b80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00009000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00009480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 000041a0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00009900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00009d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000a200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000a680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000ab00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000af80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000b400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000b880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00004ec0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000bd00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000c180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000c600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000ca80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000cf00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000d380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000d800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000dc80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00005be0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000e100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000e580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000ea00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000ee80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000f300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0000f780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0000fc00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00010080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00006900
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00010500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00010980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00010e00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00011280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00011700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00011b80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00012000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00012480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00007620
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00012900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00012d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00013200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00013680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00013b00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00013f80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00014400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00014880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00008340
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00014d00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00015180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00015600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00015a80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00015f00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00016380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00016800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00016c80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00009060
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00017100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00017580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00017a00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00017e80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00018300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00018780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00018c00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00019080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00009d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00019500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00019980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00019e00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001a280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001a700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001ab80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001b000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001b480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 0000aaa0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001b900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001bd80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001c200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001c680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001cb00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001cf80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001d400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001d880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 0000b7c0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001dd00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001e180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001e600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001ea80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001ef00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001f380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0001f800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0001fc80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 0000c4e0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00020100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00020580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00020a00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00020e80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00021300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00021780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00021c00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00022080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 0000d200
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00022500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00022980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00022e00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00023280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00023700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00023b80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00024000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00024480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 0000df20
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00024900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00024d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00025200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00025680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00025b00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00025f80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00026400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00026880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 0000ec40
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00026d00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00027180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00027600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00027a80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00027f00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00028380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00028800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00028c80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 0000f960
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00029100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00029580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00029a00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00029e80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002a300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002a780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002ac00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002b080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00010680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002b500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002b980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002be00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002c280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002c700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002cb80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002d000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002d480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 000113a0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002d900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002dd80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002e200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002e680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002eb00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002ef80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002f400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0002f880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 000120c0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0002fd00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00030180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00030600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00030a80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00030f00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00031380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00031800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00031c80
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00012de0
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00032100
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00032580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00032a00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00032e80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00033300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00033780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00033c00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00034080
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00013b00
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00034500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00034980
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00034e00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00035280
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00035700
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00035b80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00036000
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00036480
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00014820
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00036900
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00036d80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00037200
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00037680
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00037b00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00037f80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00038400
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00038880
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881f0c0 00000d20 00015540
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00038d00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00039180
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00039600
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 00039a80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 00039f00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003a380
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003a800
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003ac80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003b100
+Need more data (loopnum=0)
+0=sceMp3GetInfoToAddStreamData: 0881fde0 00000d20 00016260
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003b580
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003ba00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003be80
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003c300
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003c780
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003cc00
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003d080
+4608=sceMp3Decode(offset=2304)
+loop: 00000000 sum: 0003d500
+4608=sceMp3Decode(offset=0)
+loop: 00000000 sum: 0003d980
+0=sceMp3Decode(offset=2304)
+sceMp3Decode returned 0, should be the end. Breaking.

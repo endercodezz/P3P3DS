@@ -1,0 +1,235 @@
+#include <string>
+
+#include "Common/Serialize/Serializer.h"
+#include "Common/Serialize/SerializeFuncs.h"
+#include "Common/StringUtils.h"
+#include "Core/HLE/HLE.h"
+#include "Core/HLE/ErrorCodes.h"
+#include "Core/HLE/FunctionWrappers.h"
+#include "Core/HLE/sceKernel.h"
+#include "Core/HLE/sceKernelHeap.h"
+#include "Core/HLE/sceKernelMemory.h"
+#include "Core/Reporting.h"
+#include "Core/Util/BlockAllocator.h"
+
+static const u32 KERNEL_HEAP_BLOCK_HEADER_SIZE = 8;
+static const bool g_fromBottom = false;
+
+// This object and the functions here are available for kernel code only, not game code.
+// This differs from code like sceKernelMutex, which is available for games.
+// This exists in PPSSPP mainly because certain game patches use these kernel modules.
+
+struct KernelHeap : public KernelObject {
+	int uid = 0;
+	int partitionId = 0;
+	u32 size = 0;
+	int flags = 0;
+	u32 address = 0;
+	std::string name;
+	BlockAllocator alloc;
+
+	static u32 GetMissingErrorCode() { return SCE_KERNEL_ERROR_UNKNOWN_UID; }
+	static int GetStaticIDType() { return PPSSPP_KERNEL_TMID_Heap; }
+	int GetIDType() const override { return PPSSPP_KERNEL_TMID_Heap; }
+	const char *GetTypeName() override { return GetStaticTypeName(); }
+	static const char *GetStaticTypeName() { return "Heap"; }
+
+	void DoState(PointerWrap &p) override {
+		Do(p, uid);
+		Do(p, partitionId);
+		Do(p, size);
+		Do(p, flags);
+		Do(p, address);
+		Do(p, name);
+		Do(p, alloc);
+	}
+};
+
+static int sceKernelCreateHeap(int partitionId, int size, int flags, const char *Name) {
+	// Everything below is recorded by pspautotests sysmem/kernel/heap, which is the first test
+	// this API has ever had - these used to be guesses.
+	//
+	// Only partitions 1-6 exist, and anything else is ILLEGAL_PARTITION rather than the
+	// ILLEGAL_ARGUMENT this used to return. Note the test can't cover partition 5: creating a
+	// heap in the volatile partition takes a real PSP down hard enough to need a reboot.
+	if (partitionId < 1 || partitionId > 6)
+		return hleLogWarning(Log::sceKernel, SCE_KERNEL_ERROR_ILLEGAL_PARTITION, "invalid partition %d", partitionId);
+
+	BlockAllocator *allocator = BlockAllocatorFromID(partitionId);
+	if (!allocator)
+		return hleLogWarning(Log::sceKernel, SCE_KERNEL_ERROR_ILLEGAL_PARTITION, "invalid partition %d", partitionId);
+
+	// A zero or negative size is refused outright, before anything is allocated.
+	if (size <= 0)
+		return hleLogWarning(Log::sceKernel, SCE_KERNEL_ERROR_HEAPBLOCK_ALLOC_FAILED, "invalid size %d", size);
+	// A name is required, unlike most of the kernel object constructors.
+	if (!Name)
+		return hleLogWarning(Log::sceKernel, SCE_KERNEL_ERROR_ERROR, "invalid name");
+
+	u32 allocSize = (size + 3) & ~3;
+
+	// flags really is ignored - the test sweeps -1, 0, 1, 2, 3, 4, 0x100 and 0x1000 and every
+	// one of them creates a heap.
+	u32 addr = allocator->Alloc(allocSize, g_fromBottom, StringFromFormat("KernelHeap/%s", Name).c_str());
+	if (addr == (u32)-1) {
+		return hleLogError(Log::sceKernel, SCE_KERNEL_ERROR_NO_MEMORY, "failed to allocate %d bytes of memory", size);
+	}
+
+	KernelHeap *heap = new KernelHeap();
+	SceUID uid = kernelObjects.Create(heap);
+
+	heap->partitionId = partitionId;
+	heap->flags = flags;
+	heap->name = Name;
+	heap->size = allocSize;
+	heap->address = addr;
+	heap->alloc.Init(heap->address + 128, heap->size - 128, true);
+	heap->uid = uid;
+	return hleLogInfo(Log::sceKernel, uid);
+}
+
+static int sceKernelAllocHeapMemory(int heapId, int size) {
+	u32 error;
+	KernelHeap *heap = kernelObjects.Get<KernelHeap>(heapId, error);
+	if (!heap) {
+		// Returns a pointer, so every failure is a null pointer rather than an error code.
+		return hleLogError(Log::sceKernel, 0, "invalid heapId");
+	}
+
+	// There's 8 bytes at the end of every block, reserved.
+	u32 memSize = KERNEL_HEAP_BLOCK_HEADER_SIZE + size;
+	u32 addr = heap->alloc.Alloc(memSize, true);
+	if (addr == (u32)-1) {
+		// This returns a pointer, so failure is a null pointer - not the allocator's -1.
+		return hleLogError(Log::sceKernel, 0, "failed to allocate %d bytes", size);
+	}
+	return hleLogInfo(Log::sceKernel, addr);
+}
+
+static int sceKernelDeleteHeap(int heapId) {
+	u32 error;
+	KernelHeap *heap = kernelObjects.Get<KernelHeap>(heapId, error);
+	if (!heap)
+		return hleLogError(Log::sceKernel, error, "invalid heapId");
+
+	// Not using heap->partitionId here for backwards compatibility with old save states.
+	BlockAllocator *allocator = BlockAllocatorFromAddr(heap->address);
+	if (allocator)
+		allocator->Free(heap->address);
+	kernelObjects.Destroy<KernelHeap>(heap->uid);
+	return hleLogInfo(Log::sceKernel, 0);
+}
+
+static u32 sceKernelPartitionTotalFreeMemSize(int partitionId) {
+	BlockAllocator *allocator = BlockAllocatorFromID(partitionId);
+	// TODO: Validate error code.
+	if (!allocator)
+		return hleLogError(Log::sceKernel, SCE_KERNEL_ERROR_ILLEGAL_ARGUMENT, "invalid partition");
+	return hleLogWarning(Log::sceKernel, allocator->GetTotalFreeBytes());
+}
+
+static u32 sceKernelPartitionMaxFreeMemSize(int partitionId) {
+	BlockAllocator *allocator = BlockAllocatorFromID(partitionId);
+	// TODO: Validate error code.
+	if (!allocator)
+		return hleLogError(Log::sceKernel, SCE_KERNEL_ERROR_ILLEGAL_ARGUMENT, "invalid partition");
+	return hleLogWarning(Log::sceKernel, allocator->GetLargestFreeBlockSize());
+}
+
+static u32 sceKernelGetUidmanCB()
+{
+	ERROR_LOG_REPORT(Log::sceKernel, "UNIMP sceKernelGetUidmanCB");
+	return 0;
+}
+
+static int sceKernelFreeHeapMemory(int heapId, u32 block) {
+	u32 error;
+	KernelHeap* heap = kernelObjects.Get<KernelHeap>(heapId, error);
+	if (!heap)
+		return hleLogError(Log::sceKernel, error, "invalid heapId");
+	if (block == 0) {
+		return hleLogInfo(Log::sceKernel, 0, "heapId,0: block");
+	}
+	if (!heap->alloc.FreeExact(block)) {
+		return hleLogError(Log::sceKernel, SCE_KERNEL_ERROR_INVALID_POINTER, "invalid pointer %08x", block);
+	}
+	return hleLogInfo(Log::sceKernel, 0, "heapId, block");
+}
+
+static int sceKernelAllocHeapMemoryWithOption(int heapId, u32 memSize, u32 paramsPtr) {
+	u32 error;
+	KernelHeap* heap = kernelObjects.Get<KernelHeap>(heapId, error);
+	// Returns a pointer, so every failure below is a null pointer rather than an error code.
+	if (!heap)
+		return hleLogError(Log::sceKernel, 0, "invalid heapId");
+	u32 grain = 4;
+	// 0 is ignored.
+	if (paramsPtr != 0) {
+		if (!Memory::IsValid4AlignedRange(paramsPtr, 8))
+			return hleLogError(Log::sceKernel, 0, "invalid paramsPtr");
+		// The size field is not validated at all - sysmem/kernel/heap sweeps 0, 4, 8, 12 and
+		// 0x100 through here and every one of them allocates. Only the alignment matters.
+		grain = Memory::ReadUnchecked_U32(paramsPtr + 4);
+		// And it has to be a power of two from 4 to 0x80. 0 means "no preference", 1 and 2 are
+		// refused just as firmly as 0x100 and up.
+		if (grain == 0) {
+			grain = 4;
+		} else if (grain < 4 || grain > 0x80 || (grain & (grain - 1)) != 0) {
+			return hleLogWarning(Log::sceKernel, 0, "invalid alignment %d", grain);
+		}
+	}
+	// There's 8 bytes at the end of every block, reserved.
+	memSize += 8;
+	u32 addr = heap->alloc.AllocAligned(memSize, grain, grain, true);
+	if (addr == (u32)-1) {
+		// This returns a pointer, so failure is a null pointer - not the allocator's -1.
+		return hleLogError(Log::sceKernel, 0, "failed to allocate %d bytes", memSize);
+	}
+	return hleLogInfo(Log::sceKernel, addr);
+}
+
+static int sceKernelGetModel() {
+	constexpr u32 model = 2;  // 2 = original slim.
+	return hleLogWarning(Log::sceKernel, model - 1);
+}
+
+// Both configure things PPSSPP has no equivalent of - which kernel image a reboot would use, and
+// whether the UMD read cache is on. Accepted and ignored; the VSH calls them once each during
+// startup and only cares that they succeed.
+static int sceKernelSetRebootKernel(u32 arg) {
+	return hleLogWarning(Log::sceKernel, 0, "UNIMPL");
+}
+
+static int sceKernelSetUmdCacheOn(int on) {
+	return hleLogWarning(Log::sceKernel, 0, "UNIMPL");
+}
+
+const HLEFunction SysMemForKernel[] = {
+	{ 0X96A3CE2C, &WrapI_U<sceKernelSetRebootKernel>,              "sceKernelSetRebootKernel",           'i', "x",     HLE_KERNEL_SYSCALL },
+	{ 0X1404C1AA, &WrapI_I<sceKernelSetUmdCacheOn>,                "sceKernelSetUmdCacheOn",             'i', "i",     HLE_KERNEL_SYSCALL },
+	{ 0X636C953B, &WrapI_II<sceKernelAllocHeapMemory>,             "sceKernelAllocHeapMemory",           'x', "ii",    HLE_KERNEL_SYSCALL },
+	{ 0XC9805775, &WrapI_I<sceKernelDeleteHeap>,                   "sceKernelDeleteHeap",                'i', "i" ,    HLE_KERNEL_SYSCALL },
+	{ 0X1C1FBFE7, &WrapI_IIIC<sceKernelCreateHeap>,                "sceKernelCreateHeap",                'i', "iixs",  HLE_KERNEL_SYSCALL },
+	{ 0X237DBD4F, &WrapI_ICIUU<sceKernelAllocPartitionMemory>,     "sceKernelAllocPartitionMemory",      'i', "isixx", HLE_KERNEL_SYSCALL },
+	{ 0XB6D61D02, &WrapI_I<sceKernelFreePartitionMemory>,          "sceKernelFreePartitionMemory",       'i', "i",     HLE_KERNEL_SYSCALL },
+	{ 0X9D9A5BA1, &WrapU_I<sceKernelGetBlockHeadAddr>,             "sceKernelGetBlockHeadAddr",          'x', "i",     HLE_KERNEL_SYSCALL },
+	{ 0x9697CD32, &WrapU_I<sceKernelPartitionTotalFreeMemSize>,    "sceKernelPartitionTotalFreeMemSize", 'x', "i" ,    HLE_KERNEL_SYSCALL },
+	{ 0xE6581468, &WrapU_I<sceKernelPartitionMaxFreeMemSize>,      "sceKernelPartitionMaxFreeMemSize",   'x', "i" ,    HLE_KERNEL_SYSCALL },
+	{ 0X3FC9AE6A, &WrapU_V<sceKernelDevkitVersion>,                "sceKernelDevkitVersion",             'x', "" ,     HLE_KERNEL_SYSCALL },
+	{ 0X536AD5E1, &WrapU_V<sceKernelGetUidmanCB>,                  "sceKernelGetUidmanCB",               'i', "i" ,    HLE_KERNEL_SYSCALL },
+	{ 0X7B749390, &WrapI_IU<sceKernelFreeHeapMemory>,              "sceKernelFreeHeapMemory",            'i', "ix" ,   HLE_KERNEL_SYSCALL },
+	{ 0XEB7A74DB, &WrapI_IUU<sceKernelAllocHeapMemoryWithOption>,  "sceKernelAllocHeapMemoryWithOption", 'i', "ixp" ,  HLE_KERNEL_SYSCALL },
+	{ 0x6373995d, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL},  // 220
+	{ 0x07C586A1, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },  // 220
+	// The 5.xx NID for the same call.
+	{ 0xDA07DC6E, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },
+	// 3.95/4.05, 6.00/6.20 and 6.31/6.39 each use another NID again.
+	{ 0x4823B9D9, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },
+	{ 0x864EBFD7, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },
+	{ 0x458A70B5, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },
+	{ 0xA3B0B6BC, &WrapI_V<sceKernelGetModel>,                     "sceKernelGetModel",                  'i', "",      HLE_KERNEL_SYSCALL },
+};
+
+void Register_SysMemForKernel() {
+	RegisterHLEModule("SysMemForKernel", ARRAY_SIZE(SysMemForKernel), SysMemForKernel);
+}

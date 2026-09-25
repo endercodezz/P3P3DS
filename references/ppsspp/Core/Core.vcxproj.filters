@@ -1,0 +1,2378 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ELF">
+      <UniqueIdentifier>{f34f69bc-5d7c-44d1-90b6-aa20c435b546}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS">
+      <UniqueIdentifier>{b9b5cc6d-ef27-4209-88e2-b19d4967e4f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\x86">
+      <UniqueIdentifier>{e2af791e-cd4f-4289-bd6d-6fb070c7c4a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\ARM">
+      <UniqueIdentifier>{8a5bebeb-575f-483d-8bd2-4b7eac163a7d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\JitCommon">
+      <UniqueIdentifier>{37896407-c373-44a3-b6ec-b57bceb2c4a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FileSystems">
+      <UniqueIdentifier>{7c421b66-413f-448b-abcb-84b0e9dacde1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HLE">
+      <UniqueIdentifier>{a9512720-5888-495e-8866-6e074a534165}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HLE\Kernel">
+      <UniqueIdentifier>{7d2e1fcb-d376-4928-8b4e-1ae25fac1c2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HLE\Libraries">
+      <UniqueIdentifier>{1926828c-7fec-495c-bea5-5a5f21f1dd06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{e1b92469-14c3-492f-be08-9dcd67a5c427}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Debugger">
+      <UniqueIdentifier>{5902bf41-1790-4772-9c17-8b804e0c4c8d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{75f0ee2b-1397-4cf3-9960-94ccd7d4d803}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HW">
+      <UniqueIdentifier>{9696662f-7398-489a-a358-5ebbf4ad4d97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Dialog">
+      <UniqueIdentifier>{41034c99-9b76-477f-8a77-bffaaffd5e82}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext">
+      <UniqueIdentifier>{1966d4a4-9a34-4a6c-946a-ebaf33633276}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\Snappy">
+      <UniqueIdentifier>{0b77054f-7fc7-4c33-ada3-762aecde69e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Font">
+      <UniqueIdentifier>{1c79e88d-1c48-450b-8af6-f22ce7d40c66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\udis86">
+      <UniqueIdentifier>{435eb15d-386c-44df-97b4-343a1d6524ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\sfmt19937">
+      <UniqueIdentifier>{8f56c2fd-7706-49f7-8a1d-64dcffad9ad0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\ARM64">
+      <UniqueIdentifier>{fd036bbc-1f55-40f8-8b62-7879e6b774d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FileLoaders">
+      <UniqueIdentifier>{67687dba-8313-4442-b4eb-4be8c4867b65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\IR">
+      <UniqueIdentifier>{119ac973-e457-4025-9e1e-4fb34022ae23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Debugger\WebSocket">
+      <UniqueIdentifier>{c21d9bb5-614d-451b-8c0b-3078b29122d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\gason">
+      <UniqueIdentifier>{db010645-6b26-41a7-8d44-c53cb0533d7d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\city">
+      <UniqueIdentifier>{cf1a59fe-8509-48f0-84d0-27c71cb10dc3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\sha1">
+      <UniqueIdentifier>{d8c48d88-2e34-4a98-aa88-4277a3b8afea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\jpge">
+      <UniqueIdentifier>{6c6e0188-fabf-4203-aaa2-896c42be2c20}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ext\libzip">
+      <UniqueIdentifier>{0201ff27-4fa8-4cf3-bbb9-accfdc0c7046}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\fake">
+      <UniqueIdentifier>{678fa299-0ff7-4983-982d-2da47b52e238}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\RiscV">
+      <UniqueIdentifier>{067e3128-3aaf-4ed1-b19e-bab11606abe7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MIPS\LoongArch64">
+      <UniqueIdentifier>{1ef9e44d-2e76-4984-a6e5-5f6f143acfc8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ELF\ElfReader.cpp">
+      <Filter>ELF</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPS.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSDebugInterface.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSDis.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSDisVFPU.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\Interpreter.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\InterpreterDispatch.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\InterpreterVFPU.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSTables.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSVFPUUtils.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSTracer.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSAnalyst.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSCodeUtils.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompALU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompBranch.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompFPU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\Jit.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompLoadStore.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\Asm.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\RegCache.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompVFPU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\JitCommon\JitCommon.cpp">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\DirectoryFileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\BlockDevices.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\ISOFileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\FileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\MetaFileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\HLE.cpp">
+      <Filter>HLE</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\HLETables.cpp">
+      <Filter>HLE</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernel.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelEventFlag.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelInterrupt.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelMemory.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelModule.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelSemaphore.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelThread.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelTime.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelMutex.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAdler.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAtrac.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAudio.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAudiocodec.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAudioRouting.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceCcc.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceCtrl.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceDisplay.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceDmac.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceG729.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceGe.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceHprm.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceHttp.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceIo.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceJpeg.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceVideocodec.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMpeg.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMpegbase.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMd5.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMp4.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceP3da.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMt19937.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceGameUpdate.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNet.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNet_lib.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\scePower.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceRtc.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceSas.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUmd.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUtility.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\scePsmf.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\BlockAllocator.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\Breakpoints.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\SymbolMap.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Core.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreTiming.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Loaders.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MemMap.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MemmapFunctions.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="PSPLoaders.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="System.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\__sceAudio.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelMsgPipe.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelMbx.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelVTimer.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelAlarm.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="Config.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ELF\PrxDecrypter.cpp">
+      <Filter>ELF</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\MemoryStick.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceImpose.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\AvcDecoder.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\MediaEngine.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\StereoResampler.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PPGeDraw.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\KL4E.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PSARUnpack.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PkgUnpack.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceFont.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="ELF\ParamSFO.cpp">
+      <Filter>ELF</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceOpenPSID.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceResmgr.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceParseUri.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceSsl.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceParseHttp.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceVaudio.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceVshBridge.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPMsgDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPPlaceholderDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPSaveDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\SavedataParam.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPOskDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPScreenshotDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\SasAudio.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUsb.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="SaveState.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\snappy\snappy-c.cpp">
+      <Filter>Ext\Snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\snappy\snappy.cpp">
+      <Filter>Ext\Snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmAsm.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompALU.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompBranch.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompFPU.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompLoadStore.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmJit.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmRegCache.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompVFPU.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\disarm.cpp">
+      <Filter>Ext</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\RegCacheFPU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmRegCacheFPU.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="Font\PGF.cpp">
+      <Filter>Font</Filter>
+    </ClCompile>
+    <ClCompile Include="..\git-version.cpp" />
+    <ClCompile Include="Reporting.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\scePspNpDrm_user.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceChnnlsv.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceDeflt.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="ELF\PBPReader.cpp">
+      <Filter>ELF</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\scePauth.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNp.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\tlzrc.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceMp3.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\JitCommon\JitBlockCache.cpp">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClCompile>
+    <ClCompile Include="Cwcheat.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\MpegDemux.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HDRemaster.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSAsm.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\VirtualDiscFileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\AsyncIOManager.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\MIPSStackWalk.cpp">
+      <Filter>MIPS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\xxhash.c">
+      <Filter>Ext</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceHeap.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\NetAdhocCommon.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNetAdhoc.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNetAdhocMatching.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPGamedataInstallDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPNetconfDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPNpSigninDialog.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\DisassemblyManager.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\proAdhoc.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\GameManager.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\ReplaceTables.cpp">
+      <Filter>HLE</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\CompReplace.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM\ArmCompReplace.cpp">
+      <Filter>MIPS\ARM</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\SimpleAudioDec.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\JitSafeMem.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\HLEHelperThread.cpp">
+      <Filter>HLE</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUsbGps.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\proAdhocServer.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\itab.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\syn.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\syn-att.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\syn-intel.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\udis86.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\udis86\decode.c">
+      <Filter>Ext\udis86</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceSha256.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceSircs.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\AudioFormat.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\sfmt19937\SFMT.c">
+      <Filter>Ext\sfmt19937</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceSfmt19937.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64Asm.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompALU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompBranch.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompFPU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompLoadStore.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompReplace.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64CompVFPU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64Jit.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64RegCache.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64RegCacheFPU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\DisArm64.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\JitCommon\JitState.cpp">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClCompile>
+    <ClCompile Include="Screenshot.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\RetryingFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\LocalFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\HTTPFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\CachingFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\DiskCachingFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Compatibility.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\SasReverb.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\RamCachingFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRCompALU.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRCompBranch.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRCompFPU.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRCompLoadStore.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRCompVFPU.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRJit.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRRegCache.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRInst.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRPassSimplify.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRInterpreter.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRFrontend.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="AVIDump.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\KUBridge.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystems\BlobFileSystem.cpp">
+      <Filter>FileSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUsbCam.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Replay.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="WebServer.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\LogBroadcaster.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\LogConfigSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\SteppingBroadcaster.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GameBroadcaster.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\CPUCoreSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\ClientConfigSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\WebSocketUtils.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GameSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\MemorySubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\DisasmSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\SteppingSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\BreakpointSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\HLESubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\HLEKernelObjectSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GPUBufferSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GPUDisasmSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUsbAcc.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GPURecordSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceUsbMic.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\Camera.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceKernelHeap.cpp">
+      <Filter>HLE\Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="MemFault.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PortManager.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Instance.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\BufferQueue.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\Plugins.cpp">
+      <Filter>HLE</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\snappy\snappy-stubs-internal.cpp">
+      <Filter>Ext\Snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\snappy\snappy-sinksource.cpp">
+      <Filter>Ext\Snappy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\gason\gason.cpp">
+      <Filter>Ext\gason</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\cityhash\city.cpp">
+      <Filter>Ext\city</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\sha1\sha1.cpp">
+      <Filter>Ext\sha1</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\jpge\jpgd.cpp">
+      <Filter>Ext\jpge</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\jpge\jpge.cpp">
+      <Filter>Ext\jpge</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_add.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_add_dir.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_close.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_delete.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_dirent.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_err_str.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error_clear.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error_get.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error_get_sys_type.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error_strerror.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_error_to_str.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fclose.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_error_clear.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_error_get.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_get_offset.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_strerror.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fopen.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fopen_index.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fread.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_archive_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_archive_flag.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_file_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_name.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_num_files.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_memdup.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_name_locate.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_new.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_open.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_rename.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_replace.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_archive_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_archive_flag.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_file_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_name.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_buffer.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_free.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_function.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_zip.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_stat.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_stat_index.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_stat_init.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_strerror.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_unchange.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_unchange_all.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_unchange_archive.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_unchange_data.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="KeyMap.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\InputSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\InputBroadcaster.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\fake\FakeJit.cpp">
+      <Filter>MIPS\fake</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\LineInfo.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\MemBlockInfo.cpp">
+      <Filter>Debugger</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\MemoryInfoSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_utf-8.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_string.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_zip_new.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_window.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_tell.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_tell_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_supports.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_stat.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_remove.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_rollback_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_seek.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_seek_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_read.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_layered.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_open.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_pkware_decode.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_pkware_encode.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_get_file_attributes.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_is_deleted.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_win32_utf16.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_win32_utf8.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_win32_ansi.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_win32_named.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_win32.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_stdio.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_file_common.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_error.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_crc.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_compress.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_commit_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_close.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_call.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_begin_write_cloning.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_begin_write.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_source_accept_empty.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_file_compression.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_set_default_password.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_progress.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_pkware.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_mkstempm.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_libzip_version.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_io_util.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_hash.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_num_entries.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_get_encryption_implementation.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_ftell.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fseek.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fopen_index_encrypted.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fopen_encrypted.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_set_mtime.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_set_external_attributes.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_set_encryption.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_set_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_replace.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_rename.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_get_external_attributes.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_get_comment.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_file_add.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_fdopen.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_extra_field_api.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_extra_field.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_entry.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_discard.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_dir_add.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_buffer.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_algorithm_deflate.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_add_entry.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_random_uwp.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\libzip\zip_random_win32.c">
+      <Filter>Ext\libzip</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\ReplaySubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="ControlMapper.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="KeyMapDefaults.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Debugger\WebSocket\GPUStatsSubscriber.cpp">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\Display.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\GpioMMIO.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNp2.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="WaveFile.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\riscv-disas.cpp">
+      <Filter>Ext</Filter>
+    </ClCompile>
+    <ClCompile Include="TiltEventProcessor.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ConfigSettings.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RetroAchievements.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVJit.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVAsm.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVRegCache.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompFPU.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompLoadStore.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompVec.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompALU.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompBranch.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\RiscV\RiscVCompSystem.cpp">
+      <Filter>MIPS\RiscV</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRAnalysis.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\IR\IRNativeCommon.cpp">
+      <Filter>MIPS\IR</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameTiming.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRRegCache.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRAsm.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRJit.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompBranch.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompFPU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompLoadStore.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompSystem.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompVec.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\x86\X64IRCompALU.cpp">
+      <Filter>MIPS\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompLoadStore.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompSystem.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompVec.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRJit.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRRegCache.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRAsm.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompALU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompBranch.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\ARM64\Arm64IRCompFPU.cpp">
+      <Filter>MIPS\ARM64</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\GameDB.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\MemStick.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\Atrac3Standalone.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\AtracCtx.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\AtracCtx2.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Dialog\PSPOskConstants.cpp">
+      <Filter>Dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNetApctl.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNetInet.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceNetResolver.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\NetInetConstants.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\SocketManager.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceAac.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\AtracTrack.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\RecentFiles.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="LuaContext.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceReg.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoaders\ZipFileLoader.cpp">
+      <Filter>FileLoaders</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64Asm.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompALU.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompBranch.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompFPU.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompLoadStore.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompSystem.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64CompVec.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64Jit.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="MIPS\LoongArch64\LoongArch64RegCache.cpp">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ext\loongarch-disasm.cpp">
+      <Filter>Ext</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\GranularMixer.cpp">
+      <Filter>HW</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\PathUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="SaveStateRewind.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\VideoPlayer.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="CmdLine.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="EmuThread.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="HLE\sceChkreg.cpp">
+      <Filter>HLE\Libraries</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ELF\ElfReader.h">
+      <Filter>ELF</Filter>
+    </ClInclude>
+    <ClInclude Include="ELF\PSPElfTypes.h">
+      <Filter>ELF</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSDebugInterface.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPS.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSDis.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSDisVFPU.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\Interpreter.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\InterpreterDispatch.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\InterpreterVFPU.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSTables.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSVFPUUtils.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSTracer.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSAnalyst.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSCodeUtils.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\Jit.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\RegCache.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\JitCommon\JitCommon.h">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\DirectoryFileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\BlockDevices.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\FileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\ISOFileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\MetaFileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\FunctionWrappers.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\HLE.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\HLETables.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernel.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelEventFlag.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelInterrupt.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelMemory.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelModule.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelSemaphore.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelThread.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelTime.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelMutex.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAdler.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAtrac.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAudio.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAudiocodec.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAudioRouting.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceCcc.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceCtrl.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceDisplay.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceDmac.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceGe.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceHprm.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceHttp.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceIo.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceJpeg.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMpeg.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceVideocodec.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMpegbase.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMd5.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMp4.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceP3da.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMt19937.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceG729.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceGameUpdate.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNet.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNet_lib.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\scePower.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceRtc.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceSas.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUmd.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUtility.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\scePsmf.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BlockAllocator.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\Breakpoints.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\DebugInterface.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\SymbolMap.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="System.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreParameter.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreTiming.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Loaders.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MemMap.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Opcode.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="PSPLoaders.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\__sceAudio.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelMsgPipe.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelMbx.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelVTimer.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelAlarm.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ELF\PrxDecrypter.h">
+      <Filter>ELF</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\MemoryStick.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceImpose.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\AvcDecoder.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\MediaEngine.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\StereoResampler.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\PPGeDraw.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\PSARUnpack.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\PkgUnpack.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceFont.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="ELF\ParamSFO.h">
+      <Filter>ELF</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceOpenPSID.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceResmgr.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceParseUri.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceSsl.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceParseHttp.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceVaudio.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceVshBridge.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPMsgDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPPlaceholderDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPSaveDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\SavedataParam.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPOskDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPScreenshotDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\SasAudio.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUsb.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="SaveState.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\snappy\snappy.h">
+      <Filter>Ext\Snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\snappy\snappy-stubs-public.h">
+      <Filter>Ext\Snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\snappy\snappy-sinksource.h">
+      <Filter>Ext\Snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\snappy\snappy-stubs-internal.h">
+      <Filter>Ext\Snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\snappy\snappy-internal.h">
+      <Filter>Ext\Snappy</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM\ArmJit.h">
+      <Filter>MIPS\ARM</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM\ArmRegCache.h">
+      <Filter>MIPS\ARM</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\RegCacheFPU.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM\ArmRegCacheFPU.h">
+      <Filter>MIPS\ARM</Filter>
+    </ClInclude>
+    <ClInclude Include="Font\PGF.h">
+      <Filter>Font</Filter>
+    </ClInclude>
+    <ClInclude Include="Reporting.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\scePspNpDrm_user.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceChnnlsv.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceDeflt.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="ELF\PBPReader.h">
+      <Filter>ELF</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\scePauth.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNp.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceMp3.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\JitCommon\JitBlockCache.h">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClInclude>
+    <ClInclude Include="Cwcheat.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\MpegDemux.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HDRemaster.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSAsm.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\VirtualDiscFileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\AsyncIOManager.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\MIPSStackWalk.h">
+      <Filter>MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\disarm.h">
+      <Filter>Ext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\xxhash.h">
+      <Filter>Ext</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\KernelWaitHelpers.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceHeap.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\NetAdhocCommon.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNetAdhoc.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNetAdhocMatching.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPGamedataInstallDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPNetconfDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPNpSigninDialog.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\JitCommon\JitState.h">
+      <Filter>MIPS\JitCommon</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\DisassemblyManager.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\proAdhoc.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\GameManager.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\ReplaceTables.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\BufferQueue.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\SimpleAudioDec.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\JitSafeMem.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\HLEHelperThread.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUsbGps.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\proAdhocServer.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\decode.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\extern.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\itab.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\syn.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\types.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\udint.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\udis86\udis86.h">
+      <Filter>Ext\udis86</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceSha256.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceSircs.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\AudioFormat.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sfmt19937\SFMT.h">
+      <Filter>Ext\sfmt19937</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sfmt19937\SFMT-common.h">
+      <Filter>Ext\sfmt19937</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sfmt19937\SFMT-params.h">
+      <Filter>Ext\sfmt19937</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sfmt19937\SFMT-params19937.h">
+      <Filter>Ext\sfmt19937</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceSfmt19937.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="MemMapHelpers.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM64\Arm64Jit.h">
+      <Filter>MIPS\ARM64</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM64\Arm64RegCache.h">
+      <Filter>MIPS\ARM64</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM64\Arm64RegCacheFPU.h">
+      <Filter>MIPS\ARM64</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\DisArm64.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Screenshot.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\RetryingFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\LocalFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\HTTPFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\CachingFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\DiskCachingFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\ThreadQueueList.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="Compatibility.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\SasReverb.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\RamCachingFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRJit.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRRegCache.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRInst.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRPassSimplify.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRInterpreter.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRFrontend.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="AVIDump.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\KUBridge.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystems\BlobFileSystem.h">
+      <Filter>FileSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUsbCam.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Replay.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="WebServer.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\LogBroadcaster.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\LogConfigSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\SteppingBroadcaster.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GameBroadcaster.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\ClientConfigSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\CPUCoreSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\WebSocketUtils.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GameSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\MemorySubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\DisasmSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\SteppingSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\BreakpointSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\KernelThreadDebugInterface.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\HLESubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\HLEKernelObjectSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GPUBufferSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GPUDisasmSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigValues.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUsbAcc.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GPURecordSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceUsbMic.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\Camera.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceKernelHeap.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="MemFault.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\PortManager.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Instance.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\Plugins.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\gason\gason.h">
+      <Filter>Ext\gason</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\cityhash\city.h">
+      <Filter>Ext\city</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\cityhash\citycrc.h">
+      <Filter>Ext\city</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\sha1\sha1.h">
+      <Filter>Ext\sha1</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\jpge\jpgd.h">
+      <Filter>Ext\jpge</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\jpge\jpge.h">
+      <Filter>Ext\jpge</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\config.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zip.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zipint.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyMap.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\InputSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\InputBroadcaster.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\fake\FakeJit.h">
+      <Filter>MIPS\fake</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\LineInfo.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\MemBlockInfo.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\MemoryInfoSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zip_source_file_win32.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zip_source_file_stdio.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zip_source_file.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\compat.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\libzip\zipconf.h">
+      <Filter>Ext\libzip</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\ReplaySubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="ControlMapper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyMapDefaults.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\WebSocket\GPUStatsSubscriber.h">
+      <Filter>Debugger\WebSocket</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\Display.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\GpioMMIO.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNp2.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="WaveFile.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\riscv-disas.h">
+      <Filter>Ext</Filter>
+    </ClInclude>
+    <ClInclude Include="TiltEventProcessor.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigSettings.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RetroAchievements.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\RiscV\RiscVJit.h">
+      <Filter>MIPS\RiscV</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\RiscV\RiscVRegCache.h">
+      <Filter>MIPS\RiscV</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRAnalysis.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\IR\IRNativeCommon.h">
+      <Filter>MIPS\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameTiming.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\X64IRRegCache.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\x86\X64IRJit.h">
+      <Filter>MIPS\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM64\Arm64IRJit.h">
+      <Filter>MIPS\ARM64</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\ARM64\Arm64IRRegCache.h">
+      <Filter>MIPS\ARM64</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\GameDB.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\MemStick.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\Atrac3Standalone.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\AtracCtx.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\AtracCtx2.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="Dialog\PSPOskConstants.h">
+      <Filter>Dialog</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNetApctl.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNetInet.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceNetResolver.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\NetInetConstants.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\SocketManager.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceAac.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\ErrorCodes.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\AtracTrack.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\RecentFiles.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="LuaContext.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\PSPThreadContext.h">
+      <Filter>HLE\Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceReg.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoaders\ZipFileLoader.h">
+      <Filter>FileLoaders</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\AtracBase.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\LoongArch64\LoongArch64Jit.h">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClInclude>
+    <ClInclude Include="MIPS\LoongArch64\LoongArch64RegCache.h">
+      <Filter>MIPS\LoongArch64</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ext\loongarch-disasm.h">
+      <Filter>Ext</Filter>
+    </ClInclude>
+    <ClInclude Include="Debugger\Watch.h">
+      <Filter>Debugger</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\GranularMixer.h">
+      <Filter>HW</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\PathUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="SaveStateRewind.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\VideoPlayer.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="CmdLine.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="EmuThread.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\HLEUtil.h">
+      <Filter>HLE</Filter>
+    </ClInclude>
+    <ClInclude Include="HLE\sceChkreg.h">
+      <Filter>HLE\Libraries</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\LICENSE.TXT" />
+    <None Include="..\ext\gason\LICENSE">
+      <Filter>Ext\gason</Filter>
+    </None>
+    <None Include="..\ext\cityhash\COPYING">
+      <Filter>Ext\city</Filter>
+    </None>
+    <None Include="..\ext\cityhash\README">
+      <Filter>Ext\city</Filter>
+    </None>
+    <None Include="..\ext\libzip\Android.mk">
+      <Filter>Ext\libzip</Filter>
+    </None>
+    <None Include="..\assets\infra-dns.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\ext\sha1\CMakeLists.txt">
+      <Filter>Ext\sha1</Filter>
+    </Text>
+    <Text Include="..\ext\libzip\CMakeLists.txt">
+      <Filter>Ext\libzip</Filter>
+    </Text>
+    <Text Include="..\ext\CMakeLists.txt">
+      <Filter>Ext</Filter>
+    </Text>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
+</Project>

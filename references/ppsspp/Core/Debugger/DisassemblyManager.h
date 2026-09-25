@@ -1,0 +1,220 @@
+// Copyright (c) 2012- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <string>
+#include <string_view>
+
+#include "ppsspp_config.h"
+#include <mutex>
+#include "Common/CommonTypes.h"
+#include "Core/Debugger/SymbolMap.h"
+#include "Core/MIPS/MIPSAnalyst.h"
+
+#if PPSSPP_ARCH(AMD64)
+typedef u64 HashType;
+#else
+typedef u32 HashType;
+#endif
+
+enum DisassemblyLineType { DISTYPE_OPCODE, DISTYPE_DATA, DISTYPE_OTHER };
+
+struct DisassemblyLineInfo {
+	DisassemblyLineType type;
+	MIPSAnalyst::MipsOpcodeInfo info;
+	std::string name;
+	std::string params;
+	u32 totalSize;
+
+	void ToString(char *dest, size_t size, u32 curAddress) const;
+};
+
+enum DisasmLineType { LINE_UP, LINE_DOWN, LINE_RIGHT };
+
+struct BranchLine
+{
+	u32 first;
+	u32 second;
+	DisasmLineType type;
+	int laneIndex;
+
+	bool operator<(const BranchLine& other) const
+	{
+		return first < other.first;
+	}
+};
+
+class DisassemblyEntry
+{
+public:
+	virtual ~DisassemblyEntry() { };
+	virtual void recheck() = 0;
+	virtual int getNumLines() = 0;
+	virtual int getLineNum(u32 address, bool findStart) = 0;
+	virtual u32 getLineAddress(int line) = 0;
+	virtual u32 getTotalSize() = 0;
+	virtual bool disassemble(u32 address, DisassemblyLineInfo& dest, bool insertSymbols, DebugInterface *cpuDebug) = 0;
+	virtual void getBranchLines(u32 start, u32 size, std::vector<BranchLine>& dest) { };
+};
+
+class DisassemblyFunction: public DisassemblyEntry
+{
+public:
+	DisassemblyFunction(u32 _address, u32 _size);
+	~DisassemblyFunction();
+	void recheck() override;
+	int getNumLines() override;
+	int getLineNum(u32 address, bool findStart) override;
+	u32 getLineAddress(int line) override;
+	u32 getTotalSize() override { return size; };
+	bool disassemble(u32 address, DisassemblyLineInfo& dest, bool insertSymbols, DebugInterface *cpuDebug) override;
+	void getBranchLines(u32 start, u32 size, std::vector<BranchLine>& dest) override;
+
+private:
+	void generateBranchLines();
+	void load();
+	void clear();
+	void addOpcodeSequence(u32 start, u32 end);
+
+	u32 address;
+	u32 size;
+	HashType hash;
+	std::vector<BranchLine> lines;
+	std::map<u32,DisassemblyEntry*> entries;
+	std::vector<u32> lineAddresses;
+	std::recursive_mutex lock_;
+};
+
+class DisassemblyOpcode: public DisassemblyEntry
+{
+public:
+	DisassemblyOpcode(u32 _address, int _num): address(_address), num(_num) { }
+	void recheck() override { };
+	int getNumLines() override { return num; };
+	int getLineNum(u32 address, bool findStart) override { return (address - this->address) / 4; };
+	u32 getLineAddress(int line) override { return address + line * 4; };
+	u32 getTotalSize() override { return num * 4; };
+	bool disassemble(u32 address, DisassemblyLineInfo& dest, bool insertSymbols, DebugInterface *cpuDebug) override;
+	void getBranchLines(u32 start, u32 size, std::vector<BranchLine>& dest) override;
+
+private:
+	u32 address;
+	int num;
+};
+
+
+class DisassemblyData: public DisassemblyEntry
+{
+public:
+	DisassemblyData(u32 _address, u32 _size, DataType _type);
+
+	void recheck() override;
+	int getNumLines() override { return (int)lines.size(); };
+	int getLineNum(u32 address, bool findStart) override;
+	u32 getLineAddress(int line) override {
+		// A zero-size data symbol leaves lineAddresses empty; fall back to the
+		// symbol's own base address rather than indexing out of bounds.
+		if (line < 0 || (size_t)line >= lineAddresses.size())
+			return address;
+		return lineAddresses[line];
+	};
+	u32 getTotalSize() override { return size; };
+	bool disassemble(u32 address, DisassemblyLineInfo& dest, bool insertSymbols, DebugInterface *cpuDebug) override;
+
+private:
+	void createLines();
+
+	struct DataEntry
+	{
+		std::string text;
+		u32 size;
+		int lineNum;
+	};
+
+	u32 address;
+	u32 size;
+	HashType hash;
+	DataType type;
+	std::map<u32,DataEntry> lines;
+	std::vector<u32> lineAddresses;
+	std::recursive_mutex lock_;
+};
+
+class DisassemblyComment: public DisassemblyEntry
+{
+public:
+	DisassemblyComment(u32 _address, u32 _size, std::string_view name, std::string_view param);
+
+	void recheck() override { };
+	int getNumLines() override { return 1; };
+	int getLineNum(u32 address, bool findStart) override { return 0; };
+	u32 getLineAddress(int line) override { return address; };
+	u32 getTotalSize() override { return size; };
+	bool disassemble(u32 address, DisassemblyLineInfo& dest, bool insertSymbols, DebugInterface *cpuDebug) override;
+
+private:
+	u32 address;
+	u32 size;
+	std::string name;
+	std::string param;
+};
+
+class DebugInterface;
+
+class DisassemblyManager {
+public:
+	~DisassemblyManager();
+
+	void clear();
+
+	void setCpu(DebugInterface *cpu);
+	void setMaxParamChars(int num) { maxParamChars = num; clear(); };
+	void getLine(u32 address, bool insertSymbols, DisassemblyLineInfo &dest, DebugInterface *cpuDebug);
+	void analyze(u32 address, u32 size);
+	std::vector<BranchLine> getBranchLines(u32 start, u32 size);
+
+	u32 getStartAddress(u32 address);
+	u32 getNthPreviousAddress(u32 address, int n = 1);
+	u32 getNthNextAddress(u32 address, int n = 1);
+
+	DebugInterface *getCpu() { return cpu_; };
+	int getMaxParamChars() { return maxParamChars; };
+
+private:
+	std::map<u32,DisassemblyEntry*> entries;
+	std::recursive_mutex entriesLock_;
+	DebugInterface *cpu_;
+	int maxParamChars = 29;
+};
+
+extern DisassemblyManager g_disassemblyManager;
+
+// Drops the cached disassembly. Call this when what it describes - emulated memory and the symbol
+// map - goes away. DisassemblyManager.cpp isn't built for libretro (see libretro/Makefile.common),
+// so there it's a no-op, the same way the WebSocket debugger entry points are.
+#ifdef __LIBRETRO__
+inline void ClearDisassemblyCache() {}
+#else
+void ClearDisassemblyCache();
+#endif
+
+bool isInInterval(u32 start, u32 size, u32 value);
+bool IsLikelyStringAt(uint32_t addr);
+
+std::string DisassembleRange(u32 start, u32 size, bool displaySymbols, MIPSDebugInterface *debugger);
+bool GetDisasmAddressText(u32 address, char *dest, size_t bufSize, bool abbreviateLabels, bool showData, bool displaySymbols);

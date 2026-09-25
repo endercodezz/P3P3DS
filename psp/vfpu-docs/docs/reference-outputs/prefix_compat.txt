@@ -1,0 +1,266 @@
+# This is the output of the prefix compatibility tests
+# (run by davidgfnet on a PSP-3000)
+# Comments inline to explain the output
+
+vadd.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vadd.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vadd.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vadd.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsub.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsub.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsub.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsub.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmul.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmul.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmul.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmul.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vdiv.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vdiv.p  : rs *** *** *** *** rt *** *** *** *** rd *** *** 
+vdiv.t  : rs *** *** *** *** rt *** *** *** *** rd *** *** 
+vdiv.q  : rs *** *** *** *** rt *** *** *** *** rd *** *** 
+vmin.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmin.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmin.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmin.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmax.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmax.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmax.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vmax.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vscmp.s : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vscmp.p : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vscmp.t : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vscmp.q : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsge.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsge.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsge.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vsge.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vslt.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vslt.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vslt.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vslt.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+
+# These override swizzle and negation to perform the operation
+# Since vcrsp is likely three vdet operations (one per compoent),
+# masking must be used to control writes to each element
+vcrs.t  : rs *** *** *** *** rt *** *** *** *** rd msk sat 
+vcrsp.t : rs *** *** *** *** rt *** *** *** *** rd *** *** 
+
+# Likely four vdot operations using masking (one per component)
+vqmul.q : rs *** *** *** *** rt *** *** *** *** rd *** *** 
+
+vsbn.s  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vscl.p  : rs swz neg abs cst rt swz *** *** *** rd msk sat 
+vscl.t  : rs swz neg abs cst rt swz *** *** *** rd msk sat 
+vscl.q  : rs swz neg abs cst rt swz *** *** *** rd msk sat 
+vdot.p  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vdot.t  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+vdot.q  : rs swz neg abs cst rt swz neg abs cst rd msk sat 
+
+# Must be using swizzle and negation for rt (then it's just vdot)
+vdet.p  : rs swz neg abs cst rt *** *** *** *** rd msk sat 
+
+# Uses a vdot using swizzle/constants (on rs)
+# There seems to be some spurious errors in the test.
+vhdp.p  : rs swz *** *** cst rt swz neg abs cst rd msk sat 
+vhdp.t  : rs swz *** *** *** rt swz neg abs cst rd msk sat 
+vhdp.q  : rs swz *** *** cst rt swz neg abs cst rd msk sat 
+vmov.s  : rs swz neg abs cst rd msk sat 
+vmov.p  : rs swz neg abs cst rd msk sat 
+vmov.t  : rs swz neg abs cst rd msk sat 
+vmov.q  : rs swz neg abs cst rd msk sat 
+
+# Using abs/neg mechanism (like vmov + prefix abs/neg)
+# Constants do not work for abs since it the bit is re-used
+vabs.s  : rs swz *** abs *** rd msk sat 
+vabs.p  : rs swz *** abs *** rd msk sat 
+vabs.t  : rs swz *** abs *** rd msk sat 
+vabs.q  : rs swz *** abs *** rd msk sat 
+vneg.s  : rs swz *** abs cst rd msk sat 
+vneg.p  : rs swz *** abs cst rd msk sat 
+vneg.t  : rs swz *** abs cst rd msk sat 
+vneg.q  : rs swz *** abs cst rd msk sat 
+
+# Uses sat dst prefix, so it gives the illusion it works
+# Masking seems to work consistenly though.
+vsat0.s : rs swz neg abs cst rd msk sat 
+vsat0.p : rs swz neg abs cst rd msk sat 
+vsat0.t : rs swz neg abs cst rd msk sat 
+vsat0.q : rs swz neg abs cst rd msk sat 
+vsat1.s : rs swz neg abs cst rd msk *** 
+vsat1.p : rs swz neg abs cst rd msk *** 
+vsat1.t : rs swz neg abs cst rd msk *** 
+vsat1.q : rs swz neg abs cst rd msk *** 
+
+# Following instructions use repeated operations (ie. vsin.q is really 4x vsin.s)
+# These kind of instructions mess up prefix usage
+vrcp.s  : rs swz neg abs cst rd msk sat 
+vrcp.p  : rs *** *** *** *** rd *** *** 
+vrcp.t  : rs *** *** *** *** rd *** *** 
+vrcp.q  : rs *** *** *** *** rd *** *** 
+vrsq.s  : rs swz neg abs cst rd msk sat 
+vrsq.p  : rs *** neg abs *** rd *** *** 
+vrsq.t  : rs *** neg abs *** rd *** *** 
+vrsq.q  : rs *** neg abs *** rd *** *** 
+vsin.s  : rs swz neg abs cst rd msk sat 
+vsin.p  : rs *** *** *** *** rd *** *** 
+vsin.t  : rs *** *** *** *** rd *** *** 
+vsin.q  : rs *** *** *** *** rd *** *** 
+vcos.s  : rs swz neg abs cst rd msk sat 
+vcos.p  : rs *** neg abs *** rd *** *** 
+vcos.t  : rs *** neg abs *** rd *** *** 
+vcos.q  : rs *** neg abs *** rd *** *** 
+vexp2.s : rs swz neg abs cst rd msk sat 
+vexp2.p : rs *** *** *** *** rd *** *** 
+vexp2.t : rs *** *** *** *** rd *** *** 
+vexp2.q : rs *** *** *** *** rd *** *** 
+vlog2.s : rs swz neg abs cst rd msk sat 
+vlog2.p : rs *** neg abs *** rd *** *** 
+vlog2.t : rs *** neg abs *** rd *** *** 
+vlog2.q : rs *** neg abs *** rd *** *** 
+vlgb.s  : rs swz neg abs cst rd msk sat 
+vsbz.s  : rs swz neg abs cst rd msk sat 
+vwbn.s  : rs swz neg abs cst rd msk sat 
+vsqrt.s : rs swz neg abs cst rd msk sat 
+vsqrt.p : rs *** neg abs *** rd *** *** 
+vsqrt.t : rs *** neg abs *** rd *** *** 
+vsqrt.q : rs *** neg abs *** rd *** *** 
+vasin.s : rs swz neg abs cst rd msk sat 
+vasin.p : rs *** *** *** *** rd *** *** 
+vasin.t : rs *** *** *** *** rd *** *** 
+vasin.q : rs *** *** *** *** rd *** *** 
+vnrcp.s : rs swz *** abs cst rd msk sat   # uses neg prefix
+vnrcp.p : rs *** *** *** *** rd *** *** 
+vnrcp.t : rs *** *** *** *** rd *** *** 
+vnrcp.q : rs *** *** *** *** rd *** *** 
+vnsin.s : rs swz *** abs cst rd msk sat   # (ab)using the fact that -sin(x) = sin(-x)
+vnsin.p : rs *** *** *** *** rd *** *** 
+vnsin.t : rs *** *** *** *** rd *** *** 
+vnsin.q : rs *** *** *** *** rd *** *** 
+vrexp2.s: rs swz *** abs cst rd msk sat   # (ab)using the fact that 1/exp2(x) = exp2(-x)
+vrexp2.p: rs *** *** *** *** rd *** *** 
+vrexp2.t: rs *** *** *** *** rd *** *** 
+vrexp2.q: rs *** *** *** *** rd *** *** 
+
+# Most likely using swizzle (using two inputs?) and vmin/max
+vsrt1.q : rs *** *** *** *** rd msk sat 
+vsrt2.q : rs *** *** *** *** rd msk sat 
+vsrt3.q : rs *** *** *** *** rd msk sat 
+vsrt4.q : rs *** *** *** *** rd msk sat 
+vbfy1.p : rs *** *** *** *** rd msk sat 
+vbfy1.q : rs *** *** *** *** rd msk sat 
+vbfy2.q : rs *** *** *** *** rd msk sat 
+
+vsgn.s  : rs swz neg abs cst rd msk sat 
+vsgn.p  : rs swz neg abs cst rd msk sat 
+vsgn.t  : rs swz neg abs cst rd msk sat 
+vsgn.q  : rs swz neg abs cst rd msk sat 
+vocp.s  : rs swz *** abs cst rd msk sat   # Likely uses neg() on rs (and constant 1.0 in rt)
+vocp.p  : rs swz *** abs cst rd msk sat 
+vocp.t  : rs swz *** abs cst rd msk sat 
+vocp.q  : rs swz *** abs cst rd msk sat 
+vi2f.s  : rs swz neg abs cst rd msk sat 
+vi2f.p  : rs swz neg abs cst rd msk sat 
+vi2f.t  : rs swz neg abs cst rd msk sat 
+vi2f.q  : rs swz neg abs cst rd msk sat 
+vf2in.s : rs swz neg abs cst rd msk sat   # saturation does not work as expected since output is integer
+vf2in.p : rs swz neg abs cst rd msk sat   # applies to all 2i instructions
+vf2in.t : rs swz neg abs cst rd msk sat 
+vf2in.q : rs swz neg abs cst rd msk sat 
+vf2iz.s : rs swz neg abs cst rd msk sat 
+vf2iz.p : rs swz neg abs cst rd msk sat 
+vf2iz.t : rs swz neg abs cst rd msk sat 
+vf2iz.q : rs swz neg abs cst rd msk sat 
+vf2iu.s : rs swz neg abs cst rd msk sat 
+vf2iu.p : rs swz neg abs cst rd msk sat 
+vf2iu.t : rs swz neg abs cst rd msk sat 
+vf2iu.q : rs swz neg abs cst rd msk sat 
+vf2id.s : rs swz neg abs cst rd msk sat 
+vf2id.p : rs swz neg abs cst rd msk sat 
+vf2id.t : rs swz neg abs cst rd msk sat 
+vf2id.q : rs swz neg abs cst rd msk sat 
+vrot.p  : rs swz *** abs *** rd *** *** 
+vrot.t  : rs swz *** abs *** rd *** *** 
+vrot.q  : rs swz *** abs *** rd *** *** 
+vsocp.s : rs swz *** *** *** rd msk sat
+vsocp.p : rs *** *** *** *** rd msk sat   # Uses swizzle to replicate input
+vavg.p  : rs swz neg abs *** rd msk sat   # Errors due to rounding, can be ignored!
+vavg.t  : rs swz *** abs *** rd msk sat 
+vavg.q  : rs swz neg abs cst rd msk sat 
+vfad.p  : rs swz neg abs *** rd msk sat   # Same, rounding issues
+vfad.t  : rs swz neg abs *** rd msk sat 
+vfad.q  : rs swz neg abs cst rd msk sat 
+vcmp.s  : rs swz neg abs cst rt swz neg abs cst 
+vcmp.p  : rs swz neg abs cst rt swz neg abs cst 
+vcmp.t  : rs swz neg abs cst rt swz neg abs cst 
+vcmp.q  : rs swz neg abs cst rt swz neg abs cst 
+vzero.s : rd msk sat 
+vzero.p : rd msk sat 
+vzero.t : rd msk sat 
+vzero.q : rd msk sat 
+vone.s  : rd msk sat 
+vone.p  : rd msk sat 
+vone.t  : rd msk sat 
+vone.q  : rd msk sat 
+
+# These instructions expand into smaller operations, so prefixes
+# are probably misused or not used at all.
+# In many cases masking works, but since it is hard to express how
+# the prefix is actually used, it's just easier to use regular vector
+# instructions (and probably as fast)
+vmmul.p : rd *** *** 
+vmmul.t : rd *** *** 
+vmmul.q : rd *** *** 
+vmscl.p : rt swz *** *** *** rd *** *** 
+vmscl.t : rt swz *** *** *** rd *** *** 
+vmscl.q : rt swz *** *** *** rd *** *** 
+vmmov.p : rd *** *** 
+vmmov.t : rd *** *** 
+vmmov.q : rd *** *** 
+vmidt.p : rd *** sat 
+vmidt.t : rd *** sat 
+vmidt.q : rd *** sat 
+vmzero.p: rd msk sat   # mask and sat do not work, (just a quirk of how the test works)
+vmzero.t: rd msk sat 
+vmzero.q: rd msk sat 
+vmone.p : rd *** sat    # mask and sat do not work (same)
+vmone.t : rd *** sat 
+vmone.q : rd *** sat 
+vtfm2.p : rt *** *** *** *** rd *** *** 
+vtfm3.t : rt *** *** *** *** rd *** *** 
+vtfm4.q : rt *** *** *** *** rd *** *** 
+vhtfm2.p: rt *** *** *** *** rd *** *** 
+vhtfm3.t: rt *** *** *** *** rd *** *** 
+vhtfm4.q: rt *** *** *** *** rd *** *** 
+vcmovf.s: rs swz neg abs cst rd msk sat 
+vcmovf.t: rs swz neg abs cst rd msk sat 
+vcmovf.p: rs swz neg abs cst rd msk sat 
+vcmovf.q: rs swz neg abs cst rd msk sat 
+vcmovt.s: rs swz neg abs cst rd msk sat 
+vcmovt.t: rs swz neg abs cst rd msk sat 
+vcmovt.p: rs swz neg abs cst rd msk sat 
+vcmovt.q: rs swz neg abs cst rd msk sat 
+vi2uc.q : rs swz neg abs cst rd msk sat    # These int to int instructions can actually use
+vi2c.q  : rs swz neg abs cst rd msk sat    # most prefixes. However due to their nature, it
+vi2us.p : rs swz neg abs cst rd msk sat    # can be hard to describe how they work (since the
+vi2us.q : rs swz neg abs cst rd msk sat    # prefix will be interpreting the data as fp32).
+vi2s.p  : rs swz neg abs cst rd msk sat 
+vi2s.q  : rs swz neg abs cst rd msk sat 
+vf2h.p  : rs swz neg abs cst rd msk sat    # input is fp32, so prefix ok
+vf2h.q  : rs swz neg abs cst rd msk sat 
+vs2i.s  : rs swz neg abs cst rd msk sat 
+vs2i.p  : rs swz neg abs cst rd msk sat 
+vus2i.s : rs swz neg abs cst rd msk sat 
+vus2i.p : rs swz neg abs cst rd msk sat 
+vc2i.s  : rs swz neg abs cst rd msk sat 
+vuc2ifs.s: rs swz neg abs cst rd msk sat 
+vh2f.s  : rs swz neg abs cst rd msk sat 
+vh2f.p  : rs swz neg abs cst rd msk sat 
+vt4444.q: rs swz neg abs cst rd msk sat 
+vt5551.q: rs swz neg abs cst rd msk sat 
+vt5650.q: rs swz neg abs cst rd msk sat 
+viim.s  : rd msk sat 
+vfim.s  : rd msk sat 
+vcst.s  : rd msk sat 
+vcst.p  : rd msk sat 
+vcst.t  : rd msk sat 
+vcst.q  : rd msk sat 

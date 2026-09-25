@@ -1,0 +1,5 @@
+*.o
+*.prx
+*.elf
+*.SFO
+EBOOT.PBP

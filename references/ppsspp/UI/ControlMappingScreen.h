@@ -1,0 +1,189 @@
+// Copyright (c) 2013- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <functional>
+#include <memory>
+#include <set>
+#include <mutex>
+#include <vector>
+#include <string>
+
+#include "Common/UI/View.h"
+#include "Common/UI/UIScreen.h"
+#include "Common/UI/PopupScreens.h"
+#include "Common/Data/Text/I18n.h"
+
+#include "Core/ControlMapper.h"
+
+#include "UI/BaseScreens.h"
+#include "UI/TabbedDialogScreen.h"
+#include "UI/SimpleDialogScreen.h"
+
+class SingleControlMapper;
+
+class ControlMappingScreen : public UITwoPaneBaseDialogScreen {
+public:
+	ControlMappingScreen(const Path &gamePath) : UITwoPaneBaseDialogScreen(gamePath, TwoPaneFlags::SettingsInContextMenu | TwoPaneFlags::ContentsCanScroll | TwoPaneFlags::NoTopbarInLandscape) {
+		categoryToggles_[0] = true;
+		categoryToggles_[1] = true;
+		categoryToggles_[2] = true;
+		categoryToggles_[3] = false;
+	}
+	const char *tag() const override { return "ControlMapping"; }
+
+protected:
+	void CreateSettingsViews(UI::ViewGroup *parent) override;
+	void CreateContentViews(UI::ViewGroup *parent) override;
+	void update() override;
+
+	std::string_view GetTitle() const override;
+
+private:
+	void OnAutoConfigure(UI::EventParams &params);
+
+	void dialogFinished(const Screen *dialog, DialogResult result) override;
+
+	std::vector<SingleControlMapper *> mappers_;
+	int keyMapGeneration_ = -1;
+
+	bool categoryToggles_[10]{};
+};
+
+class KeyMappingNewKeyDialog : public UI::PopupScreen {
+public:
+	explicit KeyMappingNewKeyDialog(int btn, bool replace, std::function<void(KeyMap::MultiInputMapping)> callback, I18NCat i18n)
+		: PopupScreen(T(i18n, "Map Key"), T(I18NCat::DIALOG, "Cancel")), pspBtn_(btn), callback_(callback) {}
+
+	const char *tag() const override { return "KeyMappingNewKey"; }
+
+	bool key(const KeyInput &key) override;
+	void axis(const AxisInput &axis) override;
+
+	void SetDelay(float t);
+
+protected:
+	void CreatePopupContents(UI::ViewGroup *parent) override;
+
+	bool FillVertical() const override { return false; }
+	bool ShowButtons() const override { return true; }
+	void OnCompleted(DialogResult result) override {}
+
+private:
+	int pspBtn_;
+	std::function<void(KeyMap::MultiInputMapping)> callback_;
+
+	KeyMap::MultiInputMapping mapping_;
+
+	UI::View *comboMappingsNotEnabled_ = nullptr;
+
+	// We need to do our own detection for axis "keyup" here.
+	std::set<InputMapping> triggeredAxes_;
+
+	double delayUntil_ = 0.0f;
+};
+
+class KeyMappingNewMouseKeyDialog : public UI::PopupScreen {
+public:
+	KeyMappingNewMouseKeyDialog(int btn, bool replace, std::function<void(KeyMap::MultiInputMapping)> callback, I18NCat i18n)
+		: PopupScreen(T(i18n, "Map Mouse"), "", ""), callback_(callback) {}
+	~KeyMappingNewMouseKeyDialog() {
+		g_IsMappingMouseInput = false;
+	}
+
+	const char *tag() const override { return "KeyMappingNewMouseKey"; }
+
+	bool key(const KeyInput &key) override;
+	void axis(const AxisInput &axis) override;
+
+protected:
+	void CreatePopupContents(UI::ViewGroup *parent) override;
+
+	bool FillVertical() const override { return false; }
+	bool ShowButtons() const override { return true; }
+	void OnCompleted(DialogResult result) override {}
+
+private:
+	std::function<void(KeyMap::MultiInputMapping)> callback_;
+	bool mapped_ = false;  // Prevent double registrations
+};
+
+class JoystickHistoryView;
+
+class AnalogCalibrationScreen : public UITwoPaneBaseDialogScreen, protected ControlListener {
+public:
+	AnalogCalibrationScreen(const Path &gamePath);
+	~AnalogCalibrationScreen();
+
+	void axis(const AxisInput &axis) override;
+
+	void update() override;
+
+	InputMode PassInputToMapper() const override {
+		return InputMode::Other | InputMode::Keyboard | InputMode::Mouse;
+	}
+
+	const char *tag() const override { return "AnalogSetup"; }
+
+protected:
+	void CreateSettingsViews(UI::ViewGroup *parent) override;
+	void CreateContentViews(UI::ViewGroup *parent) override;
+
+	void SetPSPAnalog(int rotation, int stick, float x, float y) override;
+	void SetRawAnalog(int stick, float x, float y) override;
+
+	std::string_view GetTitle() const override;
+private:
+	void OnResetToDefaults(UI::EventParams &e);
+
+	float analogX_[2]{};
+	float analogY_[2]{};
+	float rawX_[2]{};
+	float rawY_[2]{};
+
+	JoystickHistoryView *stickView_[2]{};
+};
+
+class MockPSP;
+
+class VisualMappingScreen : public UIBaseDialogScreen {
+public:
+	VisualMappingScreen(const Path &gamePath) : UIBaseDialogScreen(gamePath) {}
+
+	const char *tag() const override { return "VisualMapping"; }
+
+	bool key(const KeyInput &key) override;
+	void axis(const AxisInput &axis) override;
+
+protected:
+	void CreateViews() override;
+
+	void dialogFinished(const Screen *dialog, DialogResult result) override;
+	void resized() override;
+
+private:
+	void OnMapButton(UI::EventParams &e);
+	void OnBindAll(UI::EventParams &e);
+	void HandleKeyMapping(const KeyMap::MultiInputMapping &key);
+	void MapNext(bool successive);
+
+	MockPSP *psp_ = nullptr;
+	int nextKey_ = 0;
+	int bindAll_ = -1;
+	bool replace_ = false;
+};

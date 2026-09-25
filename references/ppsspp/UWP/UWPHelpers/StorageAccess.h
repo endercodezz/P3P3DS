@@ -1,0 +1,36 @@
+// Copyright (c) 2023- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+// This header meant to be included within the storage manager
+// don't use it within PPSSPP core
+
+#pragma once
+
+#include <list>
+#include <string>
+
+winrt::hstring GetDataFromLocalSettings(winrt::hstring key);
+
+// Local settings
+std::string GetDataFromLocalSettings(std::string key);
+bool AddDataToLocalSettings(winrt::hstring key, winrt::hstring data, bool replace);
+bool AddDataToLocalSettings(std::string key, std::string data, bool replace);
+
+void AddItemToFutureList(const winrt::Windows::Storage::IStorageItem& item);
+winrt::Windows::Storage::IStorageItem GetItemByKey(winrt::hstring key);
+
+std::list<std::string> GetFutureAccessList();

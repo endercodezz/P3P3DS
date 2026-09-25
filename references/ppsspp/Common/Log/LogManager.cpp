@@ -1,0 +1,522 @@
+// Copyright (C) 2003 Dolphin Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official SVN repository and contact information can be found at
+// http://code.google.com/p/dolphin-emu/
+
+#include "ppsspp_config.h"
+
+#if PPSSPP_PLATFORM(ANDROID)
+
+#include <android/log.h>
+
+#endif
+
+#include <algorithm>
+#include <cstring>
+
+#include "Common/Data/Encoding/Utf8.h"
+#include "Common/Log/LogManager.h"
+
+#if PPSSPP_PLATFORM(WINDOWS)
+#include <io.h>
+#include "Common/Log/ConsoleListener.h"
+#endif
+
+#include "Common/TimeUtil.h"
+#include "Common/Thread/ThreadUtil.h"
+#include "Common/File/FileUtil.h"
+#include "Common/Data/Format/IniFile.h"
+#include "Common/StringUtils.h"
+
+LogChannel g_log[(size_t)Log::NUMBER_OF_LOGS];
+LogManager g_logManager;
+
+const char *hleCurrentThreadName = nullptr;
+
+bool g_bDummySetting = true;
+bool *g_bLogEnabledSetting = &g_bDummySetting;
+
+static const char level_to_char[8] = "-NEWIDV";
+
+#if PPSSPP_PLATFORM(UWP) && defined(_DEBUG)
+#define LOG_MSC_OUTPUTDEBUG true
+#else
+#define LOG_MSC_OUTPUTDEBUG false
+#endif
+
+#if PPSSPP_PLATFORM(ANDROID)
+void AndroidLog(const LogMessage &message);
+#endif
+
+// TODO: Get rid of this wrapper, not much point.
+void GenericLog(Log type, LogLevel level, const char *file, int line, const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	g_logManager.LogLine(level, type, file, line, fmt, args);
+	va_end(args);
+}
+
+// NOTE: Needs to be kept in sync with the Log enum.
+static const char * const g_logTypeNames[] = {
+	"System",
+	"Config",
+	"Boot",
+	"Common",
+	"CPU",
+	"FileSystem",
+	"G3D",
+	"TexCache",
+	"HLE",
+	"JIT",
+	"Loader",
+	"Mpeg",
+	"Atrac",
+	"ME",
+	"MemMap",
+	"SasMix",
+	"SaveState",
+	"FrameBuf",
+	"Audio",
+	"IO",
+	"Achievements",
+	"HTTP",
+	"Printf",
+	"TexReplacement",
+	"Debugger",
+	"GeDebugger",
+	"UI",
+	"IAP",
+	"CwCheats",
+	"Net",
+	"sceAudio",
+	"sceCtrl",
+	"sceDisplay",
+	"sceFont",
+	"sceGe",
+	"sceIntc",
+	"sceIo",
+	"sceKernel",
+	"sceModule",
+	"sceNet",
+	"sceRtc",
+	"sceSas",
+	"sceUtility",
+	"sceMisc",
+	"sceReg",
+};
+
+const char *LogManager::GetLogTypeName(Log type) {
+	return g_logTypeNames[(size_t)type];
+}
+
+// Ultra plain output, for CI and stuff.
+void PrintfLog(const LogMessage &message);
+
+void LogManager::Init(bool *enabledSetting, bool headless) {
+	g_bLogEnabledSetting = enabledSetting;
+	if (initialized_) {
+		// Just update the pointer, already done above.
+		return;
+	}
+	initialized_ = true;
+
+	_dbg_assert_(ARRAY_SIZE(g_logTypeNames) == (size_t)Log::NUMBER_OF_LOGS);
+	_dbg_assert_(ARRAY_SIZE(g_logTypeNames) == ARRAY_SIZE(g_log));
+
+	for (size_t i = 0; i < ARRAY_SIZE(g_log); i++) {
+		g_log[i].enabled = true;
+		g_log[i].level = LogLevel::LINFO;
+	}
+}
+
+void LogManager::Shutdown() {
+	if (!initialized_) {
+		// already done
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> lk(logFileLock_);
+		if (fp_) {
+			fclose(fp_);
+			fp_ = nullptr;
+		}
+	}
+
+	outputs_ = (LogOutput)0;
+
+	ringLog_.Clear();
+	initialized_ = false;
+}
+
+LogManager::LogManager() {
+#if PPSSPP_PLATFORM(IOS) || PPSSPP_PLATFORM(UWP) || PPSSPP_PLATFORM(SWITCH)
+	stdioUseColor_ = false;
+#elif defined(_MSC_VER)
+	stdioUseColor_ = false;
+#elif defined(__APPLE__)
+	// Xcode builtin terminal used for debugging does not support colours.
+	// Fortunately it can be detected with a TERM env variable.
+	stdioUseColor_ = isatty(fileno(stdout)) && getenv("TERM") != NULL;
+#else
+	stdioUseColor_ = isatty(fileno(stdout));
+#endif
+
+#if PPSSPP_PLATFORM(WINDOWS)
+	if (IsDebuggerPresent()) {
+		outputs_ |= LogOutput::DebugString;
+	}
+#if !PPSSPP_PLATFORM(UWP)
+	if (!consoleLog_) {
+		consoleLog_ = new ConsoleListener();
+	}
+	outputs_ |= LogOutput::WinConsole;
+#endif
+#endif
+}
+
+LogManager::~LogManager() {
+	Shutdown();
+
+#if PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(UWP)
+	delete consoleLog_;
+	consoleLog_ = nullptr;
+#endif
+}
+
+void LogManager::SetFileLogPath(const Path &filename) {
+	std::lock_guard<std::mutex> lk(logFileLock_);
+	if (fp_ && filename == logFilename_) {
+		// All good
+		return;
+	}
+
+	if (fp_) {
+		fclose(fp_);
+		fp_ = nullptr;
+	}
+
+	if (!filename.empty()) {
+		logFilename_ = Path(filename);
+
+		if (outputs_ & LogOutput::File) {
+			File::CreateFullPath(logFilename_.NavigateUp());
+			fp_ = File::OpenCFile(logFilename_, "at");
+			logFileOpenFailed_ = fp_ == nullptr;
+			if (logFileOpenFailed_) {
+				printf("Failed to open log file %s\n", logFilename_.c_str());
+			}
+		}
+	}
+}
+
+void LogManager::SaveConfig(Section *section) {
+	if (channelsChangedByDebugger_) {
+		// Leave the section as whatever was already on disk - see the doc comment on
+		// NotifyChannelsChangedByDebugger().
+		return;
+	}
+	for (int i = 0; i < (int)Log::NUMBER_OF_LOGS; i++) {
+		section->Set((std::string(g_logTypeNames[i]) + "Enabled"), g_log[i].enabled);
+		section->Set((std::string(g_logTypeNames[i]) + "Level"), (int)g_log[i].level);
+	}
+}
+
+void LogManager::LoadConfig(const Section *section) {
+	for (int i = 0; i < (int)Log::NUMBER_OF_LOGS; i++) {
+		// Defaults. Get now doesn't write the output if it fails.
+		bool enabled = true;
+		int level = (int)LogLevel::LERROR;
+		section->Get((std::string(g_logTypeNames[i]) + "Enabled"), &enabled);
+		section->Get((std::string(g_logTypeNames[i]) + "Level"), &level);
+		g_log[i].enabled = enabled;
+		g_log[i].level = (LogLevel)level;
+	}
+}
+
+void LogManager::SetOutputsEnabled(LogOutput outputs) {
+	outputs_ = outputs;
+	if (outputs & LogOutput::File) {
+		SetFileLogPath(logFilename_);
+	}
+}
+
+void LogManager::LogLine(LogLevel level, Log type, const char *file, int line, const char *format, va_list args) {
+	char msgBuf[1024];
+
+	const LogChannel &log = g_log[(size_t)type];
+	if (level > log.level || !log.enabled || outputs_ == (LogOutput)0) {
+		// If we get here, it should have been caught earlier.
+		return;
+	}
+
+	LogMessage message;
+	message.level = level;
+	message.log = g_logTypeNames[(size_t)type];
+
+#ifdef _WIN32
+	static const char sep = '\\';
+#else
+	static const char sep = '/';
+#endif
+	const char *fileshort = strrchr(file, sep);
+	if (fileshort) {
+		do
+			--fileshort;
+		while (fileshort > file && *fileshort != sep);
+		if (fileshort != file)
+			file = fileshort + 1;
+	}
+
+	const char *threadName;
+#if PPSSPP_PLATFORM(WINDOWS) || PPSSPP_PLATFORM(MAC)
+	const char *hostThreadName = GetCurrentThreadName();
+	if ((hostThreadName && strcmp(hostThreadName, "EmuThread") != 0) || !hleCurrentThreadName) {
+		// Use the host thread name.
+		threadName = hostThreadName ? hostThreadName : "unknown";
+	} else {
+		// Use the PSP HLE thread name.
+		threadName = hleCurrentThreadName;
+	}
+#else
+	threadName = hleCurrentThreadName;
+#endif
+
+	if (threadName) {
+		snprintf(message.header, sizeof(message.header), "%-12.12s %c[%s]: %s:%d",
+			threadName, level_to_char[(int)level],
+			message.log,
+			file, line);
+	} else {
+		snprintf(message.header, sizeof(message.header), "%s:%d %c[%s]:",
+			file, line, level_to_char[(int)level],
+			message.log);
+	}
+
+	GetCurrentTimeFormatted(message.timestamp);
+
+	va_list args_copy;
+
+	va_copy(args_copy, args);
+	size_t neededBytes = vsnprintf(msgBuf, sizeof(msgBuf), format, args);
+	message.msg.resize(neededBytes + 1);
+	if (neededBytes > sizeof(msgBuf)) {
+		// Needed more space? Re-run vsnprintf.
+		vsnprintf(&message.msg[0], neededBytes + 1, format, args_copy);
+	} else {
+		memcpy(&message.msg[0], msgBuf, neededBytes);
+	}
+	message.msg[neededBytes] = '\n';
+	va_end(args_copy);
+
+	if (outputs_ & LogOutput::Stdio) {
+		// This has its own mutex.
+		StdioLog(message);
+	}
+
+	// OK, now go through the possible listeners in order.
+	if (outputs_ & LogOutput::File) {
+		// Lock covers the fp_ check too - SetFileLogPath()/Shutdown() can close it concurrently.
+		std::lock_guard<std::mutex> lk(logFileLock_);
+		if (fp_) {
+			fprintf(fp_, "%s %s %s", message.timestamp, message.header, message.msg.c_str());
+			// Is this really necessary to do every time? I guess to catch the last message before a crash..
+			fflush(fp_);
+		}
+	}
+
+#if PPSSPP_PLATFORM(WINDOWS)
+	if (outputs_ & LogOutput::DebugString) {
+		// No mutex needed
+		char buffer[4096];
+		// We omit the timestamp for easy copy-paste-diffing.
+		snprintf(buffer, sizeof(buffer), "%s %s", message.header, message.msg.c_str());
+		OutputDebugStringUTF8(buffer);
+	}
+#endif
+
+	if (outputs_ & LogOutput::RingBuffer) {
+		ringLog_.Log(message);
+	}
+
+	if (outputs_ & LogOutput::Printf) {
+		PrintfLog(message);
+	}
+
+#if PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(UWP)
+	if (outputs_ & LogOutput::WinConsole) {
+		if (consoleLog_) {
+			consoleLog_->Log(message);
+		}
+	}
+#endif
+
+	if (outputs_ & LogOutput::ExternalCallback) {
+		// Held across the dispatch on purpose: RemoveExternalLogCallback() takes the same lock, so a
+		// listener can't be torn down (and its userdata freed) while we're in the middle of calling it.
+		std::lock_guard<std::mutex> guard(externalLock_);
+		for (const ExternalCallbackEntry &entry : externalCallbacks_) {
+			entry.callback(message, entry.userdata);
+		}
+	}
+}
+
+int LogManager::AddExternalLogCallback(LogCallback callback, void *userdata) {
+	if (!callback) {
+		return -1;
+	}
+	std::lock_guard<std::mutex> guard(externalLock_);
+	const int handle = nextExternalHandle_++;
+	externalCallbacks_.push_back(ExternalCallbackEntry{ handle, callback, userdata });
+	EnableOutput(LogOutput::ExternalCallback);
+	return handle;
+}
+
+void LogManager::RemoveExternalLogCallback(int handle) {
+	if (handle < 0) {
+		return;
+	}
+	std::lock_guard<std::mutex> guard(externalLock_);
+	for (size_t i = 0; i < externalCallbacks_.size(); i++) {
+		if (externalCallbacks_[i].handle == handle) {
+			externalCallbacks_.erase(externalCallbacks_.begin() + i);
+			break;
+		}
+	}
+	// Only when the last one goes away - otherwise removing one connection's callback would stop
+	// delivery to the ones still attached, which is the bug this list exists to avoid.
+	if (externalCallbacks_.empty()) {
+		DisableOutput(LogOutput::ExternalCallback);
+	}
+}
+
+void RingbufferLog::Log(const LogMessage &message) {
+	std::lock_guard<std::mutex> lock(ringLock_);
+	messages_[curMessage_] = message;
+	curMessage_++;
+	if (curMessage_ >= MAX_LOGS)
+		curMessage_ -= MAX_LOGS;
+	count_++;
+}
+
+#ifdef _WIN32
+
+void OutputDebugStringUTF8(const char *p) {
+	wchar_t *temp = new wchar_t[65536];
+
+	int len = std::min(16383*4, (int)strlen(p));
+	int size = (int)MultiByteToWideChar(CP_UTF8, 0, p, len, NULL, 0);
+	MultiByteToWideChar(CP_UTF8, 0, p, len, temp, size);
+	temp[size] = 0;
+
+	OutputDebugString(temp);
+	delete[] temp;
+}
+
+#else
+
+void OutputDebugStringUTF8(const char *p) {
+	INFO_LOG(Log::System, "%s", p);
+}
+
+#endif
+
+#ifdef HAVE_LIBRETRO_VFS
+#undef fprintf
+#endif
+
+void LogManager::StdioLog(const LogMessage &message) {
+#if PPSSPP_PLATFORM(ANDROID)
+#ifndef LOG_APP_NAME
+#define LOG_APP_NAME "PPSSPP"
+#endif
+	int mode;
+	switch (message.level) {
+	case LogLevel::LWARNING:
+		mode = ANDROID_LOG_WARN;
+		break;
+	case LogLevel::LERROR:
+		mode = ANDROID_LOG_ERROR;
+		break;
+	default:
+		mode = ANDROID_LOG_INFO;
+		break;
+	}
+
+	// Long log messages need splitting up.
+	// Not sure what the actual limit is (seems to vary), but let's be conservative.
+	const size_t maxLogLength = 512;
+	if (message.msg.length() < maxLogLength) {
+		// Log with simplified headers as Android already provides timestamp etc.
+		__android_log_print(mode, LOG_APP_NAME, "[%s] %s", message.log, message.msg.c_str());
+	} else {
+		std::string_view msg = message.msg;
+
+		// Ideally we should split at line breaks, but it's at least fairly usable anyway.
+		std::string_view first_part = msg.substr(0, maxLogLength);
+		__android_log_print(mode, LOG_APP_NAME, "[%s] %.*s", message.log, (int)first_part.size(), first_part.data());
+		msg = msg.substr(maxLogLength);
+
+		while (msg.length() > maxLogLength) {
+			std::string_view next_part = msg.substr(0, maxLogLength);
+			__android_log_print(mode, LOG_APP_NAME, "%.*s", (int)next_part.size(), next_part.data());
+			msg = msg.substr(maxLogLength);
+		}
+		// Print the final part.
+		__android_log_print(mode, LOG_APP_NAME, "%.*s", (int)msg.size(), msg.data());
+	}
+#else
+	char text[2048];
+	snprintf(text, sizeof(text), "%s %s %s", message.timestamp, message.header, message.msg.c_str());
+	text[sizeof(text) - 2] = '\n';
+	text[sizeof(text) - 1] = '\0';
+
+	const char *colorAttr = "";
+	const char *resetAttr = "";
+
+	if (stdioUseColor_) {
+		resetAttr = "\033[0m";
+		switch (message.level) {
+		case LogLevel::LNOTICE: // light green
+			colorAttr = "\033[92m";
+			break;
+		case LogLevel::LERROR: // light red
+			colorAttr = "\033[91m";
+			break;
+		case LogLevel::LWARNING: // light yellow
+			colorAttr = "\033[93m";
+			break;
+		case LogLevel::LINFO: // cyan
+			colorAttr = "\033[96m";
+			break;
+		case LogLevel::LDEBUG: // gray
+			colorAttr = "\033[90m";
+			break;
+		default:
+			break;
+		}
+	}
+
+	std::lock_guard<std::mutex> lock(stdioLock_);
+	fprintf(stderr, "%s%s%s", colorAttr, text, resetAttr);
+#endif
+}
+
+void PrintfLog(const LogMessage &message) {
+	// Same shape as the stdio and file outputs the other builds use. It used to be its own
+	// shorter format, which meant a pattern that matched a log from the app quietly matched
+	// nothing in one from headless.
+	fprintf(stderr, "%s %s %s", message.timestamp, message.header, message.msg.c_str());
+}

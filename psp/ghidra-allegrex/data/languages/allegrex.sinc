@@ -1,0 +1,330 @@
+# Allegrex common specification file
+
+define endian=little;
+define alignment=4;
+
+define space ram type=ram_space size=4 default;
+define space register type=register_space size=4;
+
+# General purpose registers
+define register offset=0 size=4 [
+    zero at v0 v1
+    a0 a1 a2 a3
+    t0 t1 t2 t3
+    t4 t5 t6 t7
+    s0 s1 s2 s3
+    s4 s5 s6 s7
+    t8 t9 k0 k1
+    gp sp fp ra
+    pc
+];
+
+# Floating point registers
+define register offset=0x1000 size=4 [
+    f1  f0  f3  f2  f5  f4  f7  f6
+    f9  f8  f11 f10 f13 f12 f15 f14
+    f17 f16 f19 f18 f21 f20 f23 f22
+    f25 f24 f27 f26 f29 f28 f31 f30
+];
+
+# Floating point control registers
+define register offset=0x1200 size=4 [
+    fir     fccr       fexr     fenr    fcsr
+];
+
+# Coprocessor 0 control registers
+define register offset=0x2000 size=4 [
+    SavedEPC       SavedErrorEPC SavedStatus  SavedCause
+    SavedV0        SavedV1       SavedErrorV0 SavedErrorV1
+    ExceptionTable ErrorHandler  DebugHandler SyscallHandler
+    SyscallTable   SyscallMax    KernelSP     UserSP
+    TCB            cop0_reg17c   cop0_reg18c  cop0_reg19c
+    cop0_reg20c    cop0_reg21c   cop0_reg22c  cop0_reg23c
+    cop0_reg24c    cop0_reg25c   cop0_reg26c  cop0_reg27c
+    cop0_reg28c    cop0_reg29c   cop0_reg30c  cop0_reg31c
+];
+
+# Coprocessor 0 data registers
+define register offset=0x2100 size=4 [
+    cop0_reg0d  cop0_reg1d    cop0_reg2d  cop0_reg3d
+    cop0_reg4d  cop0_reg5d    cop0_reg6d  cop0_reg7d
+    BadVAddr    Count         cop0_reg10d Compare
+    Status      Cause         EPC         PRId
+    Config      cop0_reg17d   cop0_reg18d cop0_reg19d
+    cop0_reg20d SyscallCode   CpuId       cop0_reg23d
+    cop0_reg24d ExceptionBase cop0_reg26d cop0_reg27d
+    TagLo       TagHi         ErrorEPC    cop0_reg31d
+];
+
+# Some other internal registers
+define register offset=0x3000 size=4 [ hi lo ];
+
+# Define context bits
+define register offset=0x4000 size=4   contextreg;
+define context contextreg
+  PAIR_INSTRUCTION_FLAG=(0,0) noflow      # =1 paired instruction
+;
+
+# VFPU registers
+# Each line represents single 4x4 VFPU register group
+define register offset=0x5000 size=4 [
+    V00 V01 V02 V03 V04 V05 V06 V07 V08 V09 V0A V0B V0C V0D V0E V0F
+    V10 V11 V12 V13 V14 V15 V16 V17 V18 V19 V1A V1B V1C V1D V1E V1F
+    V20 V21 V22 V23 V24 V25 V26 V27 V28 V29 V2A V2B V2C V2D V2E V2F
+    V30 V31 V32 V33 V34 V35 V36 V37 V38 V39 V3A V3B V3C V3D V3E V3F
+    V40 V41 V42 V43 V44 V45 V46 V47 V48 V49 V4A V4B V4C V4D V4E V4F
+    V50 V51 V52 V53 V54 V55 V56 V57 V58 V59 V5A V5B V5C V5D V5E V5F
+    V60 V61 V62 V63 V64 V65 V66 V67 V68 V69 V6A V6B V6C V6D V6E V6F
+    V70 V71 V72 V73 V74 V75 V76 V77 V78 V79 V7A V7B V7C V7D V7E V7F
+];
+
+# VFPU control registers
+define register offset=0x5300 size=4 [
+    SPFX    TPFX    DPFX    CC      INF4    RSV5    RSV6     REV
+    RCX0    RCX1    RCX2    RCX3    RCX4    RCX5    RCX6     RCX7
+];
+
+# Instruction fields
+
+define token instr(32)
+    prime       = (26,31)
+    bit25       = (25,25)
+    zero1       = (22,25)
+    rs          = (21,25)
+    fr          = (21,25)
+    base        = (21,25)
+    format      = (21,25)
+    copop       = (21,25)
+    mfmc0       = (21,25)
+    zero21      = (21,25)
+    breakcode   = (6,25)
+    off26       = (0,25) signed      # 26 bit signed offset, e.g. balc, bc
+    ind26       = (0,25)             # 26 bit unsigned index, e.g. jal
+    copfill     = (6,24)
+    cofun       = (0,24)
+    off16       = (0,15) signed      # 16 bit signed offset in conditional branch/link
+    bit21       = (21,21)
+    cc          = (18,20)
+    rt          = (16,20)
+    ft          = (16,20)
+    cop1code    = (16,20)
+    synci       = (16,20)
+    cond        = (16,20)
+    op          = (16,20)
+    nd          = (17,17)
+    tf          = (16,16)
+    szero       = (11,25)
+    rd          = (11,15)
+    cop0c       = (11,15)
+    cop0d       = (11,15)
+    fs          = (11,15)
+    fs_unk      = (11,15)
+    fs_fcr      = (11,15)
+    zero4       = (11,15)
+    msbd        = (11,15)
+    code        = (6,15)
+    bit10       = (10,10)
+    zero2       = (7,10)
+    fd          = (6,10)
+    stype       = (6,10)
+    sa          = (6,10)
+    lsb         = (6,10)
+    fct2        = (6,10)
+    zero5       = (6,10)
+    bigfunct    = (0,10)
+    fct         = (0,5)
+    bit6        = (6,6)
+    zero3       = (0,4)
+    bit5        = (5,5)
+    immed       = (0,15)
+    simmed      = (0,15) signed
+    vsimmed     = (2,15) signed
+    vt          = (16,22)
+    vs          = (8,14)
+    vd          = (0,6)
+    vt_s        = (16,22)
+    vs_s        = (8,14)
+    vd_s        = (0,6)
+    vt_p        = (16,22)
+    vs_p        = (8,14)
+    vd_p        = (0,6)
+    vt_t        = (16,22)
+    vs_t        = (8,14)
+    vd_t        = (0,6)
+    vt_q        = (16,22)
+    vs_q        = (8,14)
+    vd_q        = (0,6)
+    vt_m        = (16,22)
+    vs_m        = (8,14)
+    vd_m        = (0,6)
+    vt_e        = (16,22)
+    vs_e        = (8,14)
+    vd_e        = (0,6)
+    vt_tm       = (16,22)
+    vs_tm       = (8,14)
+    vd_tm       = (0,6)
+    vt_te       = (16,22)
+    vs_te       = (8,14)
+    vd_te       = (0,6)
+    vd_cmp      = (0,6)
+    vd_ctl      = (0,6)
+    vt_cst      = (16,20)
+    vc0         = (7,7)
+    vc1         = (15,15)
+    vop3        = (23,25)
+    vtop2       = (21,22)
+    vtimm5      = (16,20)
+    vwbnimm8    = (16,23)
+    vop2        = (24,25)
+    vtop4       = (16,19)
+    vndtf       = (16,17)
+    vcc         = (18,20)
+    bit1        = (1,1)
+    vms_h       = (0,1)
+    vmq_h       = (0,0)
+    vm_l        = (16,20)
+    vcmov_op    = (19,21)
+    vcmov_cc    = (16,18)
+    vrot_imm0   = (16,17)
+    vrot_imm1   = (18,19)
+    vrot_neg    = (20,20)
+    vpfxd_op0   = (0,1)
+    vpfxd_mask0 = (8,8)
+    vpfxd_op1   = (2,3)
+    vpfxd_mask1 = (9,9)
+    vpfxd_op2   = (4,5)
+    vpfxd_mask2 = (10,10)
+    vpfxd_op3   = (6,7)
+    vpfxd_mask3 = (11,11)
+    vpfxst_op0  = (0,1)
+    vpfxst_abs0 = (8,8)
+    vpfxst_cst0 = (12,12)
+    vpfxst_neg0 = (16,16)
+    vpfxst_op1  = (2,3)
+    vpfxst_abs1 = (9,9)
+    vpfxst_cst1 = (13,13)
+    vpfxst_neg1 = (17,17)
+    vpfxst_op2  = (4,5)
+    vpfxst_abs2 = (10,10)
+    vpfxst_cst2 = (14,14)
+    vpfxst_neg2 = (18,18)
+    vpfxst_op3  = (6,7)
+    vpfxst_abs3 = (11,11)
+    vpfxst_cst3 = (15,15)
+    vpfxst_neg3 = (19,19)
+;
+
+attach variables [ rs rt rd base ] [
+    zero  at  v0  v1  a0  a1  a2  a3
+    t0    t1  t2  t3  t4  t5  t6  t7
+    s0    s1  s2  s3  s4  s5  s6  s7
+    t8    t9  k0  k1  gp  sp  fp  ra
+];
+
+attach variables [ fs ft fd fr ] [
+    f0  f1  f2  f3  f4  f5  f6  f7  f8  f9  f10 f11 f12 f13 f14 f15
+    f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31
+];
+
+attach variables [ cop0c ] [
+    SavedEPC       SavedErrorEPC SavedStatus  SavedCause
+    SavedV0        SavedV1       SavedErrorV0 SavedErrorV1
+    ExceptionTable ErrorHandler  DebugHandler SyscallHandler
+    SyscallTable   SyscallMax    KernelSP     UserSP
+    TCB            cop0_reg17c   cop0_reg18c  cop0_reg19c
+    cop0_reg20c    cop0_reg21c   cop0_reg22c  cop0_reg23c
+    cop0_reg24c    cop0_reg25c   cop0_reg26c  cop0_reg27c
+    cop0_reg28c    cop0_reg29c   cop0_reg30c  cop0_reg31c
+];
+
+attach variables [ cop0d ] [
+    cop0_reg0d  cop0_reg1d    cop0_reg2d  cop0_reg3d
+    cop0_reg4d  cop0_reg5d    cop0_reg6d  cop0_reg7d
+    BadVAddr    Count         cop0_reg10d Compare
+    Status      Cause         EPC         PRId
+    Config      cop0_reg17d   cop0_reg18d cop0_reg19d
+    cop0_reg20d SyscallCode   CpuId       cop0_reg23d
+    cop0_reg24d ExceptionBase cop0_reg26d cop0_reg27d
+    TagLo       TagHi         ErrorEPC    cop0_reg31d
+];
+
+# Only a few Floating Point Control (FCR) registers are defined
+attach variables [ fs_fcr ] [
+    fir     _       _       _       _       _       _       _
+    _       _       _       _       _       _       _       _
+    _       _       _       _       _       _       _       _
+    _       fccr    fexr    _       fenr    _       _       fcsr
+];
+
+# GPR
+
+RD: rd          is rd           { export rd; }
+RDsrc: rd       is rd           { export rd; }
+RDsrc: rd       is rd & rd=0    { export 0:4; }
+
+# RS: rs        is rs           { export rs; }
+RSsrc: rs       is rs           { export rs; }
+RSsrc: rs       is rs & rs=0    { export 0:4; }
+
+RT: rt          is rt           { export rt; }
+RTsrc: rt       is rt           { export rt; }
+RTsrc: rt       is rt & rt=0    { export 0:4; }
+
+COP0C: cop0c    is cop0c        { export cop0c; }
+COP0D: cop0d    is cop0d        { export cop0d; }
+
+macro MemSrcCast(dest,src) {
+    dest = *(src);
+}
+macro MemDestCast(dest,src) {
+    *(dest) = src;
+}
+macro ValCast(dest,src) {
+    dest = src;
+}
+
+macro ternary(res, cond, tvar, fvar) {
+    if (cond == 0) goto <false_cond>;
+    res = tvar;
+    goto <done>;
+<false_cond>
+    res = fvar;
+<done>
+}
+
+OFF_BASE:   simmed(base)    is simmed & base { tmp:4 = base + simmed; tmpscaled:4 = 0; ValCast(tmpscaled,tmp); export tmpscaled; }
+
+Rel16: reloc        is off16    [ reloc=inst_start+4+4*off16; ]                                 { export *:4 reloc; }
+Abs26: reloc        is ind26    [ reloc=((inst_start+4) $and 0xfffffffff0000000) | 4*ind26; ]   { export *:4 reloc; }
+
+InsSize: mysize     is msbd & lsb   [ mysize = msbd - lsb + 1; ]      { tmp:1 = mysize; export tmp; }
+ExtSize: mysize     is msbd         [ mysize = msbd + 1; ]            { tmp:1 = mysize; export tmp; }
+
+# Floating point formats
+fmt1: "S"       is format=0x10   { }
+fmt1: "D"       is format=0x11   { }
+fmt1: "PS"      is format=0x16   { }
+
+fmt2: "S"       is format=0x10   { }
+fmt2: "D"       is format=0x11   { }
+
+fmt4: "D"       is format=0x11   { }
+fmt4: "W"       is format=0x14   { }
+fmt4: "L"       is format=0x15   { }
+
+# Custom Pcode Operations
+define pcodeop break;
+define pcodeop trap;
+define pcodeop wait;
+define pcodeop syscall;
+define pcodeop cacheOp;
+define pcodeop setCopControlWord;       # setCopControlWord(cop_num, reg_num, value)
+define pcodeop getCopControlWord;       # getCopControlWord(cop_num, reg_num)
+define pcodeop setCopReg;               # setCopReg(cop_num, reg_num, value)
+define pcodeop getCopReg;               # getCopReg(cop_num, reg_num)
+define pcodeop getHWRegister;           # getHWRegister(regnum)
+define pcodeop setShadow;               # setShadow(sgpr, value)
+define pcodeop getShadow;               # gpr = getShadow(sgpr)
+define pcodeop getInterruptMask;        # getInterruptMask()
+define pcodeop setInterruptMask;        # setInterruptMask(value)
+define pcodeop SYNC;

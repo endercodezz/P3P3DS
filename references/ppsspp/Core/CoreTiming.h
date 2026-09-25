@@ -1,0 +1,149 @@
+// Copyright (c) 2012- PPSSPP Project / Dolphin Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <string>
+#include <vector>
+#include "Common/CommonTypes.h"
+#include "Common/Data/Collections/LinkedList.h"
+
+// This is a system to schedule events into the emulated machine's future. Time is measured
+// in main CPU clock cycles.
+
+// To schedule an event, you first have to register its type. This is where you pass in the
+// callback. You then schedule events using the type id you get back.
+
+// See HW/SystemTimers.cpp for the main part of Dolphin's usage of this scheduler.
+
+// The int cyclesLate that the callbacks get is how many cycles late it was.
+// So to schedule a new event on a regular basis:
+// inside callback:
+//   ScheduleEvent(periodInCycles - cyclesLate, callback, "whatever")
+
+class PointerWrap;
+
+//const int CPU_HZ = 222000000;
+extern int CPU_HZ;
+
+inline s64 msToCycles(int ms) {
+	return CPU_HZ / 1000 * ms;
+}
+
+inline s64 msToCycles(float ms) {
+	return (s64)(CPU_HZ * ms * (0.001f));
+}
+
+inline s64 msToCycles(double ms) {
+	return (s64)(CPU_HZ * ms * (0.001));
+}
+
+inline s64 usToCycles(float us) {
+	return (s64)(CPU_HZ * us * (0.000001f));
+}
+
+inline s64 usToCycles(int us) {
+	return (CPU_HZ / 1000000 * (s64)us);
+}
+
+inline s64 usToCycles(s64 us) {
+	return (CPU_HZ / 1000000 * us);
+}
+
+inline s64 usToCycles(u64 us) {
+	return (s64)(CPU_HZ / 1000000 * us);
+}
+
+inline s64 cyclesToUs(s64 cycles) {
+	return (cycles * 1000000) / CPU_HZ;
+}
+
+class MIPSState;
+
+namespace CoreTiming {
+	typedef void (*TimedCallback)(u64 userdata, int cyclesLate);
+
+	struct EventType {
+		TimedCallback callback;
+		const char *name;
+	};
+
+	struct BaseEvent {
+		s64 time;
+		u64 userdata;
+		int type;
+	};
+	typedef LinkedListItem<BaseEvent> Event;
+
+	void Init(MIPSState *mips);
+	void Shutdown();
+
+	u64 GetTicks(MIPSState *mips);
+	u64 GetIdleTicks();
+	u64 GetGlobalTimeUs();
+	u64 GetGlobalTimeUsScaled();
+	// GetGlobalTimeUs() without the internal rebasing, so it's safe to call off the CPU thread -
+	// for the debugger's status poll. Same value, just doesn't help the next call along.
+	u64 PeekGlobalTimeUs();
+
+	// Debugger support (cpu.runUntilTime): break as soon as emulated time reaches this many
+	// microseconds. Advance() shortens its slice to land exactly on it rather than overshooting,
+	// so this stops at a reproducible point rather than "somewhere in the next frame". 0 clears it.
+	// Core_Break() clears it too, so a deadline can't outlive the run it belonged to.
+	// Deliberately in microseconds and not ticks: games change the CPU clock mid-run (CrossCraft
+	// Classic goes 222 -> 333MHz during startup), so a tick count fixed up front drifts.
+	void SetBreakDeadlineUs(u64 us);
+	u64 GetBreakDeadlineUs();
+
+	// Returns the event_type identifier.
+	int RegisterEvent(const char *name, TimedCallback callback);
+
+	// For save states.
+	void RestoreRegisterEvent(int &event_type, const char *name, TimedCallback callback);
+	void UnregisterAllEvents();
+
+	// userdata MAY NOT CONTAIN POINTERS. userdata might get written and reloaded from disk,
+	// when we implement state saves.
+	void ScheduleEvent(s64 cyclesIntoFuture, int event_type, u64 userdata=0);
+	s64 UnscheduleEvent(int event_type, u64 userdata);
+
+	const std::vector<EventType> &GetEventTypes();
+	const Event *GetFirstEvent();
+	void RemoveEvent(int event_type);
+	bool IsScheduled(int event_type);
+	void Advance(MIPSState *mips);
+	void ForceCheck(MIPSState *mips);
+
+	// Pretend that the main CPU has executed enough cycles to reach the next event.
+	void Idle(MIPSState *mips, int maxIdle = 0);
+
+	// Clear all pending events. This should ONLY be done on exit or state load.
+	void ClearPendingEvents();
+
+	void LogPendingEvents();
+
+	std::string GetScheduledEventsSummary();
+
+	void DoState(PointerWrap &p);
+
+	bool SetClockFrequencyHz(int cpuHz);  // Return false if the frequency was already set.
+	int GetClockFrequencyHz();
+
+	// TODO: Add accessors?
+	extern int slicelength;
+
+}; // end of namespace

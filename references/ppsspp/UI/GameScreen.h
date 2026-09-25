@@ -1,0 +1,84 @@
+// Copyright (c) 2013- PPSSPP Project.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 2.0 or later versions.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License 2.0 for more details.
+
+// A copy of the GPL 2.0 should have been included with the program.
+// If not, see http://www.gnu.org/licenses/
+
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
+
+#pragma once
+
+#include <functional>
+
+#include "UI/BaseScreens.h"
+#include "Common/UI/UIScreen.h"
+#include "Common/File/Path.h"
+#include "UI/GameInfoCache.h"
+#include "Core/Util/PkgUnpack.h"
+#include "UI/SimpleDialogScreen.h"
+
+
+class NoticeView;
+
+// Game screen: Allows you to start a game, delete saves, delete the game,
+// set game specific settings, etc.
+
+// Uses GameInfoCache heavily to implement the functionality.
+// Should possibly merge this with the PauseScreen.
+
+class GameScreen : public UITwoPaneBaseDialogScreen {
+public:
+	GameScreen(const Path &gamePath, bool inGame);
+	~GameScreen();
+
+	void update() override;
+
+	const char *tag() const override { return "Game"; }
+
+protected:
+	void CreateContentViews(UI::ViewGroup *parent) override;
+	void CreateSettingsViews(UI::ViewGroup *parent) override;
+	void CreateContextMenu(UI::ViewGroup *parent) override;
+
+	std::string_view GetTitle() const override;
+
+private:
+	// Event handlers
+	void OnGameSettings(UI::EventParams &e);
+	void OnDeleteSaveData(UI::EventParams &e);
+	void OnDeleteGame(UI::EventParams &e);
+	void OnCreateConfig(UI::EventParams &e);
+	void OnDeleteConfig(UI::EventParams &e);
+	void OnSetBackground(UI::EventParams &e);
+	void OnDeleteGameUpdate(UI::EventParams &e);
+
+	// Checks whether a game update is installed for this game. Both the info pane and the context
+	// menu need the answer, and either can be built first.
+	void RefreshInstalledUpdate();
+
+	std::string CRC32string;
+
+	bool isHomebrew_ = false;
+	bool inGame_ = false;
+
+	// Keep track of progressive loading of metadata.
+	GameInfoFlags knownFlags_ = GameInfoFlags::EMPTY;
+
+	bool knownHasCRC_ = false;
+
+	// A game update installed in PSP/GAME/<DISC_ID>, which is what actually runs when there is one.
+	InstalledGameUpdate installedUpdate_;
+	bool hasInstalledUpdate_ = false;
+
+	std::shared_ptr<GameInfo> info_;
+	mutable std::string titleCache_;
+};

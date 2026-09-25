@@ -1,0 +1,57 @@
+SimulateHDR — upstream attribution and licence
+==============================================
+
+The shaders in this directory are a port of SimulateHDR, the bloom and tone
+mapping post-process of ProperShaders (an advanced graphics mod for GTA San
+Andreas PC, DirectX 9 / Shader Model 3.0).
+
+SimulateHDR is itself a fork of "Blooming HDR" by Jose Negrete, also known as
+BlueSkyDefender:
+
+    https://github.com/BlueSkyDefender/Depth3D
+
+and is distributed under the Creative Commons Attribution-ShareAlike 4.0
+International licence (CC BY-SA 4.0):
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+CHANGES WERE MADE. This port is a derivative work and is redistributed under
+the same CC BY-SA 4.0 terms.
+
+
+What was changed in this port
+-----------------------------
+
+- Translated from HLSL ps_3_0 (.fx / .fxh effect files) to GLSL 450 compiled to
+  SPIR-V for Vulkan.
+- The DirectX 9 effect framework is gone. Uniforms that arrived through
+  ID3DXEffect::SetFloat/SetVectorArray are Vulkan push constants; textures bound
+  by name are descriptor set bindings.
+- The fullscreen quad with a vertex buffer became a vertex-buffer-less
+  fullscreen triangle derived from gl_VertexIndex.
+- The tone mapper is a uniform branch on a push constant instead of four
+  compile-time technique specialisations (T#E#L#D#). ps_3_0 did not reward
+  runtime branching; a desktop GPU running a branch that is uniform across the
+  draw does.
+- HLSL mul(M, v) row-vector products were rewritten as GLSL column-major matrix
+  products with the ACES matrices entered as columns.
+- Eye adaptation (AUTOEXP) is not ported: it needs a frame-average luminance
+  read back to the host, which is the readback this port avoids by design.
+- The colour grading LUT (LUTMODE) is not ported: it needs PNG lookup tables.
+- The debug heat map (DEBUG) is not ported.
+
+  The three above collapse to their "off" branch, which is exactly what the
+  upstream T#E0L0D0 technique variant compiled to.
+
+
+Due diligence carried over from the upstream headers
+----------------------------------------------------
+
+  Timothy Lottes tone mapper   https://www.shadertoy.com/view/XljBRK
+  ACES Cinematic fit           Krzysztof Narkowicz and Stephen Hill, via MJP's
+                               BakingLab
+                               https://github.com/TheRealMJP/BakingLab
+  Uncharted 2 tone mapper      John Hable
+  Eye adaptation               Padraic Hennessy, MJP and David Neubelt,
+                               ported by prod80
+  Bloom rework                 inspired by Adyss' bloom
