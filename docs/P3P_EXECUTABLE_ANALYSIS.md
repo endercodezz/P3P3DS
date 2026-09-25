@@ -150,7 +150,11 @@ Unlike heavy 3D titles (e.g. *Monster Hunter Portable 3rd* with extensive VFPU p
 - Vector load/store: `lv.s`, `sv.s`
 - Vector operations: `vadd`, `vsub`, `vmul`, `vdot`
 - Vector prefixes: `vpfxs`, `vpfxt`, `vpfxd`
-All encountered VFPU instructions are fully supported by the existing `PSPRecomp` code generator.
+
+**Instruction Compatibility & Lowering Breakdown:**
+- **Decoder recognized:** All 2,861 VFPU instructions are recognized by `psprecomp::decode_allegrex` as `OpcodeKind::Vfpu`.
+- **Codegen lowering implemented:** 2,799 VFPU instructions (97.83% of VFPU) have direct lowering implementations in `PSPRecomp`. Exactly 62 instructions (2.17% of VFPU) currently lack lowering in `codegen_main.cpp` and hit `rt.unsupported(..., "not lowered yet")` (10 occurrences of `vfpu1`, 52 occurrences of `vfpu4`).
+- **Runtime actually executed:** Only lowerings traversed during execution are exercised; `module_start` executed 100% cleanly without encountering any unlowered VFPU instructions.
 
 ### 4.2. Control Flow & Indirect Calls
 - **Direct Jumps (`j`):** 21,845 jump sites targeting 14,362 unique branch destinations.
@@ -192,10 +196,10 @@ A dedicated compatibility test was performed by running all 913,059 4-byte instr
      - `10` occurrences: `vfpu1`
      - `52` occurrences: `vfpu4`
 
-*Important Verification Note:* The earlier claim of "zero unsupported instructions" was an overclaim caused by top-level opcode family grouping (which only checked `op == 0` without verifying sub-opcodes). Four distinct categories are now quantitatively measured:
+*Important Verification Note:* The earlier claim of "zero unsupported instructions" was an overclaim caused by top-level opcode family grouping (which only checked `op == 0` without verifying sub-opcodes). Six distinct metrics are now quantitatively measured:
 1. *Opcode family recognized:* 89.2% MIPS ALU, 8.7% COP1, 0.3% VFPU.
-2. *Decoder supported:* 912,337 instructions.
-3. *Codegen lowerable:* 912,275 instructions.
+2. *Decoder supported:* 912,337 instructions (99.9209% of `.text`).
+3. *Codegen lowerable:* 912,275 instructions (99.9141% of `.text`).
 4. *Decoder recognized but not lowered:* 62 instructions (`vfpu1`, `vfpu4`).
 5. *Decoder unsupported:* 722 instructions (`madd`, `break`, `msub`).
 6. *Actually executed in runtime:* `module_start` executed 100% cleanly through verified lowerings.
