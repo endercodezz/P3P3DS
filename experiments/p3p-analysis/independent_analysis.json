@@ -1902,6 +1902,7 @@
     "section_name": ".text",
     "section_addr": "0x08804024",
     "total_instructions": 913059,
+    "note": "Opcode counts reflect opcode-family classification from raw instruction words; this is not a proof that all encodings are supported by the AOT recompiler.",
     "instruction_categories": {
       "standard_mips": 516560,
       "branch": 47563,
@@ -1928,7 +1929,14 @@
       "op_0x3A": 235,
       "op_0x3F": 10
     },
-    "direct_jump_targets_count": 21471,
+    "control_flow_targets": {
+      "direct_j_occurrences": 21845,
+      "direct_j_unique_targets": 14362,
+      "direct_jal_occurrences": 59553,
+      "direct_jal_unique_targets": 7698,
+      "combined_unique_targets": 21471,
+      "note": "Target counts are destination addresses of branch/jump instructions and do not represent verified function boundaries."
+    },
     "indirect_jumps_jr_count": 15940,
     "indirect_calls_jalr_count": 835
   }

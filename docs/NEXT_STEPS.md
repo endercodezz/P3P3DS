@@ -77,18 +77,7 @@ Phase 4: Nintendo 3DS Backend Integration
     - Connect guest framebuffer in VRAM (`0x04000000`) to an SDL3/OpenGL debug window on PC.
     - Confirm the initial Atlus boot screen / legal disclaimer renders.
 
-10. **Step 10: Implement Virtual File System (VFS) with Modding Support**
-    - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).
-    - Integrate multi-tier fallback pipeline:
-      `SD:/p3p3ds/mods/bind/` -> `mod.cpk` -> `mod1.cpk` -> `data.cpk`.
-    - Verify with `CriFsV2Lib` that P3P loads its initial archives without error.
-
-11. **Step 11: Implement Display & Frame Timing**
-    - Implement `sceDisplay` (`sceDisplaySetMode`, `sceDisplaySetFrameBuf`, `sceDisplayWaitVblankStart`).
-    - Connect guest framebuffer in VRAM (`0x04000000`) to an SDL3/OpenGL debug window on PC.
-    - Confirm the initial Atlus boot screen / legal disclaimer renders.
-
-12. **Step 12: Implement Controller Input & Event Flags**
+13. **Step 13: Implement Controller Input & Event Flags**
     - Hook `sceCtrl` (`sceCtrlReadBufferPositive`, `sceCtrlPeekBufferPositive`).
     - Map PC gamepad/keyboard to PSP buttons.
     - Implement semaphores and event flags needed for game state transitions.
@@ -97,17 +86,27 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ### Phase 4: Nintendo 3DS Backend Integration
 
-13. **Step 13: Build Minimal 3DS Native Harness**
-    - Create `3ds/p3p3ds/` CMake project using devkitARM toolchain.
+14. **Step 14: Build Minimal 3DS Native Harness**
+    - Create native 3DS CMake configuration using devkitARM toolchain.
     - Test New 3DS speedup initialization: `osSetSpeedupEnable(true)` and `APT_SetAppCpuTimeLimit(80)`.
     - Verify `citro3d` clear screen and basic textured quad display on New 3DS top screen.
 
-14. **Step 14: Cross-Compile Recompiled P3P Units for ARM11**
-    - Link generated `unit_*.cpp` into the 3DS homebrew target (.3dsx).
-    - Compile with `-mcpu=mpcore -mfloat-abi=hard -mfpu=vfpv2 -O2`.
+15. **Step 15: Cross-Compile Recompiled P3P Units for ARM11**
+    - Link generated translation units into the 3DS homebrew target (.3dsx).
+    - Compile with `-mcpu=mpcore -mfloat-abi=hard -mfpu=vfpv2 -O2` (or evaluate `-Os` for instruction cache density).
     - Verify memory consumption fits within the 124–178 MB application heap.
 
-15. **Step 15: Connect Citro3D GE Renderer & NDSP Audio**
-    - Replace the PC debug renderer with the Citro3D PICA200 command translator on Core 2.
+16. **Step 16: Connect Citro3D GE Renderer & NDSP Audio**
+    - Map GE display list processing to Citro3D PICA200 commands.
     - Connect `sceAudio` / `sceSasCore` to 3DS NDSP hardware channels.
-    - Verify full in-game execution on hardware / Citra emulator!
+    - Verify in-game execution on Citra emulator and New 3DS hardware.
+
+---
+
+## 2. Future Technical Considerations (Post-Milestone)
+
+- **ARM11 Instruction Cache Profiling & Optimization:** Evaluate `-Os` vs `-O2` on devkitARM to determine whether compact code size reduces L1 instruction cache thrashing on the 3DS ARM11 cores.
+- **VFPU Verification against `pspautotests`:** Cross-verify each recompiled VFPU vector instruction against hardware test logs in `references/pspautotests/tests/cpu/vfpu/`.
+- **Asynchronous VFS / CPK Streaming:** Profile sequential read throughput on real 3DS SDMC storage and implement background chunk streaming to avoid audio/video stutter during room transitions.
+- **Automated Decryption & Setup Helper:** Provide a clean CLI helper script to guide users in extracting their legally owned UMD `EBOOT.BIN` and `USRDIR/` assets.
+- **Objective Milestones:** Adhere strictly to the `MEASURE FIRST` rule; avoid arbitrary percentage completion bars (e.g. "HLE: 20%") without objective, quantitative metrics.

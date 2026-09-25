@@ -1,20 +1,19 @@
 # P3P3DS
 
-**P3P3DS** is an engineering project working toward running *Shin Megami Tensei: Persona 3 Portable* (`ULUS-10512`, North American release) natively on the **New Nintendo 3DS / New 3DS XL / New 2DS XL** family of consoles.
+**P3P3DS** is an independent research and engineering project working toward running *Shin Megami Tensei: Persona 3 Portable* (`ULUS-10512`, North American release) natively on the **New Nintendo 3DS / New 3DS XL / New 2DS XL** family of consoles.
 
 ---
 
-## Status
+## Status: NOT PLAYABLE
 
-**Early Research & PC Execution Bootstrap.**
+> **IMPORTANT:** This project is in early research and bootstrap stages. The game is **NOT PLAYABLE** on PC or Nintendo 3DS. It does not render 3D scenes, play audio, or run gameplay.
 
-We have achieved the first live native execution milestone on PC:
-1. The decrypted P3P executable is analyzed and loaded into a PSP user RAM arena.
+### What is currently verified and working:
+1. The decrypted P3P executable is analyzed and loaded into a 32 MiB PSP user RAM arena.
 2. All 178,513 PRX relocations are applied without unsupported or invalid types.
 3. The game's entry point (`module_start`, `0x08804108`) has been statically recompiled into native C++ via an AOT pipeline.
 4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, advances guest control flow, and dispatches to the first PSP import stub (`SysMemUserForUser::0x35669D4C` / `sceKernelSetCompiledSdkVersion600_602`).
-
-> **Note:** The game does **not** yet run on Nintendo 3DS, nor is it playable on PC yet. Current work is focused on expanding recompiled function coverage and implementing the necessary PSP HLE kernel services on PC before bringing up the native 3DS hardware backend.
+5. An automated verification test strictly validates this execution milestone (entry PC, return address `$ra == 0x0880413C`, and stop reason).
 
 ---
 
@@ -37,7 +36,7 @@ We have achieved the first live native execution milestone on PC:
 
 ## Goal
 
-The ultimate goal of this project is a smooth, high-fidelity experience of Persona 3 Portable running natively on New Nintendo 3DS hardware, with full support for user-supplied community mods and arbitrary fan translations.
+The long-term goal of this project is a smooth, high-fidelity experience of Persona 3 Portable running natively on New Nintendo 3DS hardware, with support for user-supplied community mods and fan translations.
 
 We are **not** building a general-purpose PSP emulator, nor an all-encompassing PPSSPP replacement. The scope is specifically tailored to Persona 3 Portable.
 
@@ -49,7 +48,7 @@ We are **not** building a general-purpose PSP emulator, nor an all-encompassing 
 - **Visual Novel Navigation:** The 2D exploration and dialogue format of P3P maps naturally to dual-screen handheld hardware.
 - **Relatively Low VFPU Density:** Only ~0.31% of the instruction stream uses PSP VFPU vector instructions (compared to heavily math-intensive titles like Monster Hunter or racing games).
 - **Atlus Script Engine:** Story flow and cutscene logic run via an internal bytecode engine (`.bf`), meaning gameplay scripting is isolated from low-level MIPS machine code.
-- **No Dynamic Self-Modifying Code:** Static analysis of the executable confirms standard relocatable code with clean function boundaries.
+- **No Evidence of Self-Modifying Code Observed So Far `[UNVERIFIED]`:** Static analysis shows standard relocatable code with clean function prologues/epilogues; runtime verification across deeper gameplay loops remains ongoing.
 
 ---
 
@@ -93,7 +92,7 @@ This project targets the **New Nintendo 3DS / New 3DS XL / New 2DS XL** exclusiv
 
 ---
 
-## Dual-Screen Presentation (Future Design)
+## Dual-Screen Presentation (Future Design Goal)
 
 While keeping classic 1:1 PSP presentation intact, the architecture is designed to support enhanced dual-screen modes:
 - **Top Screen (400x240):** 3D Tartarus exploration, battle scenes, and animated event sequences.
@@ -101,11 +100,11 @@ While keeping classic 1:1 PSP presentation intact, the architecture is designed 
 
 ---
 
-## Modding & Localization Architecture
+## Modding & Localization Architecture (Design Goals)
 
 Modding support and fan translations are first-class architectural requirements:
-- **Language-Agnostic Core:** No language strings, fonts, or specific localization hacks are hardcoded into the runtime engine.
-- **VFS Fallback Pipeline:** The file system intercepts `sceIoOpen` and resolves assets with priority fallback:
+- **Language-Agnostic Core:** No language strings, fonts, or specific localization hacks will be hardcoded into the runtime engine.
+- **VFS Fallback Pipeline:** The file system will intercept `sceIoOpen` and resolve assets with priority fallback:
   ```text
   sdmc:/p3p3ds/mods/bind/<relative_path>   (Loose file overrides)
     ↓
@@ -115,7 +114,7 @@ Modding support and fan translations are first-class architectural requirements:
     ↓
   sdmc:/p3p3ds/data/data.cpk               (Original game archive)
   ```
-- **Universal Translation Support:** Any community translation (Russian, Spanish, German, French, etc.) or gameplay overhaul can be loaded simply by dropping loose files or `.cpk` archives onto the SD card without rebuilding the executable.
+- **Translation & Mod Support (Future Goal):** The architecture aims to support community translations (such as Russian, Spanish, German, French) and mods via VFS redirection. Note that translations are not guaranteed to be drop-in asset-only packages: individual localizations may require custom font sheets, character encoding tables, `.bmd`/`.bf` script handling, or runtime executable hooks (such as glyph-spacing/kerning adjustments).
 
 ---
 
@@ -124,12 +123,12 @@ Modding support and fan translations are first-class architectural requirements:
 ```text
 P3P3DS/
 ├── 3ds/                 # 3DS platform libraries (libctru, citro3d, citro2d)
-├── core/                # Target-agnostic P3P runtime, HLE definitions, memory map
+├── core/                # (planned) Target-agnostic P3P runtime, HLE definitions, memory map
 ├── docs/                # Architecture, verification registry, and research papers
 ├── experiments/         # Standalone test harnesses and analysis scripts
 ├── platform/
 │   ├── pc/              # PC host runner and bootstrap harness
-│   └── 3ds/             # Native 3DS backend implementation
+│   └── 3ds/             # (planned) Native 3DS backend implementation
 ├── profiles/p3p/        # P3P profile configuration, function maps, and game inputs
 ├── recomp/              # Recompilation engines and tools (PSPRecomp, Yakumo, N64Recomp)
 ├── references/          # Reference emulators and hardware autotests (PPSSPP, pspautotests)
@@ -178,8 +177,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 # 2. Build the recompiler and PC bootstrap executable
 cmake --build build --target p3p_pc_bootstrap
 
-# 3. Execute the recompiled module_start smoke test
-./build/p3p_pc_bootstrap.exe
+# 3. Execute the verified module_start milestone test
+./build/p3p_pc_bootstrap.exe --verify-milestone
 ```
 
 Expected output confirms the execution milestone:
@@ -188,20 +187,43 @@ Expected output confirms the execution milestone:
    P3P3DS PC Bootstrap Execution Harness
 ====================================================
 Target ELF:       profiles/p3p/game/eboot.elf
+Dispatch budget:  1000
+Verify mode:      STRICT (--verify-milestone)
 ELF Type:         65440 (PSP PRX relocatable)
 Runtime Entry:    0x08804108
-Relocations:      178513 total
+Relocations:      178513 total (R_26=81398, R_32=14572, R_HI=37395, R_LO=45148)
 Module Info:      p3p v1.1
 Module GP:        0x08C42A50
-Registered Funcs: 319
+Module Stubs:     0x08B801DC - 0x08B80394
+Stack Arena:      0x09FF0000 - 0x0A000000
+Initial SP:       0x09FFFF00
+Initial RA:       0x00000000
+Initial A0 / A1:  0x00000000 / 0x00000000
+Registered Entries: 319 (functions, block labels, and import wrappers)
 
 === Execution Result ===
 Stop Reason:      Missing HLE import SysMemUserForUser::0x35669D4C
 Stopped:          yes
 Final Guest PC:   0x08B7FC0C
+
+=== Guest Register State ===
+  PC: 0x08B7FC0C
+  zero = 0x00000000  at   = 0x00000000  v0   = 0x06020000  v1   = 0x00000000  
+  a0   = 0x06020010  a1   = 0x00000000  a2   = 0x00000000  a3   = 0x00000000  
+  gp   = 0x08C42A50  sp   = 0x09FFFEE0  fp   = 0x00000000  ra   = 0x0880413C  
+
+=== Milestone Verification ===
+Target:           module_start -> SysMemUserForUser::0x35669D4C
+Entry (0x8804108):   OK
+Final PC (0x8b7fc0c):OK
+Return RA (0x880413c):OK
+HLE Stop Reason:  OK
+Result:           [VERIFIED] Milestone passed
+
+Execution milestone reached and verified successfully.
 ```
 
-### Reproduce Full Analysis Pipeline
+### Reproduce Full Analysis Pipeline & CTest Suite
 
 ```bash
 bash experiments/p3p-analysis/reproduce_analysis.sh
@@ -209,12 +231,12 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 
 ---
 
-## Legal & Clean-Room Notice
+## Legal & Open-Source Research Notice
 
-- This project is an independent clean-room engineering effort.
+- This project is an independent reverse-engineering and open-source research effort.
 - It is not affiliated with, endorsed by, or connected to Atlus, SEGA, Sony Interactive Entertainment, or Nintendo.
 - No proprietary game binaries, copyrighted assets, encrypted firmware keys, or commercial code are distributed in this repository.
-- All reverse engineering data and HLE implementations are derived from clean-room analysis, open-source references (`pspsdk`, `uofw`), and publicly available community research.
+- All reverse engineering data and HLE implementations are derived from independent analysis, open-source references (`pspsdk`, `uofw`), and publicly available community research.
 
 ---
 

@@ -99,7 +99,7 @@ The binary contains 54 sections. The primary runtime sections:
   - `Invalid`: `0` (`[VERIFIED]`)
 
 ### 3.3. Library Imports & NID Breakdown
-P3P imports `221` function stubs across `21` PSP OS libraries:
+P3P imports `221` function stubs across `22` PSP OS libraries:
 
 | Library Name | Import Count | Description & Status |
 | :--- | :--- | :--- |
@@ -153,13 +153,15 @@ Unlike heavy 3D titles (e.g. *Monster Hunter Portable 3rd* with extensive VFPU p
 All encountered VFPU instructions are fully supported by the existing `PSPRecomp` code generator.
 
 ### 4.2. Control Flow & Indirect Calls
-- **Direct Calls (`jal`):** 59,581 call sites across 21,470 unique target functions. Handled via direct C++ function calls or same-unit `goto` labels.
+- **Direct Jumps (`j`):** 21,845 jump sites targeting 14,362 unique branch destinations.
+- **Direct Calls (`jal`):** 59,553 call sites targeting 7,698 unique call destinations.
+- **Combined Direct J/JAL:** 81,398 sites (exactly matching the 81,398 `R_MIPS_26` relocations) across 21,470 unique target addresses. *Note: Target addresses are control-flow branch destinations and do not represent verified function boundaries.*
 - **Indirect Calls (`jalr`):** Exactly 835 call sites. These correspond to C++ virtual method dispatches and Atlus script callbacks. Handled via standard `dispatch_indirect(target_pc)` table.
 - **Function Returns (`jr $ra`):** Account for 15,940 of the total 16,578 `jr` instructions. Handled natively as C++ `return;`.
 
 ---
 
-## 5. Critical Discrepancy Analysis (Analyzer Heuristics)
+## 5. Critical Discrepancy Analysis (Analyzer Heuristics & Decoder Verification)
 
 During initial analysis, `psp_analyze` reported:
 `unsupported_instruction_occurrences: 97050` across 21,965 functions.
@@ -170,7 +172,22 @@ During initial analysis, `psp_analyze` reported:
 3. The generic `psp_analyze` seed discovery passes (`collect_relocated_data_code_pointers` and `collect_materialized_code_pointers`) scanned Segment 0 for pointers.
 4. Because `.rodata` sits inside Segment 0, any data pointer pointing to an ASCII string in `.rodata` (e.g. `"INSTALL_ERROR_ABORT_BY_SLEEP"` at `0x08B96374`) was mistakenly treated as a "function entry point".
 5. When `psp_analyze` attempted to disassemble ASCII strings as MIPS opcodes, it flagged random ASCII byte sequences as "unsupported instructions".
-6. **Verification:** Scanning the actual `.text` section revealed **zero unsupported MIPS instructions**. 100% of `.text` is valid MIPS32r2, COP1, and supported VFPU opcodes.
+
+**Empirical Decoder Compatibility Verification (`[VERIFIED]`):**
+A dedicated compatibility test was performed by running all 913,059 4-byte instruction words in the relocated `.text` section through the actual `psprecomp::decode_allegrex` engine:
+- **Decoder recognized & supported:** `912,337` instructions (**99.92%** of `.text`).
+- **Decoder unsupported in baseline:** `722` instructions (**0.08%** of `.text`).
+  All 722 unsupported instructions reside in the SPECIAL opcode family (`op = 0`):
+  - `468` occurrences: `madd` / `maddu` multiply-accumulate function codes (SPECIAL fn=0x1C).
+  - `251` occurrences: `break` software breakpoints (SPECIAL fn=0x0D).
+  - `3` occurrences: trap instructions (SPECIAL fn=0x2E, e.g. `tne`).
+  - *Sum of subcategories:* 468 + 251 + 3 = **722** (exact, mutually exclusive breakdown validated by automated test `verify_p3p_decoder`). Note: `clz` (fn=0x16, 20 occurrences) is supported by the baseline decoder and is part of the 912,337 supported instructions.
+
+*Important Verification Note:* The earlier claim of "zero unsupported instructions" was an overclaim caused by top-level opcode family grouping (which only checked `op == 0` without verifying sub-opcodes). Distinguishing between:
+1. *Opcode family recognized* (89.2% MIPS ALU, 8.7% COP1, 0.3% VFPU);
+2. *Decoder supported* (912,337 instructions);
+3. *Decoder unsupported* (722 instructions requiring lowering rules before reaching those blocks);
+4. *Actually executed in runtime* (`module_start` executed 100% cleanly).
 
 ---
 

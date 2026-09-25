@@ -17,6 +17,12 @@ void register_generated_functions(Runtime &runtime);
 
 namespace {
 
+constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
+constexpr std::uint32_t kExpectedStopPc  = 0x08B7FC0Cu;
+constexpr std::uint32_t kExpectedReturnRa = 0x0880413Cu;
+constexpr std::string_view kExpectedImportLibrary = "SysMemUserForUser";
+constexpr std::uint32_t kExpectedImportNid = 0x35669D4Cu;
+
 void print_registers(const psprecomp::AllegrexContext &ctx) {
     static const char *const kGprNames[32] = {
         "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3",
@@ -35,12 +41,61 @@ void print_registers(const psprecomp::AllegrexContext &ctx) {
     }
 }
 
+struct MilestoneVerificationResult {
+    bool passed{false};
+    bool stopped{false};
+    bool entry_matched{false};
+    bool pc_matched{false};
+    bool ra_matched{false};
+    bool stop_reason_matched{false};
+    std::string failure_detail;
+};
+
+MilestoneVerificationResult verify_milestone(
+    std::uint32_t entry_addr,
+    const psprecomp::Runtime &runtime)
+{
+    MilestoneVerificationResult res;
+    res.stopped = runtime.stopped();
+    res.entry_matched = (entry_addr == kExpectedEntryPc);
+    res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
+    res.ra_matched = (runtime.cpu().gpr[31] == kExpectedReturnRa);
+
+    const std::string &reason = runtime.stop_reason();
+    const bool lib_matched = (reason.find(kExpectedImportLibrary) != std::string::npos);
+    const bool nid_matched = (reason.find("0x35669D4C") != std::string::npos) ||
+                             (reason.find("35669d4c") != std::string::npos) ||
+                             (reason.find("sceKernelSetCompiledSdkVersion") != std::string::npos);
+    res.stop_reason_matched = lib_matched && nid_matched && (reason.find("Missing HLE import") != std::string::npos);
+
+    if (!res.stopped) {
+        res.failure_detail = "Runtime did not stop (dispatch budget exhausted without hitting HLE/stop)";
+    } else if (!res.entry_matched) {
+        res.failure_detail = "Entry PC mismatch: expected " + psprecomp::hex32(kExpectedEntryPc) +
+                             ", got " + psprecomp::hex32(entry_addr);
+    } else if (!res.pc_matched) {
+        res.failure_detail = "Stop PC mismatch: expected " + psprecomp::hex32(kExpectedStopPc) +
+                             ", got " + psprecomp::hex32(runtime.cpu().pc);
+    } else if (!res.ra_matched) {
+        res.failure_detail = "Return address ($ra) mismatch: expected " + psprecomp::hex32(kExpectedReturnRa) +
+                             ", got " + psprecomp::hex32(runtime.cpu().gpr[31]);
+    } else if (!res.stop_reason_matched) {
+        res.failure_detail = "Stop reason mismatch: expected Missing HLE for " +
+                             std::string(kExpectedImportLibrary) + "::" + psprecomp::hex32(kExpectedImportNid) +
+                             ", got: \"" + reason + "\"";
+    } else {
+        res.passed = true;
+    }
+    return res;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
     std::filesystem::path elf_path = "profiles/p3p/game/eboot.elf";
     std::uint64_t max_dispatches = 1000u;
     bool verbose = false;
+    bool verify_mode = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg(argv[i]);
@@ -50,10 +105,13 @@ int main(int argc, char **argv) {
             max_dispatches = std::stoull(argv[++i]);
         } else if (arg == "--verbose" || arg == "-v") {
             verbose = true;
+        } else if (arg == "--verify-milestone" || arg == "--verify") {
+            verify_mode = true;
         } else if (arg == "--help" || arg == "-h") {
             std::cout << "Usage: p3p_pc_bootstrap [options]\n"
                       << "  --elf <path>            Path to decrypted P3P ELF (default: profiles/p3p/game/eboot.elf)\n"
                       << "  --max-dispatches <N>    Maximum dispatch count (default: 1000)\n"
+                      << "  --verify-milestone      Strict milestone verification (returns 0 only on exact milestone match)\n"
                       << "  --verbose, -v           Enable verbose runtime traces\n";
             return 0;
         }
@@ -64,6 +122,7 @@ int main(int argc, char **argv) {
     std::cout << "====================================================\n";
     std::cout << "Target ELF:       " << elf_path.string() << "\n";
     std::cout << "Dispatch budget:  " << max_dispatches << "\n";
+    std::cout << "Verify mode:      " << (verify_mode ? "STRICT (--verify-milestone)" : "standard") << "\n";
 
     try {
         // 1. Load decrypted P3P ELF
@@ -105,7 +164,6 @@ int main(int argc, char **argv) {
         runtime.cpu().set_gpr(28, module->gp);
 
         // 6. Setup minimal valid module_start stack
-        // PSP user RAM top is 0x0A000000. Allocate 64 KiB stack growing down.
         constexpr std::uint32_t kStackTop = 0x0A000000u;
         constexpr std::uint32_t kStackSize = 0x10000u; // 64 KiB
         constexpr std::uint32_t kStackBottom = kStackTop - kStackSize;
@@ -129,7 +187,8 @@ int main(int argc, char **argv) {
 
         // 9. Register generated recompiled functions and import wrappers
         psprecomp::register_generated_functions(runtime);
-        std::cout << "Registered Funcs: " << runtime.function_count() << "\n";
+        std::cout << "Registered Entries: " << runtime.function_count()
+                  << " (functions, block labels, and import wrappers)\n";
 
         if (verbose) {
             std::cout << "\nStarting execution at " << psprecomp::hex32(entry_addr) << "...\n";
@@ -146,8 +205,26 @@ int main(int argc, char **argv) {
 
         print_registers(runtime.cpu());
 
-        std::cout << "\nExecution milestone reached successfully.\n";
-        return 0;
+        // 12. Milestone Verification
+        const auto v = verify_milestone(entry_addr, runtime);
+        std::cout << "\n=== Milestone Verification ===\n";
+        std::cout << "Target:           module_start -> SysMemUserForUser::0x35669D4C\n";
+        std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
+                  << (v.entry_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "):"
+                  << (v.pc_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Return RA (0x" << std::hex << kExpectedReturnRa << "):"
+                  << (v.ra_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "HLE Stop Reason:  " << (v.stop_reason_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Result:           " << (v.passed ? "[VERIFIED] Milestone passed" : "[FAILED] " + v.failure_detail) << "\n";
+
+        if (v.passed) {
+            std::cout << "\nExecution milestone reached and verified successfully.\n";
+            return 0;
+        } else {
+            std::cerr << "\nMilestone verification failed: " << v.failure_detail << "\n";
+            return 3;
+        }
 
     } catch (const std::exception &e) {
         std::cerr << "Fatal Exception: " << e.what() << "\n";

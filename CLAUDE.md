@@ -226,3 +226,34 @@ Commits must represent the repository maintainer/developer only unless the user 
 
 Do not modify git `author.name` or `author.email`.
 Do not add yourself as contributor, co-author, author, committer, reviewer, or maintainer.
+
+---
+
+## 16. Git Workflow: Local Commits Only, No Remote Operations
+
+After completing a well-defined user task or milestone, the agent must automatically create a local git commit if:
+1. The working tree contains modifications belonging to the completed task;
+2. All regression, verification, and smoke tests have passed cleanly;
+3. There is no explicit instruction from the user forbidding commits.
+
+**Pre-Commit Verification Checklist:**
+- Inspect `git status` and staged/unstaged `git diff`.
+- Ensure no temporary files (`.tmp/`, `.cache/`, scratchpads), local maintainer overrides (`.claude/LOCAL.md`), credentials, or proprietary game assets/ROMs/dumps are staged.
+- Strictly adhere to Section 15: never alter git `author.name` or `author.email`, and never add AI attribution trailers (`Co-Authored-By`, `Generated-By`, etc.).
+- Use a concise conventional-style commit subject (e.g. `feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`) and an informative body summarizing changes and verification results.
+
+**STRICTLY FORBIDDEN AUTOMATIC ACTIONS:**
+- Never execute `git push`
+- Never execute `git pull`
+- Never execute `git fetch`
+- Never create or modify remote references or tracking branches
+- Never perform a force push (`--force`)
+- Never modify remote URLs or remotes configuration
+
+Any network/remote Git operation requires explicit, separate user instruction.
+
+**Default Execution Loop:**
+```text
+Work -> Verify & Test -> Local Commit -> STOP (Do NOT push)
+```
+

@@ -11,9 +11,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # Configure PSPRecomp
-set(PSPRECOMP_BUILD_TESTS OFF CACHE BOOL "Disable PSPRecomp internal tests" FORCE)
-set(PSPRECOMP_BUILD_PROFILE_TESTS OFF CACHE BOOL "Disable PSPRecomp profile tests" FORCE)
-add_subdirectory(recomp/PSPRecomp EXCLUDE_FROM_ALL)
+option(PSPRECOMP_BUILD_TESTS "Build PSPRecomp upstream tests" ON)
+option(PSPRECOMP_BUILD_PROFILE_TESTS "Build PSPRecomp profile tests" OFF)
+add_subdirectory(recomp/PSPRecomp)
 
 # Target directory for generated AOT files
 set(P3P_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
@@ -48,4 +48,51 @@ target_link_libraries(p3p_pc_bootstrap PRIVATE
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(p3p_pc_bootstrap PRIVATE -Wall -Wextra)
+endif()
+
+# Decoder Compatibility Verification Tool
+add_executable(verify_p3p_decoder
+    experiments/p3p-analysis/verify_decoder.cpp
+)
+
+target_include_directories(verify_p3p_decoder PRIVATE
+    recomp/PSPRecomp/include
+)
+
+target_link_libraries(verify_p3p_decoder PRIVATE
+    psprecomp_core
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(verify_p3p_decoder PRIVATE -Wall -Wextra)
+endif()
+
+# CTest integration
+enable_testing()
+
+add_test(
+    NAME p3p_pc_bootstrap_smoke
+    COMMAND p3p_pc_bootstrap --verify-milestone
+)
+set_tests_properties(p3p_pc_bootstrap_smoke PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_test(
+    NAME p3p_decoder_compatibility
+    COMMAND verify_p3p_decoder "${P3P_ELF}"
+)
+set_tests_properties(p3p_decoder_compatibility PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+    add_test(
+        NAME p3p_analysis_comparison
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/experiments/p3p-analysis/compare_analysis.py"
+    )
+    set_tests_properties(p3p_analysis_comparison PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
 endif()

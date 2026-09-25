@@ -252,7 +252,10 @@ def analyze_p3p_elf(elf_path, base_addr=0x08804000):
     # 7. Disassembly Analysis of Actual .text Section (Only SHF_EXECINSTR)
     instruction_stats = Counter()
     vfpu_stats = Counter()
-    jump_targets = set()
+    j_targets = set()
+    jal_targets = set()
+    j_count = 0
+    jal_count = 0
     indirect_jumps = []
     indirect_calls = []
 
@@ -288,14 +291,16 @@ def analyze_p3p_elf(elf_path, base_addr=0x08804000):
                     instruction_stats["syscall"] += 1
                 else:
                     instruction_stats["special"] += 1
-            elif op == 0x02: # j
+            elif op == 0x02: # j (unconditional jump)
                 instruction_stats["j"] += 1
+                j_count += 1
                 target = (pc & 0xF0000000) | ((word & 0x03FFFFFF) << 2)
-                jump_targets.add(target)
-            elif op == 0x03: # jal
+                j_targets.add(target)
+            elif op == 0x03: # jal (jump and link - function call site)
                 instruction_stats["jal"] += 1
+                jal_count += 1
                 target = (pc & 0xF0000000) | ((word & 0x03FFFFFF) << 2)
-                jump_targets.add(target)
+                jal_targets.add(target)
             elif op in (0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17): # Branches
                 instruction_stats["branch"] += 1
             elif op == 0x10: # COP0
@@ -307,6 +312,8 @@ def analyze_p3p_elf(elf_path, base_addr=0x08804000):
                 vfpu_stats[f"op_0x{op:02X}"] += 1
             else:
                 instruction_stats["standard_mips"] += 1
+
+    combined_targets = j_targets | jal_targets
 
     summary = {
         "elf": {
@@ -335,9 +342,17 @@ def analyze_p3p_elf(elf_path, base_addr=0x08804000):
             "section_name": text_section["name"] if text_section else None,
             "section_addr": text_section["runtime_addr"] if text_section else None,
             "total_instructions": len(tdata) // 4 if text_section else 0,
+            "note": "Opcode counts reflect opcode-family classification from raw instruction words; this is not a proof that all encodings are supported by the AOT recompiler.",
             "instruction_categories": dict(instruction_stats),
             "vfpu_opcode_distribution": dict(vfpu_stats),
-            "direct_jump_targets_count": len(jump_targets),
+            "control_flow_targets": {
+                "direct_j_occurrences": j_count,
+                "direct_j_unique_targets": len(j_targets),
+                "direct_jal_occurrences": jal_count,
+                "direct_jal_unique_targets": len(jal_targets),
+                "combined_unique_targets": len(combined_targets),
+                "note": "Target counts are destination addresses of branch/jump instructions and do not represent verified function boundaries."
+            },
             "indirect_jumps_jr_count": len(indirect_jumps),
             "indirect_calls_jalr_count": len(indirect_calls)
         }
@@ -362,6 +377,9 @@ if __name__ == "__main__":
     print(f"Text instructions: {res['text_analysis']['total_instructions']}")
     print(f"  FPU (COP1): {res['text_analysis']['instruction_categories'].get('cop1_fpu', 0)}")
     print(f"  VFPU: {res['text_analysis']['instruction_categories'].get('vfpu', 0)}")
-    print(f"  Direct J/JAL targets: {res['text_analysis']['direct_jump_targets_count']}")
+    cf = res['text_analysis']['control_flow_targets']
+    print(f"  Direct J: {cf['direct_j_occurrences']} sites -> {cf['direct_j_unique_targets']} unique targets")
+    print(f"  Direct JAL: {cf['direct_jal_occurrences']} sites -> {cf['direct_jal_unique_targets']} unique targets")
+    print(f"  Combined unique J/JAL targets: {cf['combined_unique_targets']}")
     print(f"  Indirect Jumps (jr): {res['text_analysis']['indirect_jumps_jr_count']}")
     print(f"  Indirect Calls (jalr): {res['text_analysis']['indirect_calls_jalr_count']}")
