@@ -2,21 +2,21 @@
 name = "Shin Megami Tensei: Persona 3 Portable"
 disc_id = "ULUS-10512"
 region = "NTSC-U"
-module = "P3P"
+module = "p3p"
 ram_mb = 32
 load_base = "0x08804000"
 
 [input]
 # Decrypted dump made from PSP_GAME/SYSDIR/EBOOT.BIN. The executable is
 # intentionally not distributed with the repository.
-executable = "original/ULUS10512_EBOOT.BIN"
-game_root = "original/PSP_GAME/USRDIR"
-functions_csv = "analysis/p3p_functions.csv"
-nids_csv = "configs/nids.csv"
+executable = "profiles/p3p/game/eboot.elf"
+game_root = "profiles/p3p/game/USRDIR"
+functions_csv = "profiles/p3p/config/p3p_functions.csv"
+nids_csv = "recomp/PSPRecomp/configs/nids.csv"
 
 [output]
-report_json = "analysis/ULUS10512_report.json"
-generated_cpp = "generated/generated_manifest.cpp"
+report_json = "experiments/p3p-analysis/p3p_report.json"
+generated_cpp = "build/generated/p3p_generated.cpp"
 
 [policy]
 missing_function = "stop"

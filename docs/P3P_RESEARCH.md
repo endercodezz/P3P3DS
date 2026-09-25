@@ -135,10 +135,11 @@ In **P3P3DS**, the HLE `IoFileMgr` subsystem will intercept all game file reques
 ```
 
 ### 6.2. Russification & Font Handling
-Russian fan translations for Persona 3 Portable (such as the translation by The Miracle):
+Russian fan translations for Persona 3 Portable (such as the translation by The Miracle / DniweTamp):
 1. **Text Encoding:** Replaces US/Japanese font tables with custom 1-byte Cyrillic character tables (CP1251 or custom Atlus encoding table).
 2. **Font Textures:** Modifies the bitmap font textures (`font.fnt` or font `.tm2`/`.gim` files) stored inside `data.cpk`.
 3. **Dialogue Scripts:** Contains modified `.bmd` files containing Russian translated strings.
+4. **Potential Executable Patches:** May require EBOOT-level binary hooks for glyph spacing, line wrapping, or proportional font widths (`[UNVERIFIED]` - requires empirical test against translated assets).
 
-**Benefit for P3P3DS:**
-Because the translation is contained entirely inside `.cpk` files and modified `.bmd` scripts, **the Russian translation can be dropped directly into `SD:/p3p3ds/mods/mod.cpk` or `SD:/p3p3ds/mods/bind/` and will work out of the box with zero runtime re-compilation!**
+**Architectural Requirement for P3P3DS:**
+The runtime must remain language-agnostic. While dialogue assets and textures resolve cleanly through the VFS (`SD:/p3p3ds/mods/mod.cpk` or `SD:/p3p3ds/mods/bind/`), any necessary executable-level font or spacing patches must be modularly supported via profile hook tables in `profiles/p3p/config/` without hardcoding language-specific logic into the core engine.

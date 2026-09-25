@@ -19,14 +19,15 @@
 | **Virtual Load Base** | `0x08804000` | `[VERIFIED]` |
 | **Runtime Entry Point** | `0x08804108` (`module_start`, relative offset `0x00000108`) | `[VERIFIED]` |
 | **Total Relocations** | `178,513` (0 invalid, 0 unsupported) | `[VERIFIED]` |
-| **Library Imports** | `221` function stubs across `21` modules (214 resolved, 7 uncalled dead stubs) | `[VERIFIED]` |
-| **Discovered Functions** | `21,965` function seeds | `[VERIFIED]` |
+| **Library Imports** | `221` function stubs across `22` modules (all 221 stubs cataloged) | `[VERIFIED]` |
+| **Discovered Function Seeds** | `21,965` heuristic function seeds (entry discovery requires execution-driven validation) | `[INFERRED]` |
 | **`.text` Instructions** | `913,059` instructions (3,652,236 bytes) | `[VERIFIED]` |
 | **FPU / COP1 Usage** | `79,717` instructions (8.73% of `.text`) | `[VERIFIED]` |
 | **VFPU Usage** | `2,861` instructions (0.31% of `.text`) | `[VERIFIED]` |
 | **Indirect Calls (`jalr`)** | `835` call sites | `[VERIFIED]` |
 | **Indirect Jumps (`jr`)** | `15,940` sites (predominantly `jr $ra` function returns) | `[VERIFIED]` |
-| **Recompiler Viability** | **100% Viable for AOT Static Recompilation** | `[VERIFIED]` |
+| **Recompiler Entry Milestone** | **`module_start` executed on PC to first HLE call** | `[VERIFIED]` |
+| **Overall Recompiler Viability** | **Viable for AOT Static Recompilation (Full-game coverage requires iterative verification)** | `[INFERRED]` |
 
 ---
 
@@ -173,19 +174,26 @@ During initial analysis, `psp_analyze` reported:
 
 ---
 
-## 6. Code Generation Proof-of-Concept
+## 6. Code Generation & PC Execution Milestone [VERIFIED]
 
-To verify that `PSPRecomp` code generation functions on Persona 3 Portable:
-1. A test function map (`test_functions.csv`) was configured with `module_start` (`0x08804108`) and companion functions.
-2. `psp_recomp` generated C++ translation code including all 221 import wrappers into `test_generated.cpp`.
-3. The generated unit was compiled with MinGW GCC 16.1.0:
-   ```bash
-   g++ -std=c++20 -O2 -c -Irecomp/PSPRecomp/include test_generated.cpp -o test_generated.o
-   ```
-4. **Result:** Compilation succeeded with **zero warnings and zero errors**.
+To verify that `PSPRecomp` code generation and runtime execution function on Persona 3 Portable:
+1. A minimal verified function map (`profiles/p3p/config/p3p_functions.csv`) was configured with `module_start` (`0x08804108`) and predecessor `sub_08804024`.
+2. `psp_recomp` generated C++ translation code including all 221 import wrappers into `build/generated/p3p_generated.cpp`.
+3. A lightweight PC bootstrap runner (`platform/pc/main.cpp`) was built and linked against `libpsprecomp_core.a`.
+4. Execution sequence:
+   - Initial PC: `0x08804108` (`module_start`)
+   - Stack: `0x09FFFF00`, GP: `0x08C42A50`
+   - Recompiled code executed real guest control flow, advancing registers ($v0, $a0, $ra) and stack pointers.
+   - At PC `0x08804134`, the code executed a branch with delay slot, setting $ra=`0x0880413C`, and dispatched to import stub `0x08B7FC0C`.
+   - The runtime successfully caught the import and stopped deterministically:
+     ```text
+     Stop Reason: Missing HLE import SysMemUserForUser::0x35669D4C
+     Final Guest PC: 0x08B7FC0C, $ra=0x0880413C
+     ```
+5. **Result:** First live execution milestone achieved on PC (`[VERIFIED]`).
 
 ---
 
-## 7. Conclusion
+## 7. Conclusion & Next Steps
 
-Persona 3 Portable (`ULUS-10512`) is fully supported by the `PSPRecomp` static recompilation architecture. No dynamic JIT, self-modifying code, or unsupported hardware coprocessors exist in the binary. The project can safely proceed to Phase 2 (Profile Configuration and Entry Point Execution).
+Persona 3 Portable (`ULUS-10512`) static recompilation has been verified through its initial runtime execution milestone. The binary contains standard Allegrex instructions, 221 import stubs, and clean relocation tables without invalid or unsupported entries. Full game viability remains `[INFERRED]` and will be proven incrementally through execution-driven function discovery and minimal HLE service implementation.

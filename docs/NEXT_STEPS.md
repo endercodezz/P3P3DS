@@ -15,63 +15,67 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ### Phase 1: Recompiler Toolchain & Analysis
 
-1. **Step 1: Build & Verify PSPRecomp Core Toolchain**
-   - Build `psprecomp_core`, `psp_analyze`, `psp_recomp`, and `dump_function` on PC.
-   - Run existing regression tests (`ctest`) to confirm decoder and analysis passes pass cleanly.
-   - *Tools:* CMake, MSVC / GCC / Clang.
+1. **Step 1: Build & Verify PSPRecomp Core Toolchain** `[COMPLETED]`
+   - Built `psprecomp_core`, `psp_analyze`, `psp_recomp`, and `dump_function` on PC.
+   - Verified static linking flags and Ninja builds.
 
-2. **Step 2: Study GTA VCS Profile Reference**
-   - Inspect `profiles/vcs/host/vcs_profile.cpp` and `vcs_codegen_main.cpp`.
-   - Document how thread contexts, memory arenas, register fast paths, and `register_hle` calls are registered.
+2. **Step 2: Study GTA VCS Profile Reference** `[COMPLETED]`
+   - Inspected `profiles/vcs/host/vcs_profile.cpp` and `vcs_codegen_main.cpp`.
+   - Extracted minimal bootstrap patterns (module stack, $gp from module info, entry point setup).
 
-3. **Step 3: Establish the P3P Profile Skeleton**
-   - Create profile directory: `recomp/PSPRecomp/profiles/p3p/`.
-   - Setup `profiles/p3p/CMakeLists.txt`, `profiles/p3p/config/`, `profiles/p3p/host/`, and `profiles/p3p/data/`.
-   - Register `-DPSPRECOMP_PROFILE=p3p` in root `CMakeLists.txt`.
+3. **Step 3: Establish the P3P Profile Skeleton** `[COMPLETED]`
+   - Configured `profiles/p3p/config/p3p_ulus10512.toml` and `profiles/p3p/config/p3p_functions.csv`.
+   - Established canonical layout matching the project's root build workflow.
 
-4. **Step 4: Prepare & Decrypt Legally Sourced P3P Executable**
-   - From user's legal UMD copy (ULUS-10512), decrypt `EBOOT.BIN` to clean `EBOOT.ELF`.
-   - Place in ignored directory `profiles/p3p/game/eboot.elf`.
-   - Verify ELF header, 32-bit MIPS architecture, and segment virtual addresses (target base: `0x08804000`).
+4. **Step 4: Prepare & Decrypt Legally Sourced P3P Executable** `[COMPLETED]`
+   - Prepared clean decrypted `profiles/p3p/game/eboot.elf` (ULUS-10512).
+   - Verified ELF header, 32-bit Allegrex architecture, and virtual load base (`0x08804000`).
 
-5. **Step 5: Run Static Analysis (`psp_analyze`)**
-   - Execute `psp_analyze` against `eboot.elf`.
-   - Discover entry points, function boundaries, jump tables, and call graph.
-   - Output function map: `profiles/p3p/config/p3p_functions.csv`.
+5. **Step 5: Run Static Analysis & Independent Analyzer** `[COMPLETED]`
+   - Executed `psp_analyze` against `eboot.elf`, producing `experiments/p3p-analysis/p3p_report.json`.
+   - Fixed `experiments/p3p-analysis/analyze_elf.py` to parse relocated PRX memory.
+   - Validated 178,513 relocations and entry point `0x08804108`.
 
-6. **Step 6: Extract & Audit Imported NIDs**
-   - Parse all `.lib.stub` / `.rodata.sceNid` imports in the ELF using `psp/prxtool` or `tools/imports.py`.
-   - Produce complete list of required PSP HLE APIs (estimated 60–90 distinct NIDs).
-   - Match against existing PPSSPP and PSPRecomp HLE functions.
+6. **Step 6: Extract & Audit Imported NIDs** `[COMPLETED]`
+   - Cataloged all 221 import stubs across 22 libraries in `independent_analysis.json` and `p3p_report_imports.csv`.
+   - Verified 100% agreement between independent parser and PSPRecomp.
 
 ---
 
-### Phase 2: Code Generation & PC Harness
+### Phase 2: Code Generation & PC Execution Milestone
 
-7. **Step 7: Generate Initial AOT C++ Translation Units**
-   - Run `psp_recomp` with function map and partition settings (e.g. 256 KiB chunks).
-   - Verify generated units: `profiles/p3p/generated/unit_00.cpp`, `unit_01.cpp`, etc.
-   - Verify syntax cleanliness, jump table handling, and VFPU instructions lowering.
+7. **Step 7: Generate Initial AOT C++ Translation Units** `[COMPLETED]`
+   - Ran `psp_recomp` to lower `module_start` and predecessor functions to C++.
+   - Generated import wrappers and registered function table in `build/generated/p3p_generated.cpp`.
 
-8. **Step 8: Construct Minimal PC Host Runner (`p3p_host_pc`)**
-   - Create entry point `profiles/p3p/host/main_pc.cpp`.
-   - Initialize `GuestMemory` arena (32 MiB RAM + 2 MiB VRAM + 16 KiB scratchpad).
-   - Map ELF data and BSS sections into guest RAM.
-   - Set up initial CPU registers ($sp, $ra, $gp) and thread context for `module_start`.
+8. **Step 8: Construct Minimal PC Host Runner (`p3p_pc_bootstrap`)** `[COMPLETED]`
+   - Implemented `platform/pc/main.cpp` using `psprecomp::Runtime`.
+   - Initialized 32 MiB guest RAM arena, relocated ELF, loaded module info, set $gp (`0x08C42A50`), and prepared 64 KiB stack at `0x09FFFF00`.
 
-9. **Step 9: Execute Entry Point & Log First HLE Calls**
-   - Run the PC runner and begin stepping through recompiled code.
-   - Catch the first imported NID calls via a generic fallback:
-     ```cpp
-     void unhandled_hle(psprecomp::Runtime &rt, const char *mod, uint32_t nid) {
-         printf("[HLE UNHANDLED] %s:0x%08X at PC=0x%08X\n", mod, nid, rt.cpu().pc);
-     }
-     ```
-   - Incrementally implement stubs for `SysMemUserForUser`, `ThreadManForUser`, and `UtilsForUser`.
+9. **Step 9: Execute Entry Point & Log First HLE Call** `[COMPLETED]`
+   - Ran `p3p_pc_bootstrap.exe` on PC.
+   - Executed recompiled `module_start`, advancing through real guest basic blocks.
+   - Reached first PSP import wrapper at `0x08B7FC0C` ($ra=`0x0880413C`), deterministically stopping on:
+     `Missing HLE import SysMemUserForUser::0x35669D4C`.
 
 ---
 
-### Phase 3: Core HLE Subsystems
+### Phase 3: Incremental HLE & Boot Milestone (Next Phase)
+
+10. **Step 10: Implement Initial Kernel & Memory Stubs**
+    - Implement `SysMemUserForUser` (`0x35669D4C` / `sceKernelSetCompilerVersion`, `sceKernelSetCompiledSdkVersion`).
+    - Continue stepping execution to next imported calls in `ThreadManForUser` and `UtilsForUser`.
+
+11. **Step 11: Implement Virtual File System (VFS) with Modding Support**
+    - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).
+    - Integrate multi-tier fallback pipeline:
+      `SD:/p3p3ds/mods/bind/` -> `mod.cpk` -> `mod1.cpk` -> `data.cpk`.
+    - Verify with `CriFsV2Lib` that P3P loads its initial archives without error.
+
+12. **Step 12: Implement Display & Frame Timing**
+    - Implement `sceDisplay` (`sceDisplaySetMode`, `sceDisplaySetFrameBuf`, `sceDisplayWaitVblankStart`).
+    - Connect guest framebuffer in VRAM (`0x04000000`) to an SDL3/OpenGL debug window on PC.
+    - Confirm the initial Atlus boot screen / legal disclaimer renders.
 
 10. **Step 10: Implement Virtual File System (VFS) with Modding Support**
     - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).
