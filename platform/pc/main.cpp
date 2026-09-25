@@ -2,6 +2,9 @@
 #include "psprecomp/elf32.hpp"
 #include "psprecomp/runtime.hpp"
 
+#include "p3p3ds/kernel_state.hpp"
+#include "p3p3ds/hle/hle_modules.hpp"
+
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -18,10 +21,11 @@ void register_generated_functions(Runtime &runtime);
 namespace {
 
 constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc  = 0x08B7FC0Cu;
-constexpr std::uint32_t kExpectedReturnRa = 0x0880413Cu;
+constexpr std::uint32_t kExpectedStopPc  = 0x08B7FC04u;
+constexpr std::uint32_t kExpectedReturnRa = 0x08804148u;
 constexpr std::string_view kExpectedImportLibrary = "SysMemUserForUser";
-constexpr std::uint32_t kExpectedImportNid = 0x35669D4Cu;
+constexpr std::uint32_t kExpectedImportNid = 0xF77D77CBu;
+constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
 
 void print_registers(const psprecomp::AllegrexContext &ctx) {
     static const char *const kGprNames[32] = {
@@ -47,25 +51,28 @@ struct MilestoneVerificationResult {
     bool entry_matched{false};
     bool pc_matched{false};
     bool ra_matched{false};
+    bool sdk_version_matched{false};
     bool stop_reason_matched{false};
     std::string failure_detail;
 };
 
 MilestoneVerificationResult verify_milestone(
     std::uint32_t entry_addr,
-    const psprecomp::Runtime &runtime)
+    const psprecomp::Runtime &runtime,
+    const p3p3ds::KernelState &kernel)
 {
     MilestoneVerificationResult res;
     res.stopped = runtime.stopped();
     res.entry_matched = (entry_addr == kExpectedEntryPc);
     res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
     res.ra_matched = (runtime.cpu().gpr[31] == kExpectedReturnRa);
+    res.sdk_version_matched = (kernel.compiled_sdk_version() == kExpectedSdkVersion);
 
     const std::string &reason = runtime.stop_reason();
     const bool lib_matched = (reason.find(kExpectedImportLibrary) != std::string::npos);
-    const bool nid_matched = (reason.find("0x35669D4C") != std::string::npos) ||
-                             (reason.find("35669d4c") != std::string::npos) ||
-                             (reason.find("sceKernelSetCompiledSdkVersion") != std::string::npos);
+    const bool nid_matched = (reason.find("0xF77D77CB") != std::string::npos) ||
+                             (reason.find("f77d77cb") != std::string::npos) ||
+                             (reason.find("sceKernelSetCompilerVersion") != std::string::npos);
     res.stop_reason_matched = lib_matched && nid_matched && (reason.find("Missing HLE import") != std::string::npos);
 
     if (!res.stopped) {
@@ -73,6 +80,9 @@ MilestoneVerificationResult verify_milestone(
     } else if (!res.entry_matched) {
         res.failure_detail = "Entry PC mismatch: expected " + psprecomp::hex32(kExpectedEntryPc) +
                              ", got " + psprecomp::hex32(entry_addr);
+    } else if (!res.sdk_version_matched) {
+        res.failure_detail = "Kernel SDK version mismatch: expected " + psprecomp::hex32(kExpectedSdkVersion) +
+                             ", got " + psprecomp::hex32(kernel.compiled_sdk_version());
     } else if (!res.pc_matched) {
         res.failure_detail = "Stop PC mismatch: expected " + psprecomp::hex32(kExpectedStopPc) +
                              ", got " + psprecomp::hex32(runtime.cpu().pc);
@@ -190,28 +200,35 @@ int main(int argc, char **argv) {
         std::cout << "Registered Entries: " << runtime.function_count()
                   << " (functions, block labels, and import wrappers)\n";
 
+        // 10. Register target-agnostic HLE service modules
+        p3p3ds::KernelState kernel_state;
+        p3p3ds::hle::register_all_hle_modules(runtime, kernel_state);
+
         if (verbose) {
             std::cout << "\nStarting execution at " << psprecomp::hex32(entry_addr) << "...\n";
         }
 
-        // 10. Execute recompiled code
+        // 11. Execute recompiled code
         runtime.run(entry_addr, max_dispatches);
 
-        // 11. Diagnostic summary
+        // 12. Diagnostic summary
         std::cout << "\n=== Execution Result ===\n";
         std::cout << "Stop Reason:      " << runtime.stop_reason() << "\n";
         std::cout << "Stopped:          " << (runtime.stopped() ? "yes" : "no") << "\n";
         std::cout << "Final Guest PC:   " << psprecomp::hex32(runtime.cpu().pc) << "\n";
+        std::cout << "Kernel SDK Ver:   " << psprecomp::hex32(kernel_state.compiled_sdk_version()) << "\n";
 
         print_registers(runtime.cpu());
 
         // 12. Milestone Verification
-        const auto v = verify_milestone(entry_addr, runtime);
+        const auto v = verify_milestone(entry_addr, runtime, kernel_state);
         std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> SysMemUserForUser::0x35669D4C\n";
+        std::cout << "Target:           module_start -> SysMemUserForUser::0xF77D77CB\n";
         std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
                   << (v.entry_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "):"
+        std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
+                  << (v.sdk_version_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "): "
                   << (v.pc_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Return RA (0x" << std::hex << kExpectedReturnRa << "):"
                   << (v.ra_matched ? "OK" : "FAILED") << "\n";

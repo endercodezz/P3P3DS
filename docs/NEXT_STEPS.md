@@ -60,11 +60,12 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ---
 
-### Phase 3: Incremental HLE & Boot Milestone (Next Phase)
+### Phase 3: Incremental HLE & Boot Milestone
 
 10. **Step 10: Implement Initial Kernel & Memory Stubs**
-    - Implement `SysMemUserForUser` (`0x35669D4C` / `sceKernelSetCompilerVersion`, `sceKernelSetCompiledSdkVersion`).
-    - Continue stepping execution to next imported calls in `ThreadManForUser` and `UtilsForUser`.
+    - Implemented `SysMemUserForUser::0x35669D4C` (`sceKernelSetCompiledSdkVersion600_602`) `[COMPLETED]`.
+    - Guest execution advanced to `0x08B7FC04` (`SysMemUserForUser::0xF77D77CB` / `sceKernelSetCompilerVersion`).
+    - Continue stepping execution to next imported calls in `SysMemUserForUser`, `ThreadManForUser`, and `UtilsForUser`.
 
 11. **Step 11: Implement Virtual File System (VFS) with Modding Support**
     - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).

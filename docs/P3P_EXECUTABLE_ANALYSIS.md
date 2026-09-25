@@ -216,11 +216,12 @@ To verify that `PSPRecomp` code generation and runtime execution function on Per
    - Initial PC: `0x08804108` (`module_start`)
    - Stack: `0x09FFFF00`, GP: `0x08C42A50`
    - Recompiled code executed real guest control flow, advancing registers ($v0, $a0, $ra) and stack pointers.
-   - At PC `0x08804134`, the code executed a branch with delay slot, setting $ra=`0x0880413C`, and dispatched to import stub `0x08B7FC0C`.
-   - The runtime successfully caught the import and stopped deterministically:
+   - At PC `0x08804134`, the code executed a branch with delay slot, setting $ra=`0x0880413C`, and dispatched to import stub `0x08B7FC0C` (`SysMemUserForUser::0x35669D4C` / `sceKernelSetCompiledSdkVersion600_602`).
+   - The HLE service recorded SDK version `0x06020010` into kernel state, set $v0=0, and returned cleanly to $ra=`0x0880413C`.
+   - Guest execution continued through instructions at `0x0880413C`..`0x08804144`, setting $a0=`0x00030306`, $ra=`0x08804148`, and stopping deterministically at the next blocker:
      ```text
-     Stop Reason: Missing HLE import SysMemUserForUser::0x35669D4C
-     Final Guest PC: 0x08B7FC0C, $ra=0x0880413C
+     Stop Reason: Missing HLE import SysMemUserForUser::sceKernelSetCompilerVersion
+     Final Guest PC: 0x08B7FC04, $ra=0x08804148
      ```
 5. **Result:** First live execution milestone achieved on PC (`[VERIFIED]`).
 

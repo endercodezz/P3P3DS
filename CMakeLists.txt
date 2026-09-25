@@ -32,6 +32,25 @@ add_custom_command(
     VERBATIM
 )
 
+# Core P3P3DS Target-Agnostic Runtime & HLE Library
+add_library(p3p3ds_core
+    core/src/hle/sysmem.cpp
+    core/src/hle/hle_modules.cpp
+)
+
+target_include_directories(p3p3ds_core PUBLIC
+    core/include
+    recomp/PSPRecomp/include
+)
+
+target_link_libraries(p3p3ds_core PUBLIC
+    psprecomp_core
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(p3p3ds_core PRIVATE -Wall -Wextra)
+endif()
+
 # PC Bootstrap Runner
 add_executable(p3p_pc_bootstrap
     platform/pc/main.cpp
@@ -39,10 +58,12 @@ add_executable(p3p_pc_bootstrap
 )
 
 target_include_directories(p3p_pc_bootstrap PRIVATE
+    core/include
     recomp/PSPRecomp/include
 )
 
 target_link_libraries(p3p_pc_bootstrap PRIVATE
+    p3p3ds_core
     psprecomp_core
 )
 
@@ -67,8 +88,35 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(verify_p3p_decoder PRIVATE -Wall -Wextra)
 endif()
 
+# Focused SysMem HLE Unit Test
+add_executable(test_hle_sysmem
+    tests/test_hle_sysmem.cpp
+)
+
+target_include_directories(test_hle_sysmem PRIVATE
+    core/include
+    recomp/PSPRecomp/include
+)
+
+target_link_libraries(test_hle_sysmem PRIVATE
+    p3p3ds_core
+    psprecomp_core
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_hle_sysmem PRIVATE -Wall -Wextra)
+endif()
+
 # CTest integration
 enable_testing()
+
+add_test(
+    NAME p3p_hle_sysmem
+    COMMAND test_hle_sysmem
+)
+set_tests_properties(p3p_hle_sysmem PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 add_test(
     NAME p3p_pc_bootstrap_smoke
