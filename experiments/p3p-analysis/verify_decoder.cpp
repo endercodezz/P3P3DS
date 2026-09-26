@@ -49,6 +49,7 @@ bool opcode_kind_has_codegen_lowering(const psprecomp::DecodedInstruction &d) {
     case K::Lb: case K::Lbu: case K::Sb: case K::Lwc1: case K::Swc1:
     case K::Mfhi: case K::Mflo: case K::Mthi: case K::Mtlo:
     case K::Mult: case K::Multu: case K::Div: case K::Divu:
+    case K::Madd: case K::Maddu: case K::Msub: case K::Msubu:
     case K::Mfc1: case K::Mtc1:
     case K::AddS: case K::SubS: case K::MulS: case K::DivS: case K::SqrtS: case K::AbsS: case K::MovS: case K::NegS:
     case K::RoundWS: case K::TruncWS: case K::CeilWS: case K::FloorWS: case K::CvtWS: case K::CvtSW: case K::FpuCompare:
@@ -185,25 +186,22 @@ int main(int argc, char **argv) {
 
         // Exact measured ground-truth check for P3P ULUS-10512 .text
         if (total_instructions == 913059u) {
-            const std::uint32_t madd_count = unsupported_by_special_fn[0x1Cu];
-            const std::uint32_t break_count = unsupported_by_special_fn[0x0Du];
-            const std::uint32_t msub_count = unsupported_by_special_fn[0x2Eu];
+            const std::uint32_t break_count = unsupported_by_special_fn.contains(0x0Du)
+                ? unsupported_by_special_fn.at(0x0Du) : 0u;
 
-            const bool g_madd = (madd_count == 468u);
             const bool g_break = (break_count == 251u);
-            const bool g_msub = (msub_count == 3u);
-            const bool g_unsupp = (decoder_unsupported == 722u);
-            const bool g_rec = (decoder_recognized == 912337u);
-            const bool g_low = (codegen_lowerable == 912275u);
+            const bool g_unsupp = (decoder_unsupported == 251u);
+            const bool g_rec = (decoder_recognized == 912808u);
+            const bool g_low = (codegen_lowerable == 912746u);
             const bool g_not_low = (recognized_not_lowerable == 62u);
 
-            std::cout << "5. Ground truth madd check (468):          " << (g_madd ? "PASS" : "FAIL") << "\n";
-            std::cout << "6. Ground truth break check (251):         " << (g_break ? "PASS" : "FAIL") << "\n";
-            std::cout << "7. Ground truth msub check (3):            " << (g_msub ? "PASS" : "FAIL") << "\n";
+            std::cout << "5. Ground truth break check (251):         " << (g_break ? "PASS" : "FAIL") << "\n";
+            std::cout << "6. Ground truth decoder unsupported (251): " << (g_unsupp ? "PASS" : "FAIL") << "\n";
+            std::cout << "7. Ground truth decoder recognized (912808): " << (g_rec ? "PASS" : "FAIL") << "\n";
             std::cout << "8. Ground truth decoded-not-lowered (62):  " << (g_not_low ? "PASS" : "FAIL") << "\n";
-            std::cout << "9. Ground truth codegen lowerable (912275):" << (g_low ? "PASS" : "FAIL") << "\n";
+            std::cout << "9. Ground truth codegen lowerable (912746):" << (g_low ? "PASS" : "FAIL") << "\n";
 
-            if (!g_madd || !g_break || !g_msub || !g_unsupp || !g_rec || !g_low || !g_not_low) {
+            if (!g_break || !g_unsupp || !g_rec || !g_low || !g_not_low) {
                 std::cerr << "Assertion Failed: measured ground truth discrepancy detected!\n";
                 return 4;
             }

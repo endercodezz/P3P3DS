@@ -1,5 +1,8 @@
 #pragma once
 
+#include "p3p3ds/hle/display.hpp"
+#include "p3p3ds/hle/ge.hpp"
+#include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
 
 #include <cstdint>
@@ -50,6 +53,30 @@ public:
         return thread_manager_;
     }
 
+    [[nodiscard]] hle::SysMemManager &sysmem() noexcept {
+        return sysmem_manager_;
+    }
+
+    [[nodiscard]] const hle::SysMemManager &sysmem() const noexcept {
+        return sysmem_manager_;
+    }
+
+    [[nodiscard]] hle::DisplayManager &display() noexcept {
+        return display_manager_;
+    }
+
+    [[nodiscard]] const hle::DisplayManager &display() const noexcept {
+        return display_manager_;
+    }
+
+    [[nodiscard]] hle::GeManager &ge() noexcept {
+        return ge_manager_;
+    }
+
+    [[nodiscard]] const hle::GeManager &ge() const noexcept {
+        return ge_manager_;
+    }
+
 private:
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;
     static constexpr std::uint32_t kSystemFlagCompilerVersionSet = 0x2000u;
@@ -58,6 +85,9 @@ private:
     std::uint32_t compiler_version_{0};
     std::uint32_t system_flags_{0};
     hle::ThreadManager thread_manager_;
+    hle::SysMemManager sysmem_manager_;
+    hle::DisplayManager display_manager_;
+    hle::GeManager ge_manager_;
 };
 
 } // namespace p3p3ds

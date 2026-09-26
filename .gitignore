@@ -62,6 +62,7 @@ build.ninja
 
 # Logs and profiling traces
 *.log
+logs/
 experiments/**/build/
 experiments/**/out/
 experiments/**/logs/

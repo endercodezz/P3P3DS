@@ -241,6 +241,26 @@ std::string emit_regular(const psprecomp::DecodedInstruction &d, std::uint32_t p
                 << "else { ctx.lo = dividend / divisor; ctx.hi = dividend % divisor; } }\n";
         }
         break;
+    case psprecomp::OpcodeKind::Madd:
+        out << "    { const std::int64_t acc = static_cast<std::int64_t>((static_cast<std::uint64_t>(ctx.hi) << 32u) | static_cast<std::uint64_t>(ctx.lo)) + "
+            << "static_cast<std::int64_t>(static_cast<std::int32_t>(" << reg(d.rs) << ")) * static_cast<std::int64_t>(static_cast<std::int32_t>(" << reg(d.rt) << ")); "
+            << "ctx.lo = static_cast<std::uint32_t>(acc); ctx.hi = static_cast<std::uint32_t>(static_cast<std::uint64_t>(acc) >> 32u); }\n";
+        break;
+    case psprecomp::OpcodeKind::Maddu:
+        out << "    { const std::uint64_t acc = ((static_cast<std::uint64_t>(ctx.hi) << 32u) | static_cast<std::uint64_t>(ctx.lo)) + "
+            << "static_cast<std::uint64_t>(" << reg(d.rs) << ") * static_cast<std::uint64_t>(" << reg(d.rt) << "); "
+            << "ctx.lo = static_cast<std::uint32_t>(acc); ctx.hi = static_cast<std::uint32_t>(acc >> 32u); }\n";
+        break;
+    case psprecomp::OpcodeKind::Msub:
+        out << "    { const std::int64_t acc = static_cast<std::int64_t>((static_cast<std::uint64_t>(ctx.hi) << 32u) | static_cast<std::uint64_t>(ctx.lo)) - "
+            << "static_cast<std::int64_t>(static_cast<std::int32_t>(" << reg(d.rs) << ")) * static_cast<std::int64_t>(static_cast<std::int32_t>(" << reg(d.rt) << ")); "
+            << "ctx.lo = static_cast<std::uint32_t>(acc); ctx.hi = static_cast<std::uint32_t>(static_cast<std::uint64_t>(acc) >> 32u); }\n";
+        break;
+    case psprecomp::OpcodeKind::Msubu:
+        out << "    { const std::uint64_t acc = ((static_cast<std::uint64_t>(ctx.hi) << 32u) | static_cast<std::uint64_t>(ctx.lo)) - "
+            << "static_cast<std::uint64_t>(" << reg(d.rs) << ") * static_cast<std::uint64_t>(" << reg(d.rt) << "); "
+            << "ctx.lo = static_cast<std::uint32_t>(acc); ctx.hi = static_cast<std::uint32_t>(acc >> 32u); }\n";
+        break;
     case psprecomp::OpcodeKind::Mfc1:
         out << "    ctx.set_gpr(" << d.rt << ", std::bit_cast<std::uint32_t>(ctx.fpr[" << d.rd << "]));\n";
         break;
@@ -977,7 +997,9 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
         body << "void " << cpp_name << "_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {\n"
              << "    (void)direct_entry_id;\n"
              << "    std::uint32_t jump_target = 0u;\n"
+             << "    std::uint32_t local_pc = ctx.pc;\n"
              << "    std::uint32_t local_transfers = 0u;\n"
+             << "    std::uint32_t entry_id = 0u;\n"
              << "LOCAL_DISPATCH:\n"
              << "    switch (ctx.pc) {\n";
         for (const auto label : function.entry_labels) {

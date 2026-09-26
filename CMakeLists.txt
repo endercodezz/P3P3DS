@@ -37,6 +37,8 @@ add_library(p3p3ds_core
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
+    core/src/hle/display.cpp
+    core/src/hle/ge.cpp
 )
 
 target_include_directories(p3p3ds_core PUBLIC

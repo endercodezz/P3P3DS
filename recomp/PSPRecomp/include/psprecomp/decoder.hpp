@@ -13,7 +13,7 @@ enum class OpcodeKind {
     Lw, Lwl, Lwr, Sw, Swl, Swr, Lh, Lhu, Sh, Lb, Lbu, Sb, Lwc1, Swc1, Cache,
     Beq, Bne, Beql, Bnel, Blez, Bgtz, Blezl, Bgtzl, Bltz, Bgez, Bltzl, Bgezl, Bltzal, Bgezal, Bltzall, Bgezall, J, Jal, Jr, Jalr,
     Mfhi, Mflo, Mthi, Mtlo,
-    Mult, Multu, Div, Divu,
+    Mult, Multu, Div, Divu, Madd, Maddu, Msub, Msubu,
     Mfc1, Mtc1, Cfc1, Ctc1,
     AddS, SubS, MulS, DivS, SqrtS, AbsS, MovS, NegS,
     RoundWS, TruncWS, CeilWS, FloorWS, CvtWS, CvtSW, FpuCompare,

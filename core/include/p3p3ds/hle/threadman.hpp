@@ -94,6 +94,7 @@ public:
     [[nodiscard]] std::size_t thread_count() const noexcept { return threads_.size(); }
 
     bool switch_to(std::int32_t target_thid, psprecomp::AllegrexContext &ctx);
+    std::int32_t change_current_thread_attr(std::uint32_t clear_attr, std::uint32_t set_attr) noexcept;
 
 private:
     std::int32_t next_uid_{1};

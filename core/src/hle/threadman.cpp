@@ -64,6 +64,7 @@ std::int32_t ThreadManager::init_root_thread(std::string_view name, std::uint32_
     root.attributes = 0x80000000u;
     root.status = InternalThreadState::Running;
     root.context.pc = entry_pc;
+    root.context.set_gpr(26, root.stack_top - 256u); // $k0 = 256-byte thread context block
     root.context.set_gpr(28, gp);
     root.context.set_gpr(29, sp);
     root.context.set_gpr(30, sp);
@@ -171,6 +172,7 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
     // Initialize target thread context
     target->context = psprecomp::AllegrexContext{};
     target->context.pc = target->entry_pc;
+    target->context.set_gpr(26, target->stack_top - 256u); // $k0 = 256-byte thread context block
     target->context.set_gpr(28, caller_ctx.gpr[28]); // Inherit $gp
     target->context.set_gpr(31, kThreadReturnSentinel); // Return to trampoline
 
@@ -300,11 +302,27 @@ bool ThreadManager::switch_to(std::int32_t target_thid, psprecomp::AllegrexConte
     return true;
 }
 
+std::int32_t ThreadManager::change_current_thread_attr(std::uint32_t clear_attr, std::uint32_t set_attr) noexcept {
+    auto *current = current_thread();
+    if (current == nullptr) return SCE_KERNEL_ERROR_ILLEGAL_THID;
+    current->attributes = (current->attributes & ~clear_attr) | set_attr;
+    return 0;
+}
+
 void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kernel) {
     g_active_kernel = &kernel;
 
     // Register thread-return trampoline sentinel
     runtime.register_function(ThreadManager::kThreadReturnSentinel, &thread_return_trampoline, "thread_return_trampoline");
+
+    // ThreadManForUser::0xEA748E31 (sceKernelChangeCurrentThreadAttr)
+    runtime.register_hle("ThreadManForUser", 0xEA748E31u,
+        [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+            const std::uint32_t clear_attr = ctx.gpr[4];
+            const std::uint32_t set_attr = ctx.gpr[5];
+            const std::int32_t res = kernel.threads().change_current_thread_attr(clear_attr, set_attr);
+            ctx.set_gpr(2, static_cast<std::uint32_t>(res));
+        });
 
     // ThreadManForUser::0x446D8DE6 (sceKernelCreateThread)
     runtime.register_hle("ThreadManForUser", 0x446D8DE6u,
