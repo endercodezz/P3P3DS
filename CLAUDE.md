@@ -257,3 +257,48 @@ Any network/remote Git operation requires explicit, separate user instruction.
 Work -> Verify & Test -> Local Commit -> STOP (Do NOT push)
 ```
 
+---
+
+## 17. Git History Rule: Existing Commits Are Immutable
+
+For every completed task, create a **NEW local commit on top of the current HEAD** unless the user explicitly says not to commit.
+
+Existing commits are immutable.
+
+**Never:**
+- use `git commit --amend`;
+- squash commits;
+- use fixup commits intended for autosquash;
+- rebase existing project history;
+- reset/rewrite previous commits;
+- replace or recreate an earlier commit;
+- merge the current task into an older commit;
+- rewrite commit parents;
+- force-push;
+- change Git author/name/email.
+
+Even if the current task fixes something introduced by the immediately previous commit, it MUST still become a separate follow-up commit.
+
+**Required workflow:**
+```text
+record HEAD before
+→ make changes
+→ verify
+→ git add only relevant files
+→ git commit
+→ verify that the new commit's parent is exactly HEAD before
+→ STOP
+```
+
+**Post-Commit Verification:**
+After committing, explicitly verify:
+```bash
+git rev-parse HEAD
+git rev-parse HEAD^
+git log -2 --oneline
+```
+`HEAD^` MUST equal the recorded HEAD before the task.
+
+Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
+
+
