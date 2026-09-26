@@ -27,6 +27,7 @@ struct Function {
     std::string name;
     std::uint32_t address{};
     std::uint32_t size{};
+    bool is_cfg{false};
 };
 
 std::uint32_t parse_hex(std::string text) {
@@ -47,11 +48,20 @@ std::vector<Function> load_functions(const std::filesystem::path &path) {
         ++line_number;
         if (line.empty() || line[0] == '#' || line.starts_with("name,")) continue;
         std::stringstream stream(line);
-        std::string name, address, size;
-        if (!std::getline(stream, name, ',') || !std::getline(stream, address, ',') || !std::getline(stream, size)) {
+        std::string name, address, size_str;
+        if (!std::getline(stream, name, ',') || !std::getline(stream, address, ',') || !std::getline(stream, size_str)) {
             throw psprecomp::Error("Invalid function CSV line " + std::to_string(line_number));
         }
-        out.push_back({name, parse_hex(address), parse_hex(size)});
+        while (!size_str.empty() && std::isspace(static_cast<unsigned char>(size_str.front()))) size_str.erase(0, 1);
+        while (!size_str.empty() && std::isspace(static_cast<unsigned char>(size_str.back()))) size_str.pop_back();
+
+        bool is_cfg = (size_str == "auto" || size_str == "cfg" || size_str == "AUTO" || size_str == "CFG" || size_str == "0" || size_str == "0x0" || size_str == "0x00000000");
+        std::uint32_t size_val = 0;
+        if (!is_cfg) {
+            size_val = parse_hex(size_str);
+            if (size_val == 0) is_cfg = true;
+        }
+        out.push_back({name, parse_hex(address), size_val, is_cfg});
     }
     return out;
 }
@@ -1174,20 +1184,55 @@ int generate_manual(const std::filesystem::path &elf_path,
     std::vector<psprecomp::PspImport> imports;
     if (const auto module = elf.find_module_info(memory, load_base)) imports = elf.scan_imports(memory, *module);
 
+    const auto ranges = psprecomp::executable_ranges(elf, load_base);
+    std::map<std::uint32_t, std::string> known_seeds;
+    for (const auto &fn : functions) {
+        known_seeds.emplace(fn.address, fn.name);
+    }
+
     std::ofstream out(output_path);
     if (!out) throw psprecomp::Error("Cannot create generated source");
     out << "#include \"psprecomp/runtime.hpp\"\n#include <bit>\n#include <cmath>\n#include <cstdint>\n#include <limits>\n\nnamespace psprecomp {\n";
 
-    std::vector<GeneratedFunctionInput> generated;
+    struct MergedFunction {
+        std::string name;
+        std::uint32_t primary_address{};
+        std::set<std::uint32_t> instructions;
+        std::set<std::uint32_t> entry_labels;
+    };
+    std::vector<MergedFunction> merged_functions;
+    std::map<std::string, std::size_t> name_to_index;
+
     for (const auto &function : functions) {
-        GeneratedFunctionInput input{function.name, function.address, {}, {}};
-        const std::uint32_t end = function.address + function.size;
-        for (std::uint32_t pc = function.address; pc < end;) {
-            input.instructions.insert(pc);
-            input.entry_labels.insert(pc);
-            const auto decoded = psprecomp::decode_allegrex(memory.load32(pc));
-            pc += decoded.has_delay_slot() ? 8u : 4u;
+        std::size_t idx = 0;
+        const auto it = name_to_index.find(function.name);
+        if (it == name_to_index.end()) {
+            idx = merged_functions.size();
+            name_to_index[function.name] = idx;
+            merged_functions.push_back({function.name, function.address, {}, {}});
+        } else {
+            idx = it->second;
         }
+        auto &target = merged_functions[idx];
+
+        if (function.is_cfg) {
+            const auto fa = psprecomp::analyze_function(function.address, memory, ranges, known_seeds);
+            for (const auto pc : fa.labels) target.instructions.insert(pc);
+            for (const auto pc : fa.entry_labels) target.entry_labels.insert(pc);
+        } else {
+            const std::uint32_t end = function.address + function.size;
+            for (std::uint32_t pc = function.address; pc < end;) {
+                target.instructions.insert(pc);
+                target.entry_labels.insert(pc);
+                const auto decoded = psprecomp::decode_allegrex(memory.load32(pc));
+                pc += decoded.has_delay_slot() ? 8u : 4u;
+            }
+        }
+    }
+
+    std::vector<GeneratedFunctionInput> generated;
+    for (const auto &fn : merged_functions) {
+        GeneratedFunctionInput input{fn.name, fn.primary_address, fn.instructions, fn.entry_labels};
         out << emit_function_source(input, memory, safe_name(input.name, input.address));
         generated.push_back(std::move(input));
     }
@@ -1207,7 +1252,7 @@ int generate_manual(const std::filesystem::path &elf_path,
             << "::" << psprecomp::hex32(imports[i].nid) << "\");\n";
     }
     out << "}\n} // namespace psprecomp\n";
-    std::cout << "Generated " << functions.size() << " manual functions, " << imports.size()
+    std::cout << "Generated " << generated.size() << " manual functions, " << imports.size()
               << " import wrappers into " << output_path.string() << "\n";
     return 0;
 }

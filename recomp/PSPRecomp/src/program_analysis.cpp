@@ -10,9 +10,8 @@
 #include <unordered_map>
 
 namespace psprecomp {
-namespace {
 
-std::vector<ExecutableRange> executable_ranges_for(const Elf32Image &elf, std::uint32_t load_base) {
+std::vector<ExecutableRange> executable_ranges(const Elf32Image &elf, std::uint32_t load_base) {
     std::vector<ExecutableRange> ranges;
     for (std::size_t i = 0; i < elf.segments().size(); ++i) {
         const auto &segment = elf.segments()[i];
@@ -25,6 +24,8 @@ std::vector<ExecutableRange> executable_ranges_for(const Elf32Image &elf, std::u
     std::sort(ranges.begin(), ranges.end(), [](const auto &a, const auto &b) { return a.start < b.start; });
     return ranges;
 }
+
+namespace {
 
 std::uint32_t direct_jump_target(std::uint32_t pc, const DecodedInstruction &decoded) {
     return ((pc + 4u) & 0xF0000000u) | (decoded.target << 2u);
@@ -313,6 +314,8 @@ std::map<std::uint32_t, std::string> collect_initial_seeds(const Elf32Image &elf
     return seeds;
 }
 
+} // namespace
+
 FunctionAnalysis analyze_function(std::uint32_t entry,
                                   const GuestMemory &memory,
                                   const std::vector<ExecutableRange> &ranges,
@@ -397,8 +400,6 @@ FunctionAnalysis analyze_function(std::uint32_t entry,
     return result;
 }
 
-} // namespace
-
 bool is_executable_address(const std::vector<ExecutableRange> &ranges, std::uint32_t address) noexcept {
     const auto it = std::upper_bound(ranges.begin(), ranges.end(), address,
         [](std::uint32_t value, const ExecutableRange &range) { return value < range.start; });
@@ -412,7 +413,7 @@ ProgramAnalysis analyze_program(const Elf32Image &elf,
                                 std::uint32_t load_base,
                                 std::size_t max_instructions_per_function) {
     ProgramAnalysis program{};
-    program.executable_ranges = executable_ranges_for(elf, load_base);
+    program.executable_ranges = executable_ranges(elf, load_base);
     program.seeds = collect_initial_seeds(elf, memory, load_base, program.executable_ranges);
     program.functions.reserve(program.seeds.size());
 

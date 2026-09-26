@@ -38,6 +38,15 @@ struct ProgramAnalysis {
 [[nodiscard]] bool is_executable_address(const std::vector<ExecutableRange> &ranges,
                                          std::uint32_t address) noexcept;
 
+[[nodiscard]] std::vector<ExecutableRange> executable_ranges(const Elf32Image &elf,
+                                                             std::uint32_t load_base = kDefaultPspUserLoadBase);
+
+[[nodiscard]] FunctionAnalysis analyze_function(std::uint32_t entry,
+                                                const GuestMemory &memory,
+                                                const std::vector<ExecutableRange> &ranges,
+                                                const std::map<std::uint32_t, std::string> &known_seeds = {},
+                                                std::size_t max_instructions = 131072u);
+
 [[nodiscard]] ProgramAnalysis analyze_program(const Elf32Image &elf,
                                               const GuestMemory &memory,
                                               std::uint32_t load_base,

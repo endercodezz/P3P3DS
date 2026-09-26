@@ -11,9 +11,9 @@
 ### What is currently verified and working:
 1. The decrypted P3P executable is analyzed and loaded into a 32 MiB PSP user RAM arena.
 2. All 178,513 PRX relocations are applied without unsupported or invalid types.
-3. The game's entry point (`module_start`, `0x08804108`) has been statically recompiled into native C++ via an AOT pipeline.
-4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, advances guest control flow, and dispatches to the first PSP import stub (`SysMemUserForUser::0x35669D4C` / `sceKernelSetCompiledSdkVersion600_602`).
-5. An automated verification test strictly validates this execution milestone (entry PC, return address `$ra == 0x0880413C`, and stop reason).
+3. The game's entry point (`module_start`, `0x08804108`) has been statically recompiled into native C++ using execution-driven CFG coverage, including out-of-line basic blocks (such as `0x08804210`).
+4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, advances guest control flow, dispatches `SysMemUserForUser` services (`sceKernelSetCompiledSdkVersion600_602`, `sceKernelSetCompilerVersion`), and advances directly into thread creation (`ThreadManForUser::0x446D8DE6` / `sceKernelCreateThread`).
+5. An automated verification test strictly validates this execution milestone (entry PC, return address `$ra == 0x088041E0`, thread name `$a0 == 0x08B809C8`, thread entry `$a1 == 0x0880421C`, and stop reason).
 
 ---
 
@@ -22,9 +22,9 @@
 - [x] Analyze P3P executable structure (ELF32 PRX, segments, sections)
 - [x] Full PRX relocation and library import table extraction (178,513 relocations, 221 import stubs)
 - [x] Independent relocation-aware validation tooling matching PSPRecomp 100%
-- [x] Minimal Ahead-of-Time (AOT) MIPS-to-C++ code generation
+- [x] Minimal Ahead-of-Time (AOT) MIPS-to-C++ code generation with CFG out-of-line block traversal
 - [x] Execute recompiled P3P `module_start` on PC
-- [x] First guest execution to PSP HLE import (`SysMemUserForUser::0x35669D4C`)
+- [x] Guest execution through SysMem HLE services into ThreadMan (`ThreadManForUser::sceKernelCreateThread`)
 - [ ] Core PSP kernel and memory services (`SysMemUserForUser`, `ThreadManForUser`, `UtilsForUser`)
 - [ ] Virtual File System (VFS) with CRI CPK streaming and mod overlay support
 - [ ] Graphics display pipeline (PSP GE display list translation)

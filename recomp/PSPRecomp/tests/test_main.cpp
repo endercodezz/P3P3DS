@@ -743,6 +743,99 @@ static void test_automatic_cross_unit_tail_chaining() {
 #endif
 }
 
+static std::vector<std::uint8_t> make_out_of_line_block_test_elf() {
+    std::vector<std::uint8_t> bytes(0xC8u, 0u);
+    bytes[0] = 0x7Fu; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
+    bytes[4] = 1u; bytes[5] = 1u; bytes[6] = 1u;
+    put16(bytes, 16u, 2u);          // ET_EXEC
+    put16(bytes, 18u, 8u);          // EM_MIPS
+    put32(bytes, 20u, 1u);
+    put32(bytes, 24u, 0x08804000u);
+    put32(bytes, 28u, 52u);
+    put16(bytes, 40u, 52u);
+    put16(bytes, 42u, 32u);
+    put16(bytes, 44u, 1u);
+    put16(bytes, 46u, 40u);
+
+    put32(bytes, 52u, 1u);          // PT_LOAD
+    put32(bytes, 56u, 0x80u);
+    put32(bytes, 60u, 0x08804000u);
+    put32(bytes, 64u, 0x08804000u);
+    put32(bytes, 68u, 0x48u);
+    put32(bytes, 72u, 0x48u);
+    put32(bytes, 76u, 5u);
+    put32(bytes, 80u, 16u);
+
+    // 0x08804000:
+    // beq zero, zero, 0x08804030 (branch to out-of-line block outside old contiguous range 0x10)
+    put32(bytes, 0x80u, 0x1000000Bu); // beq zero, zero, +11 (pc+4 + 44 = 0x08804030)
+    put32(bytes, 0x84u, 0x00000000u); // nop
+    put32(bytes, 0x88u, 0x03E00008u); // jr ra (continuation/return)
+    put32(bytes, 0x8Cu, 0x00000000u); // nop
+    // 0x08804010..0x0880402C: separate data or next function
+    // 0x08804030: out-of-line block:
+    put32(bytes, 0xB0u, 0x2402002Au); // addiu v0, zero, 42
+    put32(bytes, 0xB4u, 0x0A201002u); // j 0x08804008 (jump back to return at 0x08804008)
+    put32(bytes, 0xB8u, 0x00000000u); // nop
+    return bytes;
+}
+
+static void test_manual_cfg_out_of_line_block() {
+#ifndef PSPRECOMP_CODEGEN_PATH
+    throw std::runtime_error("PSPRECOMP_CODEGEN_PATH was not provided by CMake");
+#else
+    const auto root = std::filesystem::temp_directory_path() / "psprecomp_manual_cfg_out_of_line_test";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    const auto elf_path = root / "out_of_line.elf";
+    const auto csv_path = root / "functions.csv";
+    const auto cpp_path = root / "generated.cpp";
+
+    const auto bytes = make_out_of_line_block_test_elf();
+    { std::ofstream out(elf_path, std::ios::binary); out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size())); }
+    { std::ofstream out(csv_path); out << "name,address,size\ntest_cfg_fn,0x08804000,cfg\n"; }
+
+    const std::filesystem::path codegen_path = PSPRECOMP_CODEGEN_PATH;
+    const std::string command = shell_quote(codegen_path) + " " + shell_quote(elf_path) + " " + shell_quote(csv_path) + " " + shell_quote(cpp_path);
+    require(std::system(shell_command(command).c_str()) == 0, "psp_recomp manual CFG fixture generation failed");
+
+    std::string text;
+    {
+        std::ifstream generated(cpp_path);
+        text.assign((std::istreambuf_iterator<char>(generated)), std::istreambuf_iterator<char>());
+    }
+    require(text.find("L_08804030:") != std::string::npos,
+            "Reachable out-of-line block was not generated as an internal label");
+    require(text.find("goto L_08804030;") != std::string::npos,
+            "Branch to out-of-line block was not lowered to direct native goto");
+    require(text.find("goto L_08804008;") != std::string::npos,
+            "Jump back from out-of-line block was not lowered to direct native goto");
+    require(text.find("runtime.register_function(0x08804030u, &test_cfg_fn, \"test_cfg_fn\");") != std::string::npos,
+            "Reachable out-of-line block was not registered in runtime dispatcher");
+
+    // Also verify sparse manual block range merging
+    const auto sparse_csv_path = root / "sparse_functions.csv";
+    const auto sparse_cpp_path = root / "sparse_generated.cpp";
+    {
+        std::ofstream out(sparse_csv_path);
+        out << "name,address,size\ntest_sparse_fn,0x08804000,0x00000010\ntest_sparse_fn,0x08804030,0x0000000C\n";
+    }
+    const std::string sparse_command = shell_quote(codegen_path) + " " + shell_quote(elf_path) + " " + shell_quote(sparse_csv_path) + " " + shell_quote(sparse_cpp_path);
+    require(std::system(shell_command(sparse_command).c_str()) == 0, "psp_recomp sparse range fixture generation failed");
+
+    std::string sparse_text;
+    {
+        std::ifstream generated(sparse_cpp_path);
+        sparse_text.assign((std::istreambuf_iterator<char>(generated)), std::istreambuf_iterator<char>());
+    }
+    require(sparse_text.find("L_08804030:") != std::string::npos,
+            "Sparse range block was not generated as an internal label");
+    require(sparse_text.find("runtime.register_function(0x08804030u, &test_sparse_fn, \"test_sparse_fn\");") != std::string::npos,
+            "Sparse range block was not registered in runtime dispatcher");
+    std::filesystem::remove_all(root);
+#endif
+}
+
 static std::vector<std::uint8_t> make_relocation_test_prx() {
     std::vector<std::uint8_t> bytes(0x1B8u, 0u);
     bytes[0] = 0x7Fu; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
@@ -1642,6 +1735,7 @@ int main() {
         test_automatic_cfg_and_codegen();
         test_automatic_cross_unit_tail_chaining();
         test_materialized_function_pointer_discovery();
+        test_manual_cfg_out_of_line_block();
 
         auto relocation_elf = psprecomp::Elf32Image::from_bytes(make_relocation_test_prx(), "synthetic_relocation.prx");
         psprecomp::GuestMemory relocation_memory;
