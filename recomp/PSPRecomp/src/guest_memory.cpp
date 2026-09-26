@@ -182,7 +182,7 @@ std::uint32_t GuestMemory::aot_load_word_right(std::uint32_t address, std::uint3
 void GuestMemory::aot_store8_slow(std::uint32_t address, std::uint8_t value) {
     if (write_watch_enabled_) { store8(address, value); return; }
     const std::uint32_t c = canonical(address);
-    if (is_vram_window(c)) { vram_[vram_offset(c)] = value; return; }
+    if (is_vram_window(c)) { store8(address, value); return; }
     if (c >= kPhysicalBase && c - kPhysicalBase < bytes_.size()) {
         bytes_[static_cast<std::size_t>(c - kPhysicalBase)] = value;
         return;
@@ -194,7 +194,7 @@ void GuestMemory::aot_store16_slow(std::uint32_t address, std::uint16_t value) {
     const std::uint32_t c = canonical(address);
     std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
-    if (is_vram_window(c)) { data = &vram_; offset = vram_offset(c); }
+    if (is_vram_window(c)) { store16(address, value); return; }
     else if (c >= kPhysicalBase) { data = &bytes_; offset = static_cast<std::size_t>(c - kPhysicalBase); }
     if (data != nullptr && offset + 2u <= data->size()) {
         (*data)[offset] = static_cast<std::uint8_t>(value & 0xFFu);
@@ -208,7 +208,7 @@ void GuestMemory::aot_store32_slow(std::uint32_t address, std::uint32_t value) {
     const std::uint32_t c = canonical(address);
     std::vector<std::uint8_t> *data = nullptr;
     std::size_t offset = 0u;
-    if (is_vram_window(c)) { data = &vram_; offset = vram_offset(c); }
+    if (is_vram_window(c)) { store32(address, value); return; }
     else if (c >= kPhysicalBase) { data = &bytes_; offset = static_cast<std::size_t>(c - kPhysicalBase); }
     if (data != nullptr && offset + 4u <= data->size()) {
         (*data)[offset] = static_cast<std::uint8_t>(value & 0xFFu);
@@ -329,15 +329,38 @@ std::uint32_t GuestMemory::load_word_right(std::uint32_t address, std::uint32_t 
     const std::uint32_t memory_word = load32(address & ~3u);
     return (existing & (0xFFFFFF00u << (24u - shift))) | (memory_word >> shift);
 }
+// P3P3DS: accounting is confined to VRAM slow paths; RAM AOT fast paths unchanged.
+void GuestMemory::account_vram_write(std::uint32_t address, std::span<const std::uint8_t> bytes) {
+    if (bytes.empty() || !is_vram_window(canonical(address))) return;
+    auto &w = vram_writes_;
+    if (w.operations++ == 0) {
+        w.first_pc = runtime_dispatch_pc();
+        w.first_address = kVramPhysicalBase + static_cast<std::uint32_t>(vram_offset(canonical(address)));
+        std::cout << "[VRAM FIRST STORE] pc=0x" << std::hex << w.first_pc
+                  << " address=0x" << w.first_address << std::dec << " bytes=" << bytes.size() << "\n";
+    }
+    w.bytes += bytes.size();
+    if (vram_write_kind_ == VramWriteKind::Color) ++w.color;
+    if (vram_write_kind_ == VramWriteKind::Depth) ++w.depth;
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        const auto offset = vram_offset(canonical(address + static_cast<std::uint32_t>(i)));
+        const auto a = kVramPhysicalBase + static_cast<std::uint32_t>(offset);
+        w.minimum = std::min(w.minimum, a); w.maximum = std::max(w.maximum, a);
+        w.changed += vram_[offset] != bytes[i];
+    }
+}
 void GuestMemory::store8(std::uint32_t address, std::uint8_t value) {
     const auto r = resolve(address, 1u);
     auto &data = region_bytes(r.region);
     const std::uint8_t old = data[r.offset];
     log_write_watch(address, 1u, "store8", old, value);
+    account_vram_write(address, std::span<const std::uint8_t>(&value, 1));
     data[r.offset] = value;
 }
 void GuestMemory::store16(std::uint32_t address, std::uint16_t value) {
     const std::uint16_t old = load16(address);
+    const std::uint8_t bytes[] = {static_cast<std::uint8_t>(value >> 0u), static_cast<std::uint8_t>(value >> 8u)};
+    account_vram_write(address, bytes);
     log_write_watch(address, 2u, "store16", old, value);
     const auto write_byte = [this](std::uint32_t byte_address, std::uint8_t byte) {
         const auto r = resolve(byte_address, 1u);
@@ -348,6 +371,8 @@ void GuestMemory::store16(std::uint32_t address, std::uint16_t value) {
 }
 void GuestMemory::store32(std::uint32_t address, std::uint32_t value) {
     const std::uint32_t old = load32(address);
+    const std::uint8_t bytes[] = {static_cast<std::uint8_t>(value >> 0u), static_cast<std::uint8_t>(value >> 8u), static_cast<std::uint8_t>(value >> 16u), static_cast<std::uint8_t>(value >> 24u)};
+    account_vram_write(address, bytes);
     log_write_watch(address, 4u, "store32", old, value);
     const auto write_byte = [this](std::uint32_t byte_address, std::uint8_t byte) {
         const auto r = resolve(byte_address, 1u);
@@ -376,6 +401,7 @@ void GuestMemory::memory_barrier() const noexcept {
 void GuestMemory::copy_in(std::uint32_t address, std::span<const std::uint8_t> source) {
     if (!contains(address, source.size()))
         throw Error("Guest memory access outside PSP RAM/EDRAM at " + hex32(address));
+    account_vram_write(address, source);
     log_write_watch(address, source.size(), "copy_in", 0u, 0u);
     std::size_t copied = 0u;
     while (copied < source.size()) {
@@ -405,6 +431,10 @@ void GuestMemory::copy_out(std::uint32_t address, std::span<std::uint8_t> destin
 void GuestMemory::zero(std::uint32_t address, std::size_t length) {
     if (!contains(address, length))
         throw Error("Guest memory access outside PSP RAM/EDRAM at " + hex32(address));
+    if (is_vram_window(canonical(address))) {
+        const std::vector<std::uint8_t> zeros(length, 0);
+        account_vram_write(address, zeros);
+    }
     log_write_watch(address, length, "zero", 0u, 0u);
     std::size_t cleared = 0u;
     while (cleared < length) {

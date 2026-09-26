@@ -22,6 +22,15 @@ namespace psprecomp {
 
 class GuestMemory {
 public:
+    // P3P3DS diagnostic hook: count stores, including writes of unchanged zero bytes.
+    struct VramWrites {
+        std::uint64_t operations{}, bytes{}, changed{}, color{}, depth{};
+        std::uint32_t minimum{0xFFFFFFFFu}, maximum{}, first_pc{}, first_address{};
+    };
+    enum class VramWriteKind { Cpu, Color, Depth };
+    [[nodiscard]] const VramWrites &vram_writes() const noexcept { return vram_writes_; }
+    void set_vram_write_kind(VramWriteKind kind) noexcept { vram_write_kind_ = kind; }
+    void reset_vram_writes() noexcept { vram_writes_ = {}; }
     static constexpr std::uint32_t kVramPhysicalBase = 0x04000000u;
     static constexpr std::uint32_t kVramSize = 2u * 1024u * 1024u;
     static constexpr std::uint32_t kVramMirrorCount = 4u;
@@ -246,6 +255,9 @@ public:
     [[nodiscard]] const std::vector<std::uint8_t> &vram_bytes() const noexcept;
 
 private:
+    VramWrites vram_writes_;
+    VramWriteKind vram_write_kind_{VramWriteKind::Cpu};
+    void account_vram_write(std::uint32_t address, std::span<const std::uint8_t> bytes);
     enum class Region { Vram, Ram };
     struct ResolvedAddress {
         Region region;

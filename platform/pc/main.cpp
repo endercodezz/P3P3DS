@@ -26,9 +26,10 @@ void register_generated_functions(Runtime &runtime);
 namespace {
 
 constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc  = 0x08B19890u;
-constexpr std::uint32_t kExpectedReturnRa = 0x08B19BE0u;
-constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08B19890";
+constexpr std::uint32_t kExpectedStopPc = 0x00000000u;
+constexpr std::uint32_t kExpectedStopCallerPc = 0x0880433Cu;
+constexpr std::uint32_t kExpectedStopInstruction = 0x0C000000u; // jal 0
+constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x00000000";
 constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
 constexpr std::uint32_t kExpectedCompilerVersion = 0x00030306u;
 constexpr std::int32_t kExpectedThreadUid = 2;
@@ -58,7 +59,7 @@ struct MilestoneVerificationResult {
     bool stopped{false};
     bool entry_matched{false};
     bool pc_matched{false};
-    bool ra_matched{false};
+    bool stop_instruction_matched{false};
     bool thread_uid_matched{false};
     bool thread_name_matched{false};
     bool sdk_version_matched{false};
@@ -76,7 +77,9 @@ MilestoneVerificationResult verify_milestone(
     res.stopped = runtime.stopped();
     res.entry_matched = (entry_addr == kExpectedEntryPc);
     res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
-    res.ra_matched = (runtime.cpu().gpr[31] == kExpectedReturnRa);
+    res.stop_instruction_matched =
+        runtime.memory().contains(kExpectedStopCallerPc, sizeof(std::uint32_t)) &&
+        runtime.memory().load32(kExpectedStopCallerPc) == kExpectedStopInstruction;
     res.thread_uid_matched = (kernel.threads().current_thread_id() == kExpectedThreadUid);
     res.thread_name_matched = (kernel.threads().current_thread() != nullptr &&
                                kernel.threads().current_thread()->name == kExpectedThreadName);
@@ -100,9 +103,8 @@ MilestoneVerificationResult verify_milestone(
     } else if (!res.pc_matched) {
         res.failure_detail = "Stop PC mismatch: expected " + psprecomp::hex32(kExpectedStopPc) +
                              ", got " + psprecomp::hex32(runtime.cpu().pc);
-    } else if (!res.ra_matched) {
-        res.failure_detail = "Return address ($ra) mismatch: expected " + psprecomp::hex32(kExpectedReturnRa) +
-                             ", got " + psprecomp::hex32(runtime.cpu().gpr[31]);
+    } else if (!res.stop_instruction_matched) {
+        res.failure_detail = "Expected literal jal 0 at " + psprecomp::hex32(kExpectedStopCallerPc);
     } else if (!res.thread_uid_matched) {
         res.failure_detail = "Current thread UID mismatch: expected " + std::to_string(kExpectedThreadUid) +
                              ", got " + std::to_string(kernel.threads().current_thread_id());
@@ -232,7 +234,9 @@ void inspect_and_dump_framebuffers(const psprecomp::GuestMemory &memory, const p
             return;
         }
         for (std::size_t i = 0; i < count; ++i) {
-            const std::uint32_t w = memory.load32(c + static_cast<std::uint32_t>(i) * 4);
+            const auto pc = c + static_cast<std::uint32_t>(i) * 4;
+            if (!memory.contains(pc, 4u)) break;
+            const std::uint32_t w = memory.load32(pc);
             const std::uint32_t op = (w >> 24) & 0xFFu;
             const std::uint32_t arg = w & 0x00FFFFFFu;
             std::cout << "  [" << std::right << std::setw(2) << std::setfill('0') << i << "] 0x"
@@ -256,8 +260,8 @@ void inspect_and_dump_framebuffers(const psprecomp::GuestMemory &memory, const p
             case 0x12: std::cout << " (VERTEXTYPE: 0x" << std::hex << arg << std::dec << ")"; break;
             case 0x13: std::cout << " (OFFSETADDR: 0x" << std::hex << arg << std::dec << ")"; break;
             case 0x14: std::cout << " (ORIGIN)"; break;
-            case 0x15: std::cout << " (DRAWBOUNDINGBOX)"; break;
-            case 0x16: std::cout << " (VSCX)"; break;
+            case 0x15: std::cout << " (REGION1)"; break;
+            case 0x16: std::cout << " (REGION2)"; break;
             case 0x9C: std::cout << " (FRAMEBUFPTR: 0x" << std::hex << arg << std::dec << ")"; break;
             case 0x9D: std::cout << " (FRAMEBUFWIDTH: " << arg << ")"; break;
             case 0xD2: std::cout << " (FRAMEBUFPIXFORMAT: " << arg << ")"; break;
@@ -273,9 +277,16 @@ void inspect_and_dump_framebuffers(const psprecomp::GuestMemory &memory, const p
         }
     };
 
-    dump_ge_list(0x08BB40D4u, 32, "Initial GE Static List (0x08BB40D4)");
-    dump_ge_list(0x48D14600u, 32, "Dynamic GE Display List (0x48D14600 / 0x08D14600)");
-    dump_ge_list(0x48D14630u, 32, "Dynamic GE Display List Offset (0x48D14630 / 0x08D14630)");
+    for (const auto &[id, list] : kernel.ge().lists()) {
+        // Only inspect the prefix actually consumed, never the unbuilt live tail.
+        dump_ge_list(list.list_address, static_cast<std::size_t>(list.commands), "Consumed GE prefix");
+    }
+    kernel.ge().report();
+    const auto &writes = memory.vram_writes();
+    std::cout << "[VRAM WRITES] operations=" << writes.operations << " bytes=" << writes.bytes
+              << " changed=" << writes.changed << " color=" << writes.color << " depth=" << writes.depth
+              << " min=" << psprecomp::hex32(writes.operations ? writes.minimum : 0)
+              << " max=" << psprecomp::hex32(writes.maximum) << " nonzero=" << vram_non_zero << "\n";
 
     std::cout << "====================================================\n\n";
 }
@@ -403,6 +414,12 @@ int main(int argc, char **argv) {
         std::cout << "Kernel SDK Ver:   " << psprecomp::hex32(kernel_state.compiled_sdk_version()) << "\n";
 
         print_registers(runtime.cpu());
+        if (runtime.memory().contains(runtime.cpu().gpr[29], 32u)) {
+            std::cout << "  Stack words:";
+            for (std::uint32_t offset=0;offset<32;offset+=4)
+                std::cout << " " << psprecomp::hex32(runtime.memory().load32(runtime.cpu().gpr[29]+offset));
+            std::cout << "\n";
+        }
 
         // 12b. Inspect Guest VRAM and dump real framebuffers if present
         inspect_and_dump_framebuffers(runtime.memory(), kernel_state);
@@ -410,7 +427,7 @@ int main(int argc, char **argv) {
         // 13. Milestone Verification
         const auto v = verify_milestone(entry_addr, runtime, kernel_state);
         std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> user_main -> GE/Display init -> sub_08B19890\n";
+        std::cout << "Target:           module_start -> GE/Display init -> literal jal 0 at 0x0880433C\n";
         std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
                   << (v.entry_matched ? "OK" : "FAILED") << "\n";
         std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
@@ -419,8 +436,8 @@ int main(int argc, char **argv) {
                   << (v.compiler_version_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "): "
                   << (v.pc_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Return RA (0x" << std::hex << kExpectedReturnRa << "):"
-                  << (v.ra_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Blocker opcode:    "
+                  << (v.stop_instruction_matched ? "OK (jal 0 at 0x0880433C)" : "FAILED") << "\n";
         std::cout << "Thread UID (" << std::dec << kExpectedThreadUid << "):      "
                   << (v.thread_uid_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Thread Name (" << kExpectedThreadName << "): "

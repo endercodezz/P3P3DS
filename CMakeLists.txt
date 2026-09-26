@@ -150,7 +150,7 @@ set_tests_properties(p3p_hle_threadman PROPERTIES
 
 add_test(
     NAME p3p_pc_bootstrap_smoke
-    COMMAND p3p_pc_bootstrap --verify-milestone
+    COMMAND p3p_pc_bootstrap --verify-milestone --max-dispatches 100000
 )
 set_tests_properties(p3p_pc_bootstrap_smoke PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -182,3 +182,10 @@ if(Python3_FOUND)
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 endif()
+
+# Focused dispatch, resumable setup execution and zero-valued VRAM write accounting.
+add_executable(test_hle_graphics tests/test_hle_graphics.cpp)
+target_link_libraries(test_hle_graphics PRIVATE p3p3ds_core)
+add_test(NAME p3p_hle_graphics COMMAND test_hle_graphics)
+
+set_tests_properties(p3p_hle_graphics PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

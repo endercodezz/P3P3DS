@@ -67,6 +67,17 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
 
 ---
 
+### Stop #8
+- **PC:** `0x00000000`
+- **Type:** DIRECT GUEST CALL / UNRESOLVED ZERO TARGET
+- **Cause:** `[VERIFIED]` After recompiling the genuine function boundaries at `0x08B19890` and `0x08A9B3F4`, execution returns through the game main/cleanup path and reaches the literal instruction `jal 0` (`0x0C000000`) at `0x0880433C`. The generated link address for this call is `0x08804344`. The final diagnostic context prints `$ra = 0` because the missing-target unwind occurs before nested generated-entry hot registers are materialized; it is not evidence that address zero is a valid thread-return trampoline.
+- **Fixes before this stop:** Corrected display NID dispatch and ABI handling; remapped `Kernel_Library::0x1839852A` to `sceKernelMemcpy` and `0xDC692EE3` to `sceKernelTryLockLwMutex`; implemented live GE list IDs, saved PCs, stall/update/resume, polling/completion, setup-register execution, FINISH/END handling, callback dispatch, and explicit VRAM write accounting. Added the verified guest boundaries `0x08B63B50`, `0x08B19890`, and `0x08A9B3F4`.
+- **GE milestone:** `[VERIFIED] STATE COMMAND OBSERVED` — the 212-command static list and 29-command dynamic list both execute through FINISH/END exactly once. Final GE state is color `0x04000000`, stride 512, format 8888; depth `0x04110000`, stride 512; display scanout `0x04088000`.
+- **Writer status:** `[VERIFIED] DRAW COMMAND OBSERVED: NO`; `[VERIFIED] VRAM WRITE EXECUTED: NO`; `[VERIFIED] VISIBLE COLOR OUTPUT: NO`. Explicit accounting reports 0 store operations, 0 bytes touched, 0 color writes, and 0 depth writes.
+- **New Stop:** literal zero call at `0x0880433C`; determine why this relocated executable path contains `jal 0` before adding any target or trampoline.
+
+---
+
 ## Visual Probe Findings & VRAM State
 
 ### Display & Framebuffer Status
@@ -81,7 +92,7 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
 - **Display List Generation Proven:** `YES` — P3P submitted 2 GE display lists:
   1. Static setup list at `0x08BB40D4` (clearing/initializing GE state registers).
   2. Dynamic display list at `0x48D14600` (uncached alias of `0x08D14600`), completed up to `0x48D14674` (29 commands ending with `GE_CMD_FINISH` and `GE_CMD_END`), configuring render target buffer to `0x04000000`, Z-buffer to `0x04110000`, viewport, scissor, and depth range.
-- **Actual Rendering to Framebuffer Proven:** `NO` — VRAM contains only zero bytes. The submitted display list has not been rasterized/drawn into EDRAM, and the game has not yet issued texture blit or 2D polygon primitive draw commands to populate pixel data.
+- **Actual Rendering to Framebuffer Proven:** `NO` — the submitted setup lists now execute, but contain no memory-producing command. VRAM write accounting remains zero; zero-valued writes would be counted if any occurred.
 - **First Frame Claim:** **NO FAKE CLAIM.** Framebuffer registration is verified, but actual rendered pixels do not exist yet.
 
 ---
@@ -105,7 +116,7 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
 - `DIRTY_FIRST_FRAME` markers in `core/src/hle/hle_modules.cpp`:
   - `ModuleMgrForUser::0xD8B73127` (`sceKernelGetModuleIdByAddress`): returns UID 1.
   - `Kernel_Library::0x092968F4` (`sceKernelCpuSuspendIntr`): returns 1.
-  - `Kernel_Library::0xBEA46419` / `0x15B6446B` / `0x1839852A` (`sceKernel*LockLwMutex`): single-threaded locks.
+  - `Kernel_Library::0xBEA46419` / `0x15B6446B` / `0xDC692EE3` (`sceKernel*LwMutex`): single-threaded lock approximations.
   - `ThreadManForUser::0x55C20A00` / `0x402FCF22`: event flag UID and synchronous poll/wait.
   - `ThreadManForUser::0xE81CAF8F`: callback UID 1.
   - `LoadExecForUser::0x4AC57943`: exit callback registered.
@@ -113,6 +124,11 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
   - `sceUtility::0x2A2B3DE0`: utility net module load stub.
 - Removal Trigger: Implement complete multithreaded event flag wait lists, real kernel callback dispatcher, and modular LW-mutex synchronization once deeper gameplay threads execute.
 
+Additional checkpoint debt:
+- GE execution is synchronous and implements only the setup opcodes observed in the two current lists. SIGNAL and control-flow corner cases stop explicitly.
+- GE callbacks run synchronously on a private temporary guest interrupt stack (`0x09FFE000`-`0x09FFF000`) whose previous bytes are restored afterward.
+- Display vblank waits advance deterministic counters; host-time scanout timing is not modeled.
+- The direct `jal 0` blocker is unresolved. Address zero must not be registered as a success trampoline without proving the intended relocated target.
 
 
 

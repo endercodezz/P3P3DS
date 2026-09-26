@@ -21,6 +21,7 @@ mkdir -p logs
 TIMESTAMP="$(date +'%Y%m%d_%H%M%S')"
 TIMESTAMPED_LOG="logs/p3p_bootstrap_${TIMESTAMP}.log"
 LATEST_LOG="logs/p3p_bootstrap_latest.log"
+MAX_DISPATCHES="${P3P3DS_MAX_DISPATCHES:-1000}"
 
 echo "===================================================="
 echo "   P3P3DS Execution Trace Harness"
@@ -43,7 +44,7 @@ set +e
 
     echo ""
     echo "=== [2/2] Running P3P PC Bootstrap ==="
-    ./build/p3p_pc_bootstrap.exe --verbose
+    ./build/p3p_pc_bootstrap.exe --verbose --max-dispatches "${MAX_DISPATCHES}"
     BOOTSTRAP_STATUS=$?
     echo ""
     echo "Bootstrap finished with exit code ${BOOTSTRAP_STATUS}"

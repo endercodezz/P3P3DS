@@ -37,20 +37,41 @@ public:
     }
 
     int set_framebuf(std::uint32_t topaddr, int bufferwidth, int pixelformat, int sync) noexcept {
-        info_.topaddr = topaddr;
-        info_.bufferwidth = bufferwidth;
-        info_.pixelformat = pixelformat;
-        info_.sync = sync;
-        info_.active = (topaddr != 0);
+        DisplayFramebufInfo requested = info_;
+        requested.topaddr = topaddr;
+        requested.bufferwidth = bufferwidth;
+        requested.pixelformat = pixelformat;
+        requested.sync = sync;
+        requested.active = (topaddr != 0);
+        if (sync == 0) {
+            info_ = requested;
+            pending_valid_ = false;
+        } else {
+            pending_ = requested;
+            pending_valid_ = true;
+        }
         return 0;
     }
 
-    [[nodiscard]] const DisplayFramebufInfo &info() const noexcept { return info_; }
+    [[nodiscard]] const DisplayFramebufInfo &info() const noexcept { return pending_valid_ ? pending_ : info_; }
     [[nodiscard]] bool has_framebuf() const noexcept { return info_.active; }
-    [[nodiscard]] std::uint64_t vcount() noexcept { return ++info_.vcount; }
+    [[nodiscard]] std::uint64_t vcount() const noexcept { return info_.vcount; }
+    [[nodiscard]] const DisplayFramebufInfo &framebuf(unsigned sync) const noexcept {
+        return sync && pending_valid_ ? pending_ : info_;
+    }
+    void advance_vblank() noexcept {
+        const auto next_vcount = info_.vcount + 1;
+        if (pending_valid_) {
+            info_ = pending_;
+            pending_valid_ = false;
+        }
+        info_.vcount = next_vcount;
+    }
 
 private:
     DisplayFramebufInfo info_;
+    DisplayFramebufInfo pending_;
+    bool pending_valid_{};
 };
 
 void register_display_module(psprecomp::Runtime &runtime, KernelState &kernel);

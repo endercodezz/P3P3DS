@@ -135,6 +135,10 @@ std::int32_t ThreadManager::create_thread(std::string_view name,
     tcb.context.set_gpr(31, kThreadReturnSentinel);
 
     threads_[uid] = std::move(tcb);
+    std::cout << "[THREAD CREATE] uid=" << uid << " name=" << name
+              << " entry=0x" << std::hex << entry_pc << std::dec
+              << " priority=" << init_priority << " stack=0x" << std::hex << stack_base
+              << "-0x" << stack_top << std::dec << "\n";
     return uid;
 }
 
@@ -193,6 +197,8 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
     // Transition target to Ready
     target->status = InternalThreadState::Ready;
     ready_queue_.push_back(thid);
+    std::cout << "[THREAD START] uid=" << thid << " name=" << target->name
+              << " args=" << arg_size << "\n";
 
     auto *current = current_thread();
     // In PSP, smaller priority number = higher priority.
@@ -251,6 +257,8 @@ bool ThreadManager::schedule(psprecomp::AllegrexContext &ctx) {
 bool ThreadManager::exit_current_thread(std::int32_t exit_status, psprecomp::AllegrexContext &ctx, psprecomp::Runtime &runtime) {
     auto *cur = current_thread();
     if (cur != nullptr) {
+        std::cout << "[THREAD EXIT] uid=" << cur->uid << " name=" << cur->name
+                  << " status=" << exit_status << " ready=" << ready_queue_.size() << "\n";
         cur->status = InternalThreadState::Stopped;
         cur->exit_status = exit_status;
     }

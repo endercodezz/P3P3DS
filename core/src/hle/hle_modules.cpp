@@ -67,8 +67,21 @@ void register_all_hle_modules(psprecomp::Runtime &runtime, KernelState &kernel) 
             ctx.set_gpr(2, 0u);
         });
 
-    // Kernel_Library::0x1839852A - sceKernelTryLockLwMutex
+    // Kernel_Library::sceKernelMemcpy (PSPSDK/uOFW NID, not TryLock).
     runtime.register_hle("Kernel_Library", 0x1839852Au,
+        [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            const auto dst = ctx.gpr[4], src = ctx.gpr[5], size = ctx.gpr[6];
+            if (size && (!rt.memory().contains(dst, size) || !rt.memory().contains(src, size))) {
+                rt.stop("sceKernelMemcpy invalid guest range"); return;
+            }
+            // Forward guest copy; do not use host pointers that bypass VRAM accounting.
+            for (std::uint32_t i = 0; i < size; ++i)
+                rt.memory().store8(dst + i, rt.memory().load8(src + i));
+            ctx.set_gpr(2, dst);
+        });
+
+    // Kernel_Library::0xDC692EE3 - sceKernelTryLockLwMutex
+    runtime.register_hle("Kernel_Library", 0xDC692EE3u,
         [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
             // DIRTY_FIRST_FRAME: single-threaded bootstrap try-lock success
             ctx.set_gpr(2, 0u);
