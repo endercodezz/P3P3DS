@@ -206,24 +206,25 @@ Initial A0 / A1:  0x00000000 / 0x00000000
 Registered Entries: 319 (functions, block labels, and import wrappers)
 
 === Execution Result ===
-Stop Reason:      Missing HLE import SysMemUserForUser::sceKernelSetCompilerVersion
+Stop Reason:      No recompiled function registered at 0x08804210
 Stopped:          yes
-Final Guest PC:   0x08B7FC04
+Final Guest PC:   0x08804210
 Kernel SDK Ver:   0x06020010
 
 === Guest Register State ===
-  PC: 0x08B7FC04
-  zero = 0x00000000  at   = 0x00000000  v0   = 0x00030000  v1   = 0x00000000  
-  a0   = 0x00030306  a1   = 0x00000000  a2   = 0x00000000  a3   = 0x00000000  
+  PC: 0x08804210
+  zero = 0x00000000  at   = 0x00000000  v0   = 0x00000000  v1   = 0x00000000  
+  a0   = 0x00000000  a1   = 0x00000000  a2   = 0x00000000  a3   = 0x00000000  
   gp   = 0x08C42A50  sp   = 0x09FFFEE0  fp   = 0x00000000  ra   = 0x08804148  
 
 === Milestone Verification ===
-Target:           module_start -> SysMemUserForUser::0xF77D77CB
+Target:           module_start -> sub_08804210
 Entry (0x8804108):   OK
 SDK Ver (0x6020010): OK
-Final PC (0x8b7fc04): OK
+Compiler Ver (0x30306): OK
+Final PC (0x8804210): OK
 Return RA (0x8804148):OK
-HLE Stop Reason:  OK
+Stop Reason:      OK
 Result:           [VERIFIED] Milestone passed
 
 Execution milestone reached and verified successfully.

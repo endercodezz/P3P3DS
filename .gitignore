@@ -26,12 +26,7 @@ private/
 **/BOOT.BIN
 **/DATA.BIN
 **/UMD_DATA.BIN
-game/
 roms/
-dumps/
-decrypted/
-extracted/
-unpacked/
 **/game/
 **/dumps/
 **/decrypted/
@@ -43,7 +38,6 @@ generated/
 profiles/*/generated/
 profiles/*/analysis/
 profiles/*/progress/
-experiments/**/test_generated.cpp
 **/test_generated.cpp
 experiments/p3p-analysis/p3p_report_functions_auto.csv
 experiments/p3p-analysis/p3p_report_function_seeds.csv

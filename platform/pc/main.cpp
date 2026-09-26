@@ -21,11 +21,11 @@ void register_generated_functions(Runtime &runtime);
 namespace {
 
 constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc  = 0x08B7FC04u;
+constexpr std::uint32_t kExpectedStopPc  = 0x08804210u;
 constexpr std::uint32_t kExpectedReturnRa = 0x08804148u;
-constexpr std::string_view kExpectedImportLibrary = "SysMemUserForUser";
-constexpr std::uint32_t kExpectedImportNid = 0xF77D77CBu;
+constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08804210";
 constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
+constexpr std::uint32_t kExpectedCompilerVersion = 0x00030306u;
 
 void print_registers(const psprecomp::AllegrexContext &ctx) {
     static const char *const kGprNames[32] = {
@@ -52,6 +52,7 @@ struct MilestoneVerificationResult {
     bool pc_matched{false};
     bool ra_matched{false};
     bool sdk_version_matched{false};
+    bool compiler_version_matched{false};
     bool stop_reason_matched{false};
     std::string failure_detail;
 };
@@ -67,13 +68,10 @@ MilestoneVerificationResult verify_milestone(
     res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
     res.ra_matched = (runtime.cpu().gpr[31] == kExpectedReturnRa);
     res.sdk_version_matched = (kernel.compiled_sdk_version() == kExpectedSdkVersion);
+    res.compiler_version_matched = (kernel.compiler_version() == kExpectedCompilerVersion);
 
     const std::string &reason = runtime.stop_reason();
-    const bool lib_matched = (reason.find(kExpectedImportLibrary) != std::string::npos);
-    const bool nid_matched = (reason.find("0xF77D77CB") != std::string::npos) ||
-                             (reason.find("f77d77cb") != std::string::npos) ||
-                             (reason.find("sceKernelSetCompilerVersion") != std::string::npos);
-    res.stop_reason_matched = lib_matched && nid_matched && (reason.find("Missing HLE import") != std::string::npos);
+    res.stop_reason_matched = (reason.find(kExpectedStopReason) != std::string::npos);
 
     if (!res.stopped) {
         res.failure_detail = "Runtime did not stop (dispatch budget exhausted without hitting HLE/stop)";
@@ -83,6 +81,9 @@ MilestoneVerificationResult verify_milestone(
     } else if (!res.sdk_version_matched) {
         res.failure_detail = "Kernel SDK version mismatch: expected " + psprecomp::hex32(kExpectedSdkVersion) +
                              ", got " + psprecomp::hex32(kernel.compiled_sdk_version());
+    } else if (!res.compiler_version_matched) {
+        res.failure_detail = "Kernel compiler version mismatch: expected " + psprecomp::hex32(kExpectedCompilerVersion) +
+                             ", got " + psprecomp::hex32(kernel.compiler_version());
     } else if (!res.pc_matched) {
         res.failure_detail = "Stop PC mismatch: expected " + psprecomp::hex32(kExpectedStopPc) +
                              ", got " + psprecomp::hex32(runtime.cpu().pc);
@@ -90,9 +91,8 @@ MilestoneVerificationResult verify_milestone(
         res.failure_detail = "Return address ($ra) mismatch: expected " + psprecomp::hex32(kExpectedReturnRa) +
                              ", got " + psprecomp::hex32(runtime.cpu().gpr[31]);
     } else if (!res.stop_reason_matched) {
-        res.failure_detail = "Stop reason mismatch: expected Missing HLE for " +
-                             std::string(kExpectedImportLibrary) + "::" + psprecomp::hex32(kExpectedImportNid) +
-                             ", got: \"" + reason + "\"";
+        res.failure_detail = "Stop reason mismatch: expected \"" + std::string(kExpectedStopReason) +
+                             "\", got: \"" + reason + "\"";
     } else {
         res.passed = true;
     }
@@ -223,16 +223,18 @@ int main(int argc, char **argv) {
         // 12. Milestone Verification
         const auto v = verify_milestone(entry_addr, runtime, kernel_state);
         std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> SysMemUserForUser::0xF77D77CB\n";
+        std::cout << "Target:           module_start -> sub_08804210\n";
         std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
                   << (v.entry_matched ? "OK" : "FAILED") << "\n";
         std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
                   << (v.sdk_version_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Compiler Ver (0x" << std::hex << kExpectedCompilerVersion << "): "
+                  << (v.compiler_version_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "): "
                   << (v.pc_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Return RA (0x" << std::hex << kExpectedReturnRa << "):"
                   << (v.ra_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "HLE Stop Reason:  " << (v.stop_reason_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Stop Reason:      " << (v.stop_reason_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Result:           " << (v.passed ? "[VERIFIED] Milestone passed" : "[FAILED] " + v.failure_detail) << "\n";
 
         if (v.passed) {
