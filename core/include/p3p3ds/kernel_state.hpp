@@ -1,5 +1,7 @@
 #pragma once
 
+#include "p3p3ds/hle/threadman.hpp"
+
 #include <cstdint>
 
 namespace p3p3ds {
@@ -40,6 +42,14 @@ public:
         return system_flags_;
     }
 
+    [[nodiscard]] hle::ThreadManager &threads() noexcept {
+        return thread_manager_;
+    }
+
+    [[nodiscard]] const hle::ThreadManager &threads() const noexcept {
+        return thread_manager_;
+    }
+
 private:
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;
     static constexpr std::uint32_t kSystemFlagCompilerVersionSet = 0x2000u;
@@ -47,6 +57,7 @@ private:
     std::uint32_t compiled_sdk_version_{0};
     std::uint32_t compiler_version_{0};
     std::uint32_t system_flags_{0};
+    hle::ThreadManager thread_manager_;
 };
 
 } // namespace p3p3ds

@@ -36,6 +36,7 @@ add_custom_command(
 add_library(p3p3ds_core
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
+    core/src/hle/threadman.cpp
 )
 
 target_include_directories(p3p3ds_core PUBLIC
@@ -107,6 +108,25 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_hle_sysmem PRIVATE -Wall -Wextra)
 endif()
 
+# Focused ThreadMan HLE Unit Test
+add_executable(test_hle_threadman
+    tests/test_hle_threadman.cpp
+)
+
+target_include_directories(test_hle_threadman PRIVATE
+    core/include
+    recomp/PSPRecomp/include
+)
+
+target_link_libraries(test_hle_threadman PRIVATE
+    p3p3ds_core
+    psprecomp_core
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_hle_threadman PRIVATE -Wall -Wextra)
+endif()
+
 # CTest integration
 enable_testing()
 
@@ -115,6 +135,14 @@ add_test(
     COMMAND test_hle_sysmem
 )
 set_tests_properties(p3p_hle_sysmem PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_test(
+    NAME p3p_hle_threadman
+    COMMAND test_hle_threadman
+)
+set_tests_properties(p3p_hle_threadman PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 

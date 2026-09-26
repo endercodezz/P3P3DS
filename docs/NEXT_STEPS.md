@@ -66,8 +66,8 @@ Phase 4: Nintendo 3DS Backend Integration
     - Implemented `SysMemUserForUser::0x35669D4C` (`sceKernelSetCompiledSdkVersion600_602`) `[COMPLETED]`.
     - Implemented `SysMemUserForUser::0xF77D77CB` (`sceKernelSetCompilerVersion`) `[COMPLETED]`.
     - Reconstructed CFG of `module_start` to cover out-of-line basic blocks (`0x08804210`), enabling full function CFG coverage `[COMPLETED]`.
-    - Guest execution advanced through `module_start` directly into `ThreadManForUser::0x446D8DE6` (`sceKernelCreateThread`) with $ra=`0x088041E0` `[COMPLETED]`.
-    - Next step: Implement initial ThreadMan runtime support (`sceKernelCreateThread`, `sceKernelStartThread`).
+    - Implemented `ThreadManForUser::0x446D8DE6` (`sceKernelCreateThread`) and `ThreadManForUser::0xF475845D` (`sceKernelStartThread`) `[COMPLETED]`.
+    - Initialized guest thread context and stack for `user_main` (`0x0880421C`), performed cooperative context switch, and executed guest instructions to next blocker at `0x08B4E6A0` (`sub_08B4E6A0`) with $ra=`0x08804268` `[COMPLETED]`.
 
 11. **Step 11: Implement Virtual File System (VFS) with Modding Support**
     - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).

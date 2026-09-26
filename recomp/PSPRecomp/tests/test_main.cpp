@@ -836,6 +836,85 @@ static void test_manual_cfg_out_of_line_block() {
 #endif
 }
 
+static std::vector<std::uint8_t> make_tail_call_boundary_test_elf() {
+    std::vector<std::uint8_t> bytes(0xB0u, 0u);
+    bytes[0] = 0x7Fu; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
+    bytes[4] = 1u; bytes[5] = 1u; bytes[6] = 1u;
+    put16(bytes, 16u, 2u);          // ET_EXEC
+    put16(bytes, 18u, 8u);          // EM_MIPS
+    put32(bytes, 20u, 1u);
+    put32(bytes, 24u, 0x08804000u);
+    put32(bytes, 28u, 52u);
+    put16(bytes, 40u, 52u);
+    put16(bytes, 42u, 32u);
+    put16(bytes, 44u, 1u);
+    put16(bytes, 46u, 40u);
+
+    put32(bytes, 52u, 1u);          // PT_LOAD
+    put32(bytes, 56u, 0x80u);
+    put32(bytes, 60u, 0x08804000u);
+    put32(bytes, 64u, 0x08804000u);
+    put32(bytes, 68u, 0x30u);
+    put32(bytes, 72u, 0x30u);
+    put32(bytes, 76u, 5u);
+    put32(bytes, 80u, 16u);
+
+    // 0x08804000: function A
+    put32(bytes, 0x80u, 0x24040001u); // addiu a0, zero, 1
+    put32(bytes, 0x84u, 0x0A201004u); // j 0x08804010 (target function B)
+    put32(bytes, 0x88u, 0x00000000u); // nop
+    put32(bytes, 0x8Cu, 0x00000000u); // nop
+    // 0x08804010: function B
+    put32(bytes, 0x90u, 0x24820002u); // addiu v0, a0, 2
+    put32(bytes, 0x94u, 0x03E00008u); // jr ra
+    put32(bytes, 0x98u, 0x00000000u); // nop
+    return bytes;
+}
+
+static void test_manual_cfg_tail_call_boundary() {
+#ifndef PSPRECOMP_CODEGEN_PATH
+    throw std::runtime_error("PSPRECOMP_CODEGEN_PATH was not provided by CMake");
+#else
+    const auto root = std::filesystem::temp_directory_path() / "psprecomp_tail_call_boundary_test";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    const auto elf_path = root / "tail_call.elf";
+    const auto csv_path = root / "functions.csv";
+    const auto cpp_path = root / "generated.cpp";
+
+    const auto bytes = make_tail_call_boundary_test_elf();
+    { std::ofstream out(elf_path, std::ios::binary); out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size())); }
+    { std::ofstream out(csv_path); out << "name,address,size\nfn_caller_a,0x08804000,cfg\nfn_target_b,0x08804010,cfg\n"; }
+
+    const std::filesystem::path codegen_path = PSPRECOMP_CODEGEN_PATH;
+    const std::string command = shell_quote(codegen_path) + " " + shell_quote(elf_path) + " " + shell_quote(csv_path) + " " + shell_quote(cpp_path);
+    require(std::system(shell_command(command).c_str()) == 0, "psp_recomp tail call boundary fixture generation failed");
+
+    std::string text;
+    {
+        std::ifstream generated(cpp_path);
+        text.assign((std::istreambuf_iterator<char>(generated)), std::istreambuf_iterator<char>());
+    }
+
+    const auto fn_a_pos = text.find("void fn_caller_a_entry(");
+    const auto fn_b_pos = text.find("void fn_target_b_entry(");
+    require(fn_a_pos != std::string::npos, "Function A was not emitted");
+    require(fn_b_pos != std::string::npos, "Function B was not emitted");
+
+    const std::string fn_a_body = text.substr(fn_a_pos, fn_b_pos - fn_a_pos);
+    require(fn_a_body.find("L_08804010:") == std::string::npos,
+            "Function A absorbed Function B's entry as an internal basic block label");
+    require(fn_a_body.find("ctx.pc = 0x08804010u;") != std::string::npos,
+            "Function A did not lower tail call to external dispatch/chain");
+
+    const std::string fn_b_body = text.substr(fn_b_pos);
+    require(fn_b_body.find("L_08804010:") != std::string::npos,
+            "Function B did not emit its own entry label");
+
+    std::filesystem::remove_all(root);
+#endif
+}
+
 static std::vector<std::uint8_t> make_relocation_test_prx() {
     std::vector<std::uint8_t> bytes(0x1B8u, 0u);
     bytes[0] = 0x7Fu; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
@@ -1736,6 +1815,7 @@ int main() {
         test_automatic_cross_unit_tail_chaining();
         test_materialized_function_pointer_discovery();
         test_manual_cfg_out_of_line_block();
+        test_manual_cfg_tail_call_boundary();
 
         auto relocation_elf = psprecomp::Elf32Image::from_bytes(make_relocation_test_prx(), "synthetic_relocation.prx");
         psprecomp::GuestMemory relocation_memory;

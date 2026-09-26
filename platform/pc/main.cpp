@@ -21,14 +21,13 @@ void register_generated_functions(Runtime &runtime);
 namespace {
 
 constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc  = 0x08B7FCB4u;
-constexpr std::uint32_t kExpectedReturnRa = 0x088041E0u;
-constexpr std::string_view kExpectedStopReason = "Missing HLE import ThreadManForUser::sceKernelCreateThread";
+constexpr std::uint32_t kExpectedStopPc  = 0x08B4E6A0u;
+constexpr std::uint32_t kExpectedReturnRa = 0x08804268u;
+constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08B4E6A0";
 constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
 constexpr std::uint32_t kExpectedCompilerVersion = 0x00030306u;
-constexpr std::uint32_t kExpectedThreadEntryA1 = 0x0880421Cu;
-constexpr std::uint32_t kExpectedThreadNameA0  = 0x08B809C8u;
-constexpr std::uint32_t kExpectedThreadPriorityA2 = 0x00000020u;
+constexpr std::int32_t kExpectedThreadUid = 2;
+constexpr std::string_view kExpectedThreadName = "user_main";
 
 void print_registers(const psprecomp::AllegrexContext &ctx) {
     static const char *const kGprNames[32] = {
@@ -54,8 +53,8 @@ struct MilestoneVerificationResult {
     bool entry_matched{false};
     bool pc_matched{false};
     bool ra_matched{false};
-    bool a0_matched{false};
-    bool a1_matched{false};
+    bool thread_uid_matched{false};
+    bool thread_name_matched{false};
     bool sdk_version_matched{false};
     bool compiler_version_matched{false};
     bool stop_reason_matched{false};
@@ -72,8 +71,9 @@ MilestoneVerificationResult verify_milestone(
     res.entry_matched = (entry_addr == kExpectedEntryPc);
     res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
     res.ra_matched = (runtime.cpu().gpr[31] == kExpectedReturnRa);
-    res.a0_matched = (runtime.cpu().gpr[4] == kExpectedThreadNameA0);
-    res.a1_matched = (runtime.cpu().gpr[5] == kExpectedThreadEntryA1);
+    res.thread_uid_matched = (kernel.threads().current_thread_id() == kExpectedThreadUid);
+    res.thread_name_matched = (kernel.threads().current_thread() != nullptr &&
+                               kernel.threads().current_thread()->name == kExpectedThreadName);
     res.sdk_version_matched = (kernel.compiled_sdk_version() == kExpectedSdkVersion);
     res.compiler_version_matched = (kernel.compiler_version() == kExpectedCompilerVersion);
 
@@ -97,12 +97,12 @@ MilestoneVerificationResult verify_milestone(
     } else if (!res.ra_matched) {
         res.failure_detail = "Return address ($ra) mismatch: expected " + psprecomp::hex32(kExpectedReturnRa) +
                              ", got " + psprecomp::hex32(runtime.cpu().gpr[31]);
-    } else if (!res.a0_matched) {
-        res.failure_detail = "Thread name pointer ($a0) mismatch: expected " + psprecomp::hex32(kExpectedThreadNameA0) +
-                             ", got " + psprecomp::hex32(runtime.cpu().gpr[4]);
-    } else if (!res.a1_matched) {
-        res.failure_detail = "Thread entry function ($a1) mismatch: expected " + psprecomp::hex32(kExpectedThreadEntryA1) +
-                             ", got " + psprecomp::hex32(runtime.cpu().gpr[5]);
+    } else if (!res.thread_uid_matched) {
+        res.failure_detail = "Current thread UID mismatch: expected " + std::to_string(kExpectedThreadUid) +
+                             ", got " + std::to_string(kernel.threads().current_thread_id());
+    } else if (!res.thread_name_matched) {
+        res.failure_detail = "Current thread name mismatch: expected " + std::string(kExpectedThreadName) +
+                             ", got " + (kernel.threads().current_thread() ? kernel.threads().current_thread()->name : "null");
     } else if (!res.stop_reason_matched) {
         res.failure_detail = "Stop reason mismatch: expected \"" + std::string(kExpectedStopReason) +
                              "\", got: \"" + reason + "\"";
@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
 
         // 10. Register target-agnostic HLE service modules
         p3p3ds::KernelState kernel_state;
+        kernel_state.threads().init_root_thread("root", entry_addr, initial_sp, module->gp);
         p3p3ds::hle::register_all_hle_modules(runtime, kernel_state);
 
         if (verbose) {
@@ -236,7 +237,7 @@ int main(int argc, char **argv) {
         // 12. Milestone Verification
         const auto v = verify_milestone(entry_addr, runtime, kernel_state);
         std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> ThreadManForUser::sceKernelCreateThread\n";
+        std::cout << "Target:           module_start -> user_main -> sub_08B4E6A0\n";
         std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
                   << (v.entry_matched ? "OK" : "FAILED") << "\n";
         std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
@@ -247,10 +248,10 @@ int main(int argc, char **argv) {
                   << (v.pc_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Return RA (0x" << std::hex << kExpectedReturnRa << "):"
                   << (v.ra_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Thread A0 (0x" << std::hex << kExpectedThreadNameA0 << "):"
-                  << (v.a0_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Entry A1 (0x" << std::hex << kExpectedThreadEntryA1 << "): "
-                  << (v.a1_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Thread UID (" << std::dec << kExpectedThreadUid << "):      "
+                  << (v.thread_uid_matched ? "OK" : "FAILED") << "\n";
+        std::cout << "Thread Name (" << kExpectedThreadName << "): "
+                  << (v.thread_name_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Stop Reason:      " << (v.stop_reason_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Result:           " << (v.passed ? "[VERIFIED] Milestone passed" : "[FAILED] " + v.failure_detail) << "\n";
 

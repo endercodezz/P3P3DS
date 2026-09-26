@@ -11,9 +11,9 @@
 ### What is currently verified and working:
 1. The decrypted P3P executable is analyzed and loaded into a 32 MiB PSP user RAM arena.
 2. All 178,513 PRX relocations are applied without unsupported or invalid types.
-3. The game's entry point (`module_start`, `0x08804108`) has been statically recompiled into native C++ using execution-driven CFG coverage, including out-of-line basic blocks (such as `0x08804210`).
-4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, advances guest control flow, dispatches `SysMemUserForUser` services (`sceKernelSetCompiledSdkVersion600_602`, `sceKernelSetCompilerVersion`), and advances directly into thread creation (`ThreadManForUser::0x446D8DE6` / `sceKernelCreateThread`).
-5. An automated verification test strictly validates this execution milestone (entry PC, return address `$ra == 0x088041E0`, thread name `$a0 == 0x08B809C8`, thread entry `$a1 == 0x0880421C`, and stop reason).
+3. The game's entry point (`module_start`, `0x08804108`) and primary thread entry (`user_main`, `0x0880421C`) have been statically recompiled into native C++ using execution-driven CFG coverage.
+4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, dispatches `SysMemUserForUser` services (`sceKernelSetCompiledSdkVersion600_602`, `sceKernelSetCompilerVersion`), creates and starts the primary guest thread via `ThreadManForUser` (`sceKernelCreateThread`, `sceKernelStartThread`), performs a cooperative context switch, and executes guest instructions inside `user_main` (`0x0880421C`) to the first internal function call at `0x08B4E6A0`.
+5. An automated verification test strictly validates this execution milestone (entry PC `0x08804108`, stop PC `0x08B4E6A0`, return address `$ra == 0x08804268`, active thread `user_main` [UID 2], SDK version `0x06020010`, compiler version `0x00030306`, and stop reason).
 
 ---
 
@@ -24,7 +24,8 @@
 - [x] Independent relocation-aware validation tooling matching PSPRecomp 100%
 - [x] Minimal Ahead-of-Time (AOT) MIPS-to-C++ code generation with CFG out-of-line block traversal
 - [x] Execute recompiled P3P `module_start` on PC
-- [x] Guest execution through SysMem HLE services into ThreadMan (`ThreadManForUser::sceKernelCreateThread`)
+- [x] Guest execution through SysMem HLE services into ThreadMan (`ThreadManForUser::sceKernelCreateThread` / `sceKernelStartThread`)
+- [x] Context switch and execution of `user_main` (`0x0880421C`) to next internal callsite
 - [ ] Core PSP kernel and memory services (`SysMemUserForUser`, `ThreadManForUser`, `UtilsForUser`)
 - [ ] Virtual File System (VFS) with CRI CPK streaming and mod overlay support
 - [ ] Graphics display pipeline (PSP GE display list translation)
@@ -203,27 +204,34 @@ Stack Arena:      0x09FF0000 - 0x0A000000
 Initial SP:       0x09FFFF00
 Initial RA:       0x00000000
 Initial A0 / A1:  0x00000000 / 0x00000000
-Registered Entries: 319 (functions, block labels, and import wrappers)
+Registered Entries: 314 (functions, block labels, and import wrappers)
 
 === Execution Result ===
-Stop Reason:      No recompiled function registered at 0x08804210
+Stop Reason:      No recompiled function registered at 0x08B4E6A0
 Stopped:          yes
-Final Guest PC:   0x08804210
+Final Guest PC:   0x08B4E6A0
 Kernel SDK Ver:   0x06020010
 
 === Guest Register State ===
-  PC: 0x08804210
+  PC: 0x08B4E6A0
   zero = 0x00000000  at   = 0x00000000  v0   = 0x00000000  v1   = 0x00000000  
   a0   = 0x00000000  a1   = 0x00000000  a2   = 0x00000000  a3   = 0x00000000  
-  gp   = 0x08C42A50  sp   = 0x09FFFEE0  fp   = 0x00000000  ra   = 0x08804148  
+  t0   = 0x00000000  t1   = 0x00000000  t2   = 0x00000000  t3   = 0x00000000  
+  t4   = 0x00000000  t5   = 0x00000000  t6   = 0x00000000  t7   = 0x00000000  
+  s0   = 0x00000000  s1   = 0x00000000  s2   = 0x00000000  s3   = 0x00000000  
+  s4   = 0x00000000  s5   = 0x09FEFB20  s6   = 0x00000000  s7   = 0x00000000  
+  t8   = 0x00000000  t9   = 0x00000000  k0   = 0x00000000  k1   = 0x00000000  
+  gp   = 0x08C42A50  sp   = 0x09FEFAC0  fp   = 0x09FEFEC0  ra   = 0x08804268  
 
 === Milestone Verification ===
-Target:           module_start -> sub_08804210
+Target:           module_start -> user_main -> sub_08B4E6A0
 Entry (0x8804108):   OK
 SDK Ver (0x6020010): OK
 Compiler Ver (0x30306): OK
-Final PC (0x8804210): OK
-Return RA (0x8804148):OK
+Final PC (0x8b4e6a0): OK
+Return RA (0x8804268):OK
+Thread UID (2):      OK
+Thread Name (user_main): OK
 Stop Reason:      OK
 Result:           [VERIFIED] Milestone passed
 
