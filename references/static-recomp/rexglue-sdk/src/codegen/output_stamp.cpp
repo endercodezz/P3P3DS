@@ -1,0 +1,147 @@
+/**
+ * @file        codegen/output_stamp.cpp
+ * @brief       Input fingerprinting so unchanged modules skip codegen entirely
+ *
+ * @copyright   Copyright (c) 2026 Tom Clay <tomc@tctechstuff.com>
+ *              All rights reserved.
+ *
+ * @license     BSD 3-Clause License
+ *              See LICENSE file in the project root for full license text.
+ */
+
+#include <rex/codegen/output_stamp.h>
+
+#include <fstream>
+
+#include <fmt/format.h>
+#include <nlohmann/json.hpp>
+
+#include <rex/hash.h>
+
+#include "codegen_logging.h"
+#include "file_io.h"
+
+namespace rex::codegen {
+
+/// Bump when the stamp layout changes.
+constexpr int kStampVersion = 1;
+
+std::optional<OutputStamp> OutputStamp::Load(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+    return std::nullopt;
+
+  nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+  if (doc.is_discarded() || !doc.is_object()) {
+    REXCODEGEN_WARN("Ignoring malformed codegen stamp: {}", path.string());
+    return std::nullopt;
+  }
+
+  auto version = doc.find("version");
+  if (version == doc.end() || !version->is_number_integer() || version->get<int>() != kStampVersion)
+    return std::nullopt;
+
+  OutputStamp stamp;
+  if (auto it = doc.find("fingerprint"); it != doc.end() && it->is_string())
+    stamp.fingerprint = it->get<std::string>();
+  if (stamp.fingerprint.empty())
+    return std::nullopt;
+
+  if (auto it = doc.find("outputs"); it != doc.end() && it->is_array()) {
+    for (const auto& entry : *it) {
+      if (entry.is_string())
+        stamp.outputs.push_back(entry.get<std::string>());
+    }
+  }
+  return stamp;
+}
+
+std::string OutputStamp::Serialize() const {
+  nlohmann::json doc;
+  doc["version"] = kStampVersion;
+  doc["fingerprint"] = fingerprint;
+  doc["outputs"] = outputs;
+  return doc.dump(2) + "\n";
+}
+
+std::string ComputeInputFingerprint(std::span<const std::filesystem::path> inputFiles,
+                                    std::string_view sdkVersion,
+                                    std::span<const std::string> flagValues) {
+  std::string accumulator;
+  accumulator += "sdk=";
+  accumulator += sdkVersion;
+  accumulator += '\n';
+
+  for (const auto& flag : flagValues) {
+    accumulator += "flag=";
+    accumulator += flag;
+    accumulator += '\n';
+  }
+
+  for (const auto& path : inputFiles) {
+    // Content, not mtime: survives a checkout, a copy, or a bare touch.
+    std::error_code ec;
+    std::string digest = "<missing>";
+    if (std::filesystem::exists(path, ec)) {
+      digest = rex::hash_file(path);
+      if (digest.empty()) {
+        // Weaker than content, but a constant here would report a locked input
+        // as unchanged and skip the module forever.
+        REXCODEGEN_WARN("Could not read {} for fingerprinting", path.string());
+        digest = fmt::format("<unreadable:{}:{}>", std::filesystem::file_size(path, ec),
+                             std::filesystem::last_write_time(path, ec).time_since_epoch().count());
+      }
+    }
+    accumulator += fmt::format("file={} {}\n", path.filename().string(), digest);
+  }
+
+  return rex::hash_bytes(accumulator);
+}
+
+namespace {
+
+std::string EscapeDepfilePath(const std::filesystem::path& path) {
+  std::string source = std::filesystem::absolute(path).generic_string();
+  std::string escaped;
+  escaped.reserve(source.size() + 8);
+  for (char c : source) {
+    if (c == ' ' || c == '#')
+      escaped += '\\';
+    if (c == '$')
+      escaped += '$';
+    escaped += c;
+  }
+  return escaped;
+}
+
+}  // namespace
+
+bool WriteDepfile(const std::filesystem::path& path, const std::filesystem::path& target,
+                  std::span<const std::filesystem::path> inputs) {
+  std::string out = EscapeDepfilePath(target);
+  out += ':';
+  for (const auto& input : inputs) {
+    out += " \\\n  ";
+    out += EscapeDepfilePath(input);
+  }
+  out += '\n';
+
+  return WriteFileBytes(path, out);
+}
+
+bool OutputsAreUpToDate(const OutputStamp& stamp, std::string_view fingerprint,
+                        const std::filesystem::path& outputDir) {
+  if (stamp.fingerprint != fingerprint)
+    return false;
+  if (stamp.outputs.empty())
+    return false;
+
+  for (const auto& name : stamp.outputs) {
+    std::error_code ec;
+    if (!std::filesystem::exists(outputDir / name, ec))
+      return false;
+  }
+  return true;
+}
+
+}  // namespace rex::codegen

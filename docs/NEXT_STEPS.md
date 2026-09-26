@@ -62,7 +62,9 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ### Phase 3: Incremental HLE & Boot Milestone
 
-10. **Step 10: Implement Initial Kernel & Memory Stubs**
+> *Architectural Reference:* See `docs/STATIC_RECOMP_ARCHITECTURE_AUDIT.md` for a comprehensive audit of modern static recompilers (XenonRecomp, ReXGlue, Xenia, N64Recomp) and the roadmap to the First Visible Frame.
+
+10. **Step 10: Implement Initial Kernel & Memory Stubs** `[COMPLETED]`
     - Implemented `SysMemUserForUser::0x35669D4C` (`sceKernelSetCompiledSdkVersion600_602`) `[COMPLETED]`.
     - Implemented `SysMemUserForUser::0xF77D77CB` (`sceKernelSetCompilerVersion`) `[COMPLETED]`.
     - Reconstructed CFG of `module_start` to cover out-of-line basic blocks (`0x08804210`), enabling full function CFG coverage `[COMPLETED]`.

@@ -1,6 +1,6 @@
 # P3P3DS — Upstream Vendored Repositories & Provenance Registry
 
-This registry records the exact provenance, upstream source URLs, imported commit revisions, branches, licenses, and architectural purposes of all 25 vendored research and reference repositories included in the **P3P3DS** repository tree.
+This registry records the exact provenance, upstream source URLs, imported commit revisions, branches, licenses, and architectural purposes of all 32 vendored research and reference repositories included in the **P3P3DS** repository tree.
 
 All original `LICENSE`, `COPYING`, `NOTICE`, and copyright headers inside each vendored directory are preserved unchanged.
 
@@ -26,8 +26,15 @@ All original `LICENSE`, `COPYING`, `NOTICE`, and copyright headers inside each v
 | `recomp/psprecomp-sp00nz` | `https://github.com/sp00nznet/psprecomp` | `caca7595251410ae7887aa209ba56397a835d0e1` | `main` | MIT | Clean-room static recompilation toolkit and verification oracle design |
 | `recomp/Yakumo` | `https://github.com/TeamGDB/Yakumo` | `87bc4d9f5ad61829652ffb07bc8e477d39f706d5` | `main` | MIT | Production static recompilation port of Monster Hunter Portable 3rd HD |
 | `references/DaedalusX64-3DS` | `https://github.com/MasterFeizz/DaedalusX64-3DS` | `31c5e560d4cbd11d6e5b50e5e42c25b9598a68a9` | `master` | GPL-2.0 | Reference for MIPS dynarec on ARM11, citro3d PICA200 renderer, and NDSP audio |
+| `references/persona-3-dual` | `https://github.com/p3d-project/persona-3-dual` | `0c6dccac10e946f7850cfb10ef6a551d2a849c6d` | `main` | CC-BY-NC-SA-4.0 | Nintendo dual-screen Persona UI/presentation, handheld rendering and resource-management reference |
 | `references/ppsspp` | `https://github.com/hrydgard/ppsspp` | `a50fb6071f4b5ee71f3cd04b65d1cf4cbba22518` | `master` | GPL-2.0+ | Gold-standard PSP emulator: ground truth oracle for HLE, GE, VFPU, audio |
 | `references/pspautotests` | `https://github.com/hrydgard/pspautotests` | `6f03ee6457804144add92bfc47563cf60c443e4f` | `master` | BSD-3-Clause | Comprehensive test suite for PSP CPU, VFPU, GE, and kernel timing |
+| `references/static-recomp/N64ModernRuntime` | `https://github.com/N64Recomp/N64ModernRuntime` | `cdf5abbd5026fef5c364c676e4667c45e42b6863` | `main` | GPL-3.0-or-later | Dynamic overlays, modular C patch injection system, and function address mapping reference |
+| `references/static-recomp/rexglue-sdk` | `https://github.com/rexglue/rexglue-sdk` | `c94f5ebdcb3c9d1a460ca48e04f9758448f8d518` | `main` | BSD-3-Clause | Xbox 360 AOT runtime SDK, function dispatchers, guest memory layout, and kernel HLE reference |
+| `references/static-recomp/UnleashedRecomp` | `https://github.com/hedge-dev/UnleashedRecomp` | `cf829a9eca8fb680fba4b0409ddeb6ca92f22e3c` | `main` | GPL-3.0-or-later | Production XenonRecomp runtime, game memory mapping, and graphics pipeline integration reference |
+| `references/static-recomp/xenia` | `https://github.com/xenia-project/xenia` | `95a5c3ee250f80c3b9d139658649d9ffb6db3eec` | `master` | BSD-3-Clause | Kernel HLE, memory subsystems, and GPU translation architecture reference for Xbox recompilation ecosystem |
+| `references/static-recomp/XenonRecomp` | `https://github.com/hedge-dev/XenonRecomp` | `ddd128bcca99fe8bfbb99bea583c972351fa6ace` | `main` | MIT | Xbox 360 PPC-to-C++ static recompilation architecture, CFG recovery, and jump-table analysis reference |
+| `references/static-recomp/Zelda64Recomp` | `https://github.com/Zelda64Recomp/Zelda64Recomp` | `b65c482ed672258eb684ab94a4e8c8aa662615ee` | `dev` | GPL-3.0-or-later | Production N64 recompiled game runtime, RT64 graphics translation bridge, and mod patch system |
 | `references/uofw` | `https://github.com/uofw/uofw` | `5e192e75a83d043d5a65db21128d62758e5741f5` | `master` | GPL-3.0 | Reverse-engineered Sony PSP firmware modules in C (ThreadMan, SysMem, Io) |
 | `tools/AemulusModManager` | `https://github.com/TekkaGB/AemulusModManager` | `fe5ec67cfa45b6f0de10c2121652c2eaa332b0ac` | `master` | GPL-3.0 | Package manager for Persona 3/4/5 mod merging and priority virtualization |
 | `tools/Amicitia` | `https://github.com/tge-was-taken/Amicitia` | `6b6312af992d27cc8b45122480d5bb1b23aa4202` | `master` | MIT | GUI asset editor for Atlus container and model formats (PAC, BIN, GIM, SPR) |

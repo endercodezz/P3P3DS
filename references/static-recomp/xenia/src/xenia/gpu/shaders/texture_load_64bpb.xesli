@@ -1,0 +1,42 @@
+/**
+ ******************************************************************************
+ * Xenia : Xbox 360 Emulator Research Project                                 *
+ ******************************************************************************
+ * Copyright 2022 Ben Vanik. All rights reserved.                             *
+ * Released under the BSD license - see LICENSE in the root for more details. *
+ ******************************************************************************
+ */
+
+#include "texture_load.xesli"
+
+XE_TEXTURE_LOAD_ENTRY(16)
+{
+  // 1 thread = 4 blocks passed through an externally provided
+  // uint4 transformation function (XE_TEXTURE_LOAD_64BPB_TRANSFORM).
+  XeTextureLoadInfo load_info = XeTextureLoadGetInfo(pass_push_consts_xe);
+  uint3_xe block_index = in_global_thread_id_xe << uint3_xe(2u, 0u, 0u);
+  dont_flatten_xe
+  if (any(greater_than_equal_xe(block_index.xy, load_info.size_blocks.xy))) {
+    return;
+  }
+  uint block_offset_host =
+      load_info.host_offset +
+      uint(XeTextureHostLinearOffset(int3_xe(block_index), load_info.host_pitch,
+                                     load_info.size_blocks.y, 8u));
+  uint block_offset_guest =
+      XeTextureLoadSourceAddress(load_info, block_index, 3u);
+  uint4_xe guest_blocks = XeEndianSwap32(
+      byte_buffer_align16_load16_xe(xe_texture_load_source, block_offset_guest),
+      load_info.endian_32);
+  byte_buffer_align16_store16_xe(xe_texture_load_dest, block_offset_host,
+                                 XE_TEXTURE_LOAD_64BPB_TRANSFORM(guest_blocks));
+  block_offset_host += 16u;
+  block_offset_guest +=
+      XeTextureLoadLocalXAddressXor(2u, 3u, load_info.is_tiled);
+  guest_blocks = XeEndianSwap32(
+      byte_buffer_align16_load16_xe(xe_texture_load_source, block_offset_guest),
+      load_info.endian_32);
+  byte_buffer_align16_store16_xe(xe_texture_load_dest, block_offset_host,
+                                 XE_TEXTURE_LOAD_64BPB_TRANSFORM(guest_blocks));
+}
+entry_code_end_compute_xe

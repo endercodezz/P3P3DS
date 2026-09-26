@@ -33,6 +33,13 @@ This document contains a structured inventory of all repositories currently inte
 | [tge-was-taken/AtlusFileSystemLibrary](https://github.com/tge-was-taken/AtlusFileSystemLibrary) | `tools/AtlusFileSystemLibrary` | `ASSET TOOLS`, `P3P-SPECIFIC`, `FILESYSTEM` | **HIGH** | MIT | Low-level C# library providing programmatic read/write access to Atlus archive formats (CRI CPK, PAC/BIN, SPR, TMX/GIM). Ideal foundation for automated asset pipelines. | `AtlusFileSystemLibrary/` | Cloned & Evaluated |
 | [Sewer56/CriFsV2Lib](https://github.com/Sewer56/CriFsV2Lib) | `tools/CriFsV2Lib` | `FILESYSTEM`, `ASSET TOOLS`, `MODDING` | **HIGH** | MIT | Ultra-fast modern library for parsing CriWare CPK archives and handling CRI file table virtualization with in-memory decompression. | `CriFsV2Lib/` | Cloned & Evaluated |
 | [esperknight/CriPakTools](https://github.com/esperknight/CriPakTools) | `tools/CriPakTools` | `ASSET TOOLS`, `FILESYSTEM` | **MEDIUM** | Public Domain / Open | Command-line tool for unpacking and packing CriWare CPK archives with CRILAYLA compression algorithms. | `CriPakTools/` | Cloned & Evaluated |
+| [hedge-dev/XenonRecomp](https://github.com/hedge-dev/XenonRecomp) | `references/static-recomp/XenonRecomp` | `STATIC RECOMPILER`, `REFERENCE`, `CPU / POWERPC`, `CFG / CODEGEN` | **HIGH** | MIT | State-of-the-art Xbox 360 PPC-to-C++ static recompilation architecture, recursive CFG analysis, and jump table lowering reference. | `XenonRecomp/`, `XenonRecomp.Analysis/` | Vendored & Analyzed |
+| [rexglue/rexglue-sdk](https://github.com/rexglue/rexglue-sdk) | `references/static-recomp/rexglue-sdk` | `RUNTIME SDK`, `REFERENCE`, `KERNEL HLE`, `MEMORY / DISPATCHER` | **HIGH** | BSD-3-Clause | Clean-room modular runtime SDK for recompiled titles, featuring clean interface injection (`RuntimeConfig`), guest memory arena, and function thunking. | `include/rexglue/`, `src/` | Vendored & Analyzed |
+| [xenia-project/xenia](https://github.com/xenia-project/xenia) | `references/static-recomp/xenia` | `EMULATOR`, `REFERENCE`, `KERNEL HLE`, `MEMORY / GPU` | **MEDIUM** | BSD-3-Clause | Research emulator providing mature reference implementations for kernel object managers, graphics translation state machines, and guest memory models. | `src/xenia/kernel/`, `src/xenia/gpu/`, `src/xenia/memory/` | Vendored & Analyzed |
+| [N64Recomp/N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime) | `references/static-recomp/N64ModernRuntime` | `RUNTIME SDK`, `REFERENCE`, `DYNAMIC OVERLAYS`, `PATCH SYSTEM` | **MEDIUM** | GPL-3.0-or-later | Reference for dynamic overlay handling, binary function re-mapping, and modular C-based patch injection in static recompilations. | `src/` | Vendored & Evaluated |
+| [Zelda64Recomp/Zelda64Recomp](https://github.com/Zelda64Recomp/Zelda64Recomp) | `references/static-recomp/Zelda64Recomp` | `STATIC RECOMPILER`, `REFERENCE`, `RUNTIME`, `GRAPHICS BRIDGE` | **HIGH** | GPL-3.0-or-later | Production recompiled game implementation, demonstrating RT64 graphics bridge, C patches, and asset loading. | `src/`, `patches/` | Vendored & Evaluated |
+| [hedge-dev/UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) | `references/static-recomp/UnleashedRecomp` | `STATIC RECOMPILER`, `REFERENCE`, `RUNTIME`, `MEMORY / GPU` | **HIGH** | GPL-3.0-or-later | Complete production static recompilation project utilizing XenonRecomp codegen, host runtime dispatch, and memory virtualization. | `src/` | Vendored & Evaluated |
+| [p3d-project/persona-3-dual](https://github.com/p3d-project/persona-3-dual) | `references/persona-3-dual` | `REFERENCE`, `PERSONA-SPECIFIC`, `DUAL-SCREEN DESIGN`, `UI / PRESENTATION`, `HANDHELD RENDERING` | **HIGH** | CC-BY-NC-SA-4.0 | Technical reference for Nintendo dual-screen Persona UI layouts (3D top screen, 2D bottom dialogue/menus), character portrait lifecycles, and handheld memory budgeting. | `source/views/EnvironmentView.cpp`, `source/components/screens/DialogueScreen.cpp`, `source/systems/UISystem.cpp`, `source/managers/RenderManager.cpp`, `source/controllers/AnimationController.cpp`, `tools/converters/` | Vendored & Analyzed |
 
 ---
 
@@ -78,8 +85,16 @@ P3P3DS/
 │   └── Yakumo/
 ├── references/
 │   ├── DaedalusX64-3DS/
+│   ├── persona-3-dual/
 │   ├── ppsspp/
 │   ├── pspautotests/
+│   ├── static-recomp/
+│   │   ├── N64ModernRuntime/
+│   │   ├── rexglue-sdk/
+│   │   ├── UnleashedRecomp/
+│   │   ├── xenia/
+│   │   ├── XenonRecomp/
+│   │   └── Zelda64Recomp/
 │   └── uofw/
 └── tools/
     ├── AemulusModManager/

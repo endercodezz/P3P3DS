@@ -1,0 +1,170 @@
+{
+  "_comment": "Persona 3 Dual — Tile Map Definition v3.0",
+  "_schema": "IDs are grouped by category in blocks of 100. Keys use short snake_case. Constants use SCREAMING_SNAKE_CASE.",
+
+  "TILE_MAP": {
+
+    "_group_core": "0-99: Core / System",
+    "w":     0,
+    "c":     1,
+    "s":     2,
+
+    "_group_environment": "100-199: Environment / Terrain",
+    "stair_u": 100,
+    "stair_d": 101,
+    "tartarus_f": 102,
+    "door":    103,
+
+    "_group_interactables": "200-299: Interactables / Objects",
+    "chest":  200,
+    "item":   201,
+    "desk":   202,
+    "shop":   204,
+    "switch": 205,
+    "sign":   206,
+    "book":   207,
+    "tv":     208,
+    "phone":  209,
+    "computer":  210,
+
+    "_group_encounter": "300-399: Encounter / Combat",
+
+    "_group_scene": "400-499: Scenes / Event",
+    "scene_0": 400,
+    "scene_1": 401,
+    "scene_2": 402,
+    "scene_3": 403,
+    "scene_4": 404,
+    "scene_5": 405,
+    "scene_6": 406,
+    "scene_7": 407,
+    "scene_8": 408,
+    "scene_9": 409,
+
+    "_group_ingame_cutscene": "500-599: Cutscene / Dynamic Events",
+
+    "_group_party": "600-699: Characters (Party)",
+    "c_mc":  600,
+    "c_yu":  601,
+    "c_ju":  602,
+    "c_ak":  603,
+    "c_mi":  604,
+    "c_fu":  605,
+    "c_ae":  606,
+    "c_ko":  607,
+    "c_ke":  608,
+    "c_sh":  609,
+
+    "_group_npc": "700-799: Characters (NPCs)",
+    "n_gen":  700,
+    "n_sl":   701,
+    "n_mer":  702,
+
+    "_group_enemies": "800-899: Enemies (Shadows)",
+    "shd_w":  800,
+    "shd_m":  801,
+    "shd_s":  802,
+
+    "_group_reserved": "900-999: Reserved / Extended",
+    "floor":   900,
+    "spawn":   901,
+    "spawn_p": 902,
+    "bound":   903,
+    "nav":     904,
+    "prop":    905,
+    "light":   906,
+    "meta":    907,
+    "res":     908,
+    "null":    909,
+
+    "_legacy_aliases": {
+      "a":   0,
+      "c_a": 603,
+      "p": 400,
+      "e": 401
+    }
+  },
+
+  "TILE_MAP_META": {
+
+    "_group_core": "0-99: Core / System",
+    "w":     "NO_COLLISION",
+    "c":     "COLLISION",
+    "s":     "SAVE",
+
+    "_group_environment": "100-199: Environment / Terrain",
+    "stair_u": "STAIR_UP",
+    "stair_d": "STAIR_DOWN",
+    "tartarus_f":    "TARTARUS_FLOOR_SELECT",
+    "door":    "DOOR",
+
+    "_group_interactables": "200-299: Interactables / Objects",
+    "chest":  "CHEST",
+    "item":   "ITEM_PICKUP",
+    "desk":   "DESK",
+    "shop":   "SHOP",
+    "switch": "SWITCH",
+    "sign":   "SIGN",
+    "book":   "BOOKSHELF",
+    "tv":     "TV",
+    "phone":  "PHONE_BOOTH",
+    "computer":  "COMPUTER",
+
+    "_group_encounter": "300-399: Encounter / Combat",
+
+    "_group_scene": "400-499: Scene / Event",
+    "scene_0": "SCENE_0",
+    "scene_1": "SCENE_1",
+    "scene_2": "SCENE_2",
+    "scene_3": "SCENE_3",
+    "scene_4": "SCENE_4",
+    "scene_5": "SCENE_5",
+    "scene_6": "SCENE_6",
+    "scene_7": "SCENE_7",
+    "scene_8": "SCENE_8",
+    "scene_9": "SCENE_9",
+
+    "_group_ingame_cutscene": "500-599: Cutscene / Dynamic Events",
+
+    "_group_party": "600-699: Characters (Party)",
+    "c_mc":  "CHARACTER_MC",
+    "c_yu":  "CHARACTER_YUKARI",
+    "c_ju":  "CHARACTER_JUNPEI",
+    "c_ak":  "CHARACTER_AKIHIKO",
+    "c_mi":  "CHARACTER_MITSURU",
+    "c_fu":  "CHARACTER_FUUKA",
+    "c_ae":  "CHARACTER_AEGIS",
+    "c_ko":  "CHARACTER_KOROMARU",
+    "c_ke":  "CHARACTER_KEN",
+    "c_sh":  "CHARACTER_SHINJIRO",
+
+    "_group_npc": "700-799: Characters (NPCs)",
+    "n_gen":  "NPC_GENERIC",
+    "n_sl":   "NPC_SOCIAL_LINK",
+    "n_mer":  "NPC_MERCHANT",
+
+    "_group_enemies": "800-899: Enemies (Shadows)",
+    "shd_w":  "SHADOW_WEAK",
+    "shd_m":  "SHADOW_MID",
+    "shd_s":  "SHADOW_STRONG",
+
+    "_group_reserved": "900-999: Reserved / Extended",
+    "floor":   "FLOOR_MARKER",
+    "spawn":   "SPAWN_POINT",
+    "spawn_p": "SPAWN_PARTY",
+    "bound":   "MAP_BOUNDARY",
+    "nav":     "NAVMESH_HINT",
+    "prop":    "PROP_ANCHOR",
+    "light":   "LIGHT_SOURCE",
+    "meta":    "META_REGION",
+    "res":     "RESERVED",
+    "null":    "NULL_TILE",
+
+    "_legacy_aliases": {
+      "a":   "RESERVED (legacy, maps to NO_COLLISION / 0)",
+      "c_a": "CHARACTER_AKIHIKO (legacy, maps to c_ak / 603)",
+      "p": "PREV_SCENE (legacy, maps to scene_0",
+      "e": "NEXT_SCENE (legacy, maps to scene_1"
+    }
+  }
+}

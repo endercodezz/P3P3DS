@@ -1,0 +1,28 @@
+BasedOnStyle: Microsoft
+IndentWidth: 4
+ColumnLimit: 120
+
+# Braces (every opening brace on its own line)
+BreakBeforeBraces: Allman
+
+# Pointers/references attach to the type: int* x, not int *x
+PointerAlignment: Left
+
+# Never collapse a function to a single line
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Blank lines
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# Don't reflow/rewrap comment text (avoids mangling hand-written comments)
+ReflowComments: false
+
+# Sort #includes alphabetically, case-sensitive
+SortIncludes: CaseSensitive
+
+# Don't pack multiple args/params onto one line if they don't all fit
+BinPackArguments: false
+BinPackParameters: false

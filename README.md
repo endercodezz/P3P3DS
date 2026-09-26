@@ -264,3 +264,8 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 - [DaedalusX64-3DS](https://github.com/MasterFeizz/DaedalusX64-3DS) by MasterFeizz — Battle-tested Citro3D rendering and NDSP audio pipeline for MIPS on 3DS.
 - [libctru](https://github.com/devkitPro/libctru) & [citro3d](https://github.com/devkitPro/citro3d) by devkitPro — Nintendo 3DS homebrew SDK and GPU libraries.
 - [zarroboogs](https://github.com/zarroboogs/p3p-patches) & [DniweTamp](https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu) — P3P community patches and reverse engineering research.
+- [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev — Xbox 360 PPC-to-C++ static recompilation architecture/analysis reference.
+- [ReXGlue](https://github.com/rexglue/rexglue-sdk) by Tom Clay & contributors — Xbox 360 AOT runtime and Xenia-derived platform architecture reference.
+- [Xenia](https://github.com/xenia-project/xenia) by Ben Vanik & contributors — Kernel, memory, and GPU architecture reference for Xbox recomp ecosystem.
+- [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Mr-Wiseguy & contributors — MIPS static recompilation, indirect calls, relocations and jump-table reference.
+- [Persona 3 Dual](https://github.com/p3d-project/persona-3-dual) by the p3d-project team — Nintendo dual-screen Persona UI/presentation and constrained handheld-rendering reference.
