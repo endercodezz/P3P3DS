@@ -199,13 +199,14 @@ int main(int argc, char **argv) {
         // 7. Set $sp
         runtime.cpu().set_gpr(29, initial_sp);
 
-        // 8. Set $ra = 0, $a0 = 0, $a1 = 0
-        runtime.cpu().set_gpr(31, 0u);
+        // 8. Set $ra = thread return sentinel, $a0 = 0, $a1 = 0
+        runtime.cpu().set_gpr(31, p3p3ds::hle::ThreadManager::kThreadReturnSentinel);
         runtime.cpu().set_gpr(4, 0u);
         runtime.cpu().set_gpr(5, 0u);
 
         std::cout << "Initial SP:       " << psprecomp::hex32(initial_sp) << "\n";
-        std::cout << "Initial RA:       0x00000000\n";
+        std::cout << "Initial RA:       " << psprecomp::hex32(p3p3ds::hle::ThreadManager::kThreadReturnSentinel)
+                  << " (Thread return sentinel)\n";
         std::cout << "Initial A0 / A1:  0x00000000 / 0x00000000\n";
 
         // 9. Register generated recompiled functions and import wrappers

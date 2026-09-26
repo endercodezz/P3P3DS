@@ -9,6 +9,8 @@ namespace p3p3ds::hle {
 
 namespace {
 
+KernelState *g_active_kernel = nullptr;
+
 std::string read_safe_string(const psprecomp::GuestMemory &memory, std::uint32_t address, std::size_t max_len = 64u) {
     std::string result;
     for (std::size_t i = 0; i < max_len && memory.contains(address + static_cast<std::uint32_t>(i), 1u); ++i) {
@@ -25,6 +27,15 @@ void copy_guest_bytes(psprecomp::GuestMemory &memory, std::uint32_t dst, std::ui
     }
 }
 
+void thread_return_trampoline(psprecomp::Runtime &runtime, psprecomp::AllegrexContext &ctx) {
+    if (g_active_kernel != nullptr) {
+        const std::int32_t exit_status = static_cast<std::int32_t>(ctx.gpr[2]);
+        g_active_kernel->threads().exit_current_thread(exit_status, ctx, runtime);
+    } else {
+        runtime.stop("Thread return without active kernel state");
+    }
+}
+
 } // namespace
 
 ThreadManager::ThreadManager() {
@@ -36,6 +47,7 @@ void ThreadManager::reset() {
     current_thread_id_ = 0;
     next_stack_top_ = 0x09FF0000u;
     threads_.clear();
+    ready_queue_.clear();
 }
 
 std::int32_t ThreadManager::init_root_thread(std::string_view name, std::uint32_t entry_pc, std::uint32_t sp, std::uint32_t gp) {
@@ -50,11 +62,12 @@ std::int32_t ThreadManager::init_root_thread(std::string_view name, std::uint32_
     root.stack_address = 0x09FF0000u;
     root.stack_top = 0x0A000000u;
     root.attributes = 0x80000000u;
-    root.status = ThreadStatus::Running;
+    root.status = InternalThreadState::Running;
     root.context.pc = entry_pc;
     root.context.set_gpr(28, gp);
     root.context.set_gpr(29, sp);
     root.context.set_gpr(30, sp);
+    root.context.set_gpr(31, kThreadReturnSentinel);
 
     threads_[uid] = root;
     current_thread_id_ = uid;
@@ -79,10 +92,7 @@ std::int32_t ThreadManager::create_thread(std::string_view name,
         return SCE_KERNEL_ERROR_ILLEGAL_STACK_SIZE;
     }
 
-    // Align stack size to 256 bytes
     const std::uint32_t aligned_stack_size = (stack_size + 0xFFu) & ~0xFFu;
-
-    // Allocate stack arena downwards from next_stack_top_
     const std::uint32_t stack_top = next_stack_top_;
     if (stack_top < aligned_stack_size || stack_top - aligned_stack_size < 0x09000000u) {
         return SCE_KERNEL_ERROR_NO_MEMORY;
@@ -90,10 +100,25 @@ std::int32_t ThreadManager::create_thread(std::string_view name,
     const std::uint32_t stack_base = stack_top - aligned_stack_size;
     next_stack_top_ = stack_base;
 
-    // Zero out newly allocated stack
-    memory.zero(stack_base, aligned_stack_size);
+    // Fill stack with 0xFF unless PSP_THREAD_ATTR_NO_FILLSTACK is set
+    if ((attributes & kThreadAttrNoFillStack) == 0u) {
+        for (std::uint32_t offset = 0u; offset < aligned_stack_size; offset += 4u) {
+            memory.store32(stack_base + offset, 0xFFFFFFFFu);
+        }
+    }
+
+    // Zero out top 256-byte k0 section
+    memory.zero(stack_top - 256u, 256u);
 
     const std::int32_t uid = next_uid_++;
+
+    // Write thread UID at base of stack and in k0 section
+    memory.store32(stack_base, static_cast<std::uint32_t>(uid));
+    memory.store32(stack_top - 256u + 0xC0u, static_cast<std::uint32_t>(uid));
+    memory.store32(stack_top - 256u + 0xC8u, stack_base);
+    memory.store32(stack_top - 256u + 0xF8u, 0xFFFFFFFFu);
+    memory.store32(stack_top - 256u + 0xFCu, 0xFFFFFFFFu);
+
     ThreadControlBlock tcb{};
     tcb.uid = uid;
     tcb.name = std::string(name);
@@ -105,10 +130,8 @@ std::int32_t ThreadManager::create_thread(std::string_view name,
     tcb.stack_top = stack_top;
     tcb.attributes = attributes;
     tcb.option_address = option_address;
-    tcb.status = ThreadStatus::Dormant;
-
-    // Place thread UID at base of stack (standard PSP behavior checked by pspautotests)
-    memory.store32(stack_base, static_cast<std::uint32_t>(uid));
+    tcb.status = InternalThreadState::Dormant;
+    tcb.context.set_gpr(31, kThreadReturnSentinel);
 
     threads_[uid] = std::move(tcb);
     return uid;
@@ -119,26 +142,42 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
                                          std::uint32_t arg_ptr,
                                          psprecomp::GuestMemory &memory,
                                          psprecomp::AllegrexContext &caller_ctx) {
+    if (thid <= 0) {
+        return SCE_KERNEL_ERROR_ILLEGAL_THID;
+    }
     auto *target = get_thread(thid);
     if (!target) {
         return SCE_KERNEL_ERROR_UNKNOWN_THID;
     }
-    if (target->status != ThreadStatus::Dormant) {
+    if (target->status != InternalThreadState::Dormant) {
         return SCE_KERNEL_ERROR_NOT_DORMANT;
+    }
+
+    if (static_cast<std::int32_t>(arg_size) < 0) {
+        return SCE_KERNEL_ERROR_ILLEGAL_ADDR;
+    }
+    if (arg_size > 0u) {
+        if (arg_ptr == 0u || !memory.contains(arg_ptr, arg_size)) {
+            return SCE_KERNEL_ERROR_ILLEGAL_ADDR;
+        }
+    }
+
+    const std::uint32_t aligned_arg_size = (arg_size + 15u) & ~15u;
+    const std::uint32_t required_bytes = 256u + aligned_arg_size + 64u;
+    if (required_bytes >= target->stack_size || target->stack_top - required_bytes < target->stack_address) {
+        return SCE_KERNEL_ERROR_NO_MEMORY;
     }
 
     // Initialize target thread context
     target->context = psprecomp::AllegrexContext{};
     target->context.pc = target->entry_pc;
-    target->context.set_gpr(28, caller_ctx.gpr[28]); // Inherit $gp from caller module
+    target->context.set_gpr(28, caller_ctx.gpr[28]); // Inherit $gp
+    target->context.set_gpr(31, kThreadReturnSentinel); // Return to trampoline
 
-    // Calculate initial SP with PSP top-of-stack headroom (256 bytes k0 section + optional args + 64 byte margin)
     std::uint32_t sp = target->stack_top - 256u;
     if (arg_ptr != 0u && arg_size > 0u) {
-        sp -= (arg_size + 15u) & ~15u;
-        if (memory.contains(arg_ptr, arg_size)) {
-            copy_guest_bytes(memory, sp, arg_ptr, arg_size);
-        }
+        sp -= aligned_arg_size;
+        copy_guest_bytes(memory, sp, arg_ptr, arg_size);
         target->context.set_gpr(4, arg_size); // $a0 = arg_size
         target->context.set_gpr(5, sp);       // $a1 = arg_ptr on stack
     } else {
@@ -148,26 +187,78 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
     sp -= 64u;
     target->context.set_gpr(29, sp); // $sp
     target->context.set_gpr(30, sp); // $fp
-    target->context.set_gpr(31, 0u); // $ra
 
-    // Perform context switch from caller to newly started thread
+    // Transition target to Ready
+    target->status = InternalThreadState::Ready;
+    ready_queue_.push_back(thid);
+
     auto *current = current_thread();
-    if (current != nullptr) {
-        // Save caller's resume state: return value 0 in $v0, return address in PC
-        caller_ctx.set_gpr(2, 0u);
+    // In PSP, smaller priority number = higher priority.
+    // If target has strictly higher priority than current, preempt immediately.
+    if (current != nullptr && target->current_priority < current->current_priority) {
+        caller_ctx.set_gpr(2, 0u); // Return 0 to caller upon future resume
         caller_ctx.pc = caller_ctx.gpr[31];
         current->context = caller_ctx;
-        current->status = ThreadStatus::Ready;
+        current->status = InternalThreadState::Ready;
+        ready_queue_.push_back(current->uid);
+
+        ready_queue_.erase(std::remove(ready_queue_.begin(), ready_queue_.end(), thid), ready_queue_.end());
+        current_thread_id_ = thid;
+        target->status = InternalThreadState::Running;
+        caller_ctx = target->context;
+        psprecomp::set_runtime_thread_identity(target->uid, target->name);
+        return 0;
     }
 
-    // Switch active thread
-    current_thread_id_ = thid;
-    target->status = ThreadStatus::Running;
-    caller_ctx = target->context;
-
-    // Notify runtime of thread identity and context switch generation change
-    psprecomp::set_runtime_thread_identity(target->uid, target->name);
+    // Target priority is equal or lower: caller continues running and receives 0.
+    caller_ctx.set_gpr(2, 0u);
     return 0;
+}
+
+bool ThreadManager::schedule(psprecomp::AllegrexContext &ctx) {
+    if (ready_queue_.empty()) {
+        return false;
+    }
+
+    // Pick highest priority (lowest numerical priority value) in FIFO order
+    auto best_it = ready_queue_.begin();
+    auto *first_thread = get_thread(*best_it);
+    std::int32_t best_prio = first_thread ? first_thread->current_priority : 127;
+
+    for (auto it = ready_queue_.begin() + 1; it != ready_queue_.end(); ++it) {
+        auto *t = get_thread(*it);
+        if (t && t->current_priority < best_prio) {
+            best_prio = t->current_priority;
+            best_it = it;
+        }
+    }
+
+    const std::int32_t next_thid = *best_it;
+    ready_queue_.erase(best_it);
+
+    auto *target = get_thread(next_thid);
+    if (!target) return false;
+
+    current_thread_id_ = next_thid;
+    target->status = InternalThreadState::Running;
+    ctx = target->context;
+    psprecomp::set_runtime_thread_identity(target->uid, target->name);
+    return true;
+}
+
+bool ThreadManager::exit_current_thread(std::int32_t exit_status, psprecomp::AllegrexContext &ctx, psprecomp::Runtime &runtime) {
+    auto *cur = current_thread();
+    if (cur != nullptr) {
+        cur->status = InternalThreadState::Stopped;
+        cur->exit_status = exit_status;
+    }
+
+    if (schedule(ctx)) {
+        return true;
+    }
+
+    runtime.stop("All threads completed");
+    return false;
 }
 
 ThreadControlBlock *ThreadManager::get_thread(std::int32_t uid) noexcept {
@@ -195,19 +286,26 @@ bool ThreadManager::switch_to(std::int32_t target_thid, psprecomp::AllegrexConte
     auto *current = current_thread();
     if (current != nullptr) {
         current->context = ctx;
-        if (current->status == ThreadStatus::Running) {
-            current->status = ThreadStatus::Ready;
+        if (current->status == InternalThreadState::Running) {
+            current->status = InternalThreadState::Ready;
+            ready_queue_.push_back(current->uid);
         }
     }
 
+    ready_queue_.erase(std::remove(ready_queue_.begin(), ready_queue_.end(), target_thid), ready_queue_.end());
     current_thread_id_ = target_thid;
-    target->status = ThreadStatus::Running;
+    target->status = InternalThreadState::Running;
     ctx = target->context;
     psprecomp::set_runtime_thread_identity(target->uid, target->name);
     return true;
 }
 
 void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kernel) {
+    g_active_kernel = &kernel;
+
+    // Register thread-return trampoline sentinel
+    runtime.register_function(ThreadManager::kThreadReturnSentinel, &thread_return_trampoline, "thread_return_trampoline");
+
     // ThreadManForUser::0x446D8DE6 (sceKernelCreateThread)
     runtime.register_hle("ThreadManForUser", 0x446D8DE6u,
         [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
