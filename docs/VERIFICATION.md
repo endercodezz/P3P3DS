@@ -67,3 +67,5 @@ This registry tracks the verification status of all technical claims, hardware p
 | Recompiled P3P code will fit in New 3DS memory | `[INFERRED]` | `docs/ARCHITECTURE_OPTIONS.md:3.2` | Estimated ~95–110 MB footprint vs 124–178 MB available; requires physical hardware measurement. |
 | Recompiled P3P will run at 90-100% native speed on New 3DS | `[INFERRED]` | Architectural analysis | Inferred from native ARM machine code compilation vs in-flight JIT, but unmeasured without on-device profiling. |
 | PICA200 can maintain 30 FPS for Tartarus 3D dungeons | `[UNVERIFIED]` | Needs citro3d benchmark | Working hypothesis based on geometry complexity vs DaedalusX64-3DS. |
+
+The repository intentionally tracks two canonical current-state artifacts: `logs/p3p_bootstrap_latest.log` is the latest bootstrap/verification trace, and `build/generated/p3p_generated.cpp` is the generated AOT snapshot for the current P3P frontier. Other generated files, build outputs, and logs remain ignored.
