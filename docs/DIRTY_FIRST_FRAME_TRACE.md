@@ -69,12 +69,23 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
 
 ### Stop #8
 - **PC:** `0x00000000`
-- **Type:** DIRECT GUEST CALL / UNRESOLVED ZERO TARGET
-- **Cause:** `[VERIFIED]` After recompiling the genuine function boundaries at `0x08B19890` and `0x08A9B3F4`, execution returns through the game main/cleanup path and reaches the literal instruction `jal 0` (`0x0C000000`) at `0x0880433C`. The generated link address for this call is `0x08804344`. The final diagnostic context prints `$ra = 0` because the missing-target unwind occurs before nested generated-entry hot registers are materialized; it is not evidence that address zero is a valid thread-return trampoline.
+- **Type:** STATIC RECOMPILER SPARSE-DISPATCH DEFECT
+- **Previous attribution:** `[WRONG]` The stop was attributed to the literal `jal 0` at `0x0880433C`. Generated-code probes proved that execution never entered `0x0880432C`, `0x08804334`, or `0x0880433C`.
+- **Cause:** `[VERIFIED]` `sub_08B14350` restores its caller return address and tail-jumps to `0x08B1D07C`. That function saves the correct `$ra = 0x08AB306C`, calls `0x08B175C0`, and reaches its epilogue at `0x08B1D0B0`. The epilogue restores the correct `0x08AB306C`, but the sparse generated `LOCAL_DISPATCH` selected on stale `ctx.pc == 0x08B1D0B0` instead of the new `local_pc`. It therefore re-entered the epilogue 2,048 times, advanced `$sp` by 16 bytes per iteration, and finally dispatched a zero read from unrelated stack memory.
 - **Fixes before this stop:** Corrected display NID dispatch and ABI handling; remapped `Kernel_Library::0x1839852A` to `sceKernelMemcpy` and `0xDC692EE3` to `sceKernelTryLockLwMutex`; implemented live GE list IDs, saved PCs, stall/update/resume, polling/completion, setup-register execution, FINISH/END handling, callback dispatch, and explicit VRAM write accounting. Added the verified guest boundaries `0x08B63B50`, `0x08B19890`, and `0x08A9B3F4`.
 - **GE milestone:** `[VERIFIED] STATE COMMAND OBSERVED` — the 212-command static list and 29-command dynamic list both execute through FINISH/END exactly once. Final GE state is color `0x04000000`, stride 512, format 8888; depth `0x04110000`, stride 512; display scanout `0x04088000`.
 - **Writer status:** `[VERIFIED] DRAW COMMAND OBSERVED: NO`; `[VERIFIED] VRAM WRITE EXECUTED: NO`; `[VERIFIED] VISIBLE COLOR OUTPUT: NO`. Explicit accounting reports 0 store operations, 0 bytes touched, 0 color writes, and 0 depth writes.
-- **New Stop:** literal zero call at `0x0880433C`; determine why this relocated executable path contains `jal 0` before adding any target or trampoline.
+- **Fix:** Sparse generated entry dispatch now switches on `local_pc`, matching the dense dispatcher and the existing JR/JR-RA lowering. A focused codegen fixture forces a greater-than-32-KiB entry span and rejects any generated `switch (ctx.pc)` sparse dispatcher.
+- **Verified call/return chain:** `0x08AB3064: jal 0x08B14350` establishes `$ra = 0x08AB306C`; `0x08B14390: jal 0x08B19928` returns to `0x08B14398`; `0x08B1439C` tail-jumps to `0x08B1D07C`; `0x08B1D07C` saves `0x08AB306C` at `$sp + 4`; `0x08B1D0A8: jal 0x08B175C0` returns to `0x08B1D0B0`; and `0x08B1D0D8: jr $ra` restores and selects `0x08AB306C`. From there the guest calls `0x08B1D100`, whose `0x08B1D130: jal 0x08B17054` produces the new missing-function stop with `$ra = 0x08B1D138`.
+- **Probe result:** `[VERIFIED]` The defective run saved the correct return address once but re-entered `0x08B1D0B0` 2,048 times. The corrected run enters the save and restore probes exactly once each, never enters the three `0x0880432C/34/3C` probes, and reaches `0x08B17054`. The latest checkpoint is captured in `logs/p3p_bootstrap_latest.log`; diagnostic probe sources remain in the ignored generated unit and `.tmp/p3p_generated_jal0_probe.cpp`.
+- **New Stop:** `0x08B17054`, called by `jal` at `0x08B1D130` with `$ra = 0x08B1D138`.
+
+### `jal 0` investigation at `0x0880433C`
+- **Raw and runtime word:** `[VERIFIED]` Runtime address `0x0880433C` is PRX-relative vaddr `0x33C` in load segment 0 and maps to ELF file offset `0x3DC`. Raw bytes are `00 00 00 0C`, or little-endian word `0x0C000000`. The relocated runtime word is also `0x0C000000`.
+- **Relocation record:** `[VERIFIED]` None of the executable's 178,513 `SHT_PRX_RELOC` entries has `r_offset == 0x33C`. In `.rel.text`, adjacent direct-call relocations exist at `0x324`, `0x32C`, `0x334`, `0x344`, and `0x34C`, but not `0x33C`. Patch segment, target segment, and relocation addend are therefore not applicable at this site.
+- **Loader result:** `[VERIFIED]` P3P3DS copies the raw word and applies no patch because no relocation entry selects it. PPSSPP and uOFW likewise iterate relocation records and would leave this site untouched. If a hypothetical `R_MIPS_26` entry with patch segment 0 and target segment 0 existed, all three algorithms would encode `0x0E201000`, targeting `0x08804000`; that hypothetical is not the executable's relocation data.
+- **Static CFG classification:** `[VERIFIED]` The branch at `0x0880430C` is always taken in this binary because `s5` is formed from a relocated-zero `lui/addiu` pair. The selected path calls game `main` at `0x08804538`, passes its result to the exit-processing routine at `0x08B72F04`, then has fallthrough calls at `0x08804334` and `0x0880433C`. This is post-`main` termination/fallback code, not graphics startup and not a callback path. `[UNVERIFIED]` The exact link-time symbol represented by the unrelocated zero call is unknown.
+- **Dynamic reachability:** `[VERIFIED]` Current execution does not reach this CRT tail. With the sparse-dispatch fix, the same run returns through `0x08AB306C` and stops at the real missing function `0x08B17054`.
 
 ---
 
@@ -128,8 +139,6 @@ Additional checkpoint debt:
 - GE execution is synchronous and implements only the setup opcodes observed in the two current lists. SIGNAL and control-flow corner cases stop explicitly.
 - GE callbacks run synchronously on a private temporary guest interrupt stack (`0x09FFE000`-`0x09FFF000`) whose previous bytes are restored afterward.
 - Display vblank waits advance deterministic counters; host-time scanout timing is not modeled.
-- The direct `jal 0` blocker is unresolved. Address zero must not be registered as a success trampoline without proving the intended relocated target.
-
-
+- The literal `jal 0` is not the current blocker and remains unregistered. Its exact link-time symbol is still unknown; current execution never reaches it.
 
 

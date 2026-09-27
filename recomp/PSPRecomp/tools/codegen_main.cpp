@@ -1001,7 +1001,7 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
              << "    std::uint32_t local_transfers = 0u;\n"
              << "    std::uint32_t entry_id = 0u;\n"
              << "LOCAL_DISPATCH:\n"
-             << "    switch (ctx.pc) {\n";
+             << "    switch (local_pc) {\n";
         for (const auto label : function.entry_labels) {
             body << "    case " << psprecomp::hex32(label) << "u: goto L_"
                  << psprecomp::hex32(label).substr(2) << ";\n";

@@ -744,7 +744,7 @@ static void test_automatic_cross_unit_tail_chaining() {
 }
 
 static std::vector<std::uint8_t> make_out_of_line_block_test_elf() {
-    std::vector<std::uint8_t> bytes(0xC8u, 0u);
+    std::vector<std::uint8_t> bytes(0x80C8u, 0u);
     bytes[0] = 0x7Fu; bytes[1] = 'E'; bytes[2] = 'L'; bytes[3] = 'F';
     bytes[4] = 1u; bytes[5] = 1u; bytes[6] = 1u;
     put16(bytes, 16u, 2u);          // ET_EXEC
@@ -761,8 +761,8 @@ static std::vector<std::uint8_t> make_out_of_line_block_test_elf() {
     put32(bytes, 56u, 0x80u);
     put32(bytes, 60u, 0x08804000u);
     put32(bytes, 64u, 0x08804000u);
-    put32(bytes, 68u, 0x48u);
-    put32(bytes, 72u, 0x48u);
+    put32(bytes, 68u, 0x8048u);
+    put32(bytes, 72u, 0x8048u);
     put32(bytes, 76u, 5u);
     put32(bytes, 80u, 16u);
 
@@ -777,6 +777,9 @@ static std::vector<std::uint8_t> make_out_of_line_block_test_elf() {
     put32(bytes, 0xB0u, 0x2402002Au); // addiu v0, zero, 42
     put32(bytes, 0xB4u, 0x0A201002u); // j 0x08804008 (jump back to return at 0x08804008)
     put32(bytes, 0xB8u, 0x00000000u); // nop
+    // 0x0880C040: distant manual block used to force sparse entry dispatch.
+    put32(bytes, 0x80C0u, 0x03E00008u); // jr ra
+    put32(bytes, 0x80C4u, 0x00000000u); // nop
     return bytes;
 }
 
@@ -832,6 +835,31 @@ static void test_manual_cfg_out_of_line_block() {
             "Sparse range block was not generated as an internal label");
     require(sparse_text.find("runtime.register_function(0x08804030u, &test_sparse_fn, \"test_sparse_fn\");") != std::string::npos,
             "Sparse range block was not registered in runtime dispatcher");
+
+    // A function whose entry labels span more than the dense-table limit uses
+    // the sparse dispatcher. Plain JR lowering updates local_pc before jumping
+    // back to LOCAL_DISPATCH, so that dispatcher must select on local_pc too.
+    const auto sparse_dispatch_csv_path = root / "sparse_dispatch_functions.csv";
+    const auto sparse_dispatch_cpp_path = root / "sparse_dispatch_generated.cpp";
+    {
+        std::ofstream out(sparse_dispatch_csv_path);
+        out << "name,address,size\ntest_sparse_dispatch_fn,0x08804008,0x00000008\n"
+               "test_sparse_dispatch_fn,0x0880C040,0x00000008\n";
+    }
+    const std::string sparse_dispatch_command = shell_quote(codegen_path) + " " + shell_quote(elf_path) + " " +
+        shell_quote(sparse_dispatch_csv_path) + " " + shell_quote(sparse_dispatch_cpp_path);
+    require(std::system(shell_command(sparse_dispatch_command).c_str()) == 0,
+            "psp_recomp sparse-dispatch fixture generation failed");
+
+    std::string sparse_dispatch_text;
+    {
+        std::ifstream generated(sparse_dispatch_cpp_path);
+        sparse_dispatch_text.assign((std::istreambuf_iterator<char>(generated)), std::istreambuf_iterator<char>());
+    }
+    require(sparse_dispatch_text.find("switch (local_pc)") != std::string::npos,
+            "Sparse local dispatcher did not select the JR/JR-RA destination in local_pc");
+    require(sparse_dispatch_text.find("switch (ctx.pc)") == std::string::npos,
+            "Sparse local dispatcher still selected stale ctx.pc after JR/JR-RA");
     std::filesystem::remove_all(root);
 #endif
 }
