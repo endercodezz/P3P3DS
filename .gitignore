@@ -83,6 +83,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Xenia build scripts (upstream, not part of P3P3DS)
+references/static-recomp/xenia/tools/build/
+
 # IDE and OS files
 .vscode/
 .idea/
