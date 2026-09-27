@@ -1,11 +1,9 @@
-[jal0-probe] 08B1D07C save-ra=08AB306C sp=09FEF900 old-slot4=08E10000
-[jal0-probe] 08B1D0B0 restore-ra-slot=08AB306C sp=09FEF900 current-ra=08B1D0B0
 ====================================================
    P3P3DS PC Bootstrap Execution Harness
 ====================================================
 Target ELF:       profiles/p3p/game/eboot.elf
 Dispatch budget:  100000
-Verify mode:      standard
+Verify mode:      STRICT (--verify-milestone)
 ELF Type:         65440 (PSP PRX relocatable)
 Runtime Entry:    0x08804108
 Relocations:      178513 total (R_26=81398, R_32=14572, R_HI=37395, R_LO=45148)
@@ -16,7 +14,7 @@ Stack Arena:      0x09FF0000 - 0x0A000000
 Initial SP:       0x09FFFF00
 Initial RA:       0x00000020 (Thread return sentinel)
 Initial A0 / A1:  0x00000000 / 0x00000000
-Registered Entries: 1316 (functions, block labels, and import wrappers)
+Registered Entries: 1386 (functions, block labels, and import wrappers)
 
 Starting execution at 0x08804108...
 [THREAD CREATE] uid=2 name=user_main entry=0x880421c priority=32 stack=0x9fb0000-0x9ff0000
@@ -41,22 +39,22 @@ Starting execution at 0x08804108...
 
 
 === Execution Result ===
-Stop Reason:      No recompiled function registered at 0x08B17054
+Stop Reason:      No recompiled function registered at 0x08B1C594
 Stopped:          yes
-Final Guest PC:   0x08B17054
+Final Guest PC:   0x08B1C594
 Kernel SDK Ver:   0x06020010
 
 === Guest Register State ===
-  PC: 0x08B17054
-  zero = 0x00000000  at   = 0x00000000  v0   = 0x08E054F0  v1   = 0x08E0542C  
-  a0   = 0x08E054F0  a1   = 0x00000000  a2   = 0x08E05404  a3   = 0x08EF9D08  
-  t0   = 0x00000002  t1   = 0x08EF9CDC  t2   = 0x00000000  t3   = 0x08C3A640  
-  t4   = 0x08C3A638  t5   = 0x08C3A638  t6   = 0x00000404  t7   = 0x00000101  
-  s0   = 0x08E00000  s1   = 0x00000002  s2   = 0x00000000  s3   = 0x08E10000  
+  PC: 0x08B1C594
+  zero = 0x00000000  at   = 0x00000000  v0   = 0x08BB0000  v1   = 0x0000000F  
+  a0   = 0x08EE8448  a1   = 0x000000E3  a2   = 0x08E00000  a3   = 0x08ED6DB8  
+  t0   = 0x00000003  t1   = 0x08EE8450  t2   = 0x00000000  t3   = 0x08E054B0  
+  t4   = 0x00000002  t5   = 0x08C3A638  t6   = 0x00000404  t7   = 0x00000101  
+  s0   = 0x08EE8448  s1   = 0x08EF9DC8  s2   = 0x00000000  s3   = 0x08E10000  
   s4   = 0x08E10000  s5   = 0x00000000  s6   = 0x00000000  s7   = 0x00000000  
   t8   = 0x08EF6500  t9   = 0x08EF912C  k0   = 0x09FEFF00  k1   = 0x00000000  
-  gp   = 0x08C42A50  sp   = 0x09FEF900  fp   = 0x09FEFEC0  ra   = 0x08B1D138  
-  Stack words: 0x00000000 0x08E10000 0x08AB3074 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
+  gp   = 0x08C42A50  sp   = 0x09FEF910  fp   = 0x09FEFEC0  ra   = 0x08AB3164  
+  Stack words: 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
 
 ====================================================
    P3P3DS GUEST VRAM & FRAMEBUFFER PROBE
@@ -338,12 +336,12 @@ Display State:
 
 
 === Milestone Verification ===
-Target:           module_start -> GE/Display init -> 0x08B17054 frontier
+Target:           module_start -> GE/Display init -> 0x08B1C594 frontier
 Entry (0x8804108):   OK
 SDK Ver (0x6020010): OK
 Compiler Ver (0x30306): OK
-Final PC (0x8b17054): OK
-Blocker opcode:    OK (jal 0x08B17054 at 0x08B1D130)
+Final PC (0x8b1c594): OK
+Blocker opcode:    OK (jal 0x08B1C594 at 0x08AB315C)
 Thread UID (2):      OK
 Thread Name (user_main): OK
 Stop Reason:      OK

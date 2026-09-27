@@ -26,10 +26,10 @@ void register_generated_functions(Runtime &runtime);
 namespace {
 
 constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc = 0x08B17054u;
-constexpr std::uint32_t kExpectedStopCallerPc = 0x08B1D130u;
-constexpr std::uint32_t kExpectedStopInstruction = 0x0E2C5C15u; // jal 0x08B17054
-constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08B17054";
+constexpr std::uint32_t kExpectedStopPc = 0x08B1C594u;
+constexpr std::uint32_t kExpectedStopCallerPc = 0x08AB315Cu;
+constexpr std::uint32_t kExpectedStopInstruction = 0x0E2C7165u; // jal 0x08B1C594
+constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08B1C594";
 constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
 constexpr std::uint32_t kExpectedCompilerVersion = 0x00030306u;
 constexpr std::int32_t kExpectedThreadUid = 2;
@@ -427,7 +427,7 @@ int main(int argc, char **argv) {
         // 13. Milestone Verification
         const auto v = verify_milestone(entry_addr, runtime, kernel_state);
         std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> GE/Display init -> 0x08B17054 frontier\n";
+        std::cout << "Target:           module_start -> GE/Display init -> 0x08B1C594 frontier\n";
         std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
                   << (v.entry_matched ? "OK" : "FAILED") << "\n";
         std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
@@ -437,7 +437,7 @@ int main(int argc, char **argv) {
         std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "): "
                   << (v.pc_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Blocker opcode:    "
-                  << (v.stop_instruction_matched ? "OK (jal 0x08B17054 at 0x08B1D130)" : "FAILED") << "\n";
+                  << (v.stop_instruction_matched ? "OK (jal 0x08B1C594 at 0x08AB315C)" : "FAILED") << "\n";
         std::cout << "Thread UID (" << std::dec << kExpectedThreadUid << "):      "
                   << (v.thread_uid_matched ? "OK" : "FAILED") << "\n";
         std::cout << "Thread Name (" << kExpectedThreadName << "): "
