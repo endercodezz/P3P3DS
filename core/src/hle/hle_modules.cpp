@@ -14,6 +14,7 @@ void register_all_hle_modules(psprecomp::Runtime &runtime, KernelState &kernel) 
     register_threadman_for_user(runtime, kernel);
     register_display_module(runtime, kernel);
     register_ge_module(runtime, kernel);
+    register_umd_module(runtime, kernel);
 
     // ModuleMgrForUser::0xD8B73127 - sceKernelGetModuleIdByAddress
     runtime.register_hle("ModuleMgrForUser", 0xD8B73127u,
@@ -92,13 +93,6 @@ void register_all_hle_modules(psprecomp::Runtime &runtime, KernelState &kernel) 
         [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const std::int32_t status = static_cast<std::int32_t>(ctx.gpr[4]);
             kernel.threads().exit_current_thread(status, ctx, rt);
-        });
-
-    // ThreadManForUser::0xE81CAF8F - sceKernelCreateCallback
-    runtime.register_hle("ThreadManForUser", 0xE81CAF8Fu,
-        [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
-            // DIRTY_FIRST_FRAME: callback UID = 1
-            ctx.set_gpr(2, 1u);
         });
 
     // LoadExecForUser::0x4AC57943 - sceKernelRegisterExitCallback

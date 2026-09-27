@@ -1,11 +1,14 @@
 {
   "schema": 1,
-  "source_base": "2d520e30f9cac063707cb9d3b26055288a9967eb",
+  "source_base": "0e6eca51292ce77ca40b78e9eeb6be094327e6a8",
   "phase1_checkpoint": "ea7374b5a63fa73c05af8fdc27a552a23e60f470",
   "blocker_type": "missing_hle",
-  "blocker_service": "sceUmdUser::sceUmdRegisterUMDCallBack",
-  "blocker_pc": "0x08B80114",
-  "blocker_caller": "0x08AA15D4",
+  "blocker_service": "sceUmdUser::sceUmdCheckMedium",
+  "blocker_pc": "0x08B800EC",
+  "blocker_caller": "0x08AA15E4",
+  "umd_callback_uid": 4,
+  "umd_registration_result": 0,
+  "umd_registration_guest_return": "0x08AA15DC",
   "first_vram_write": {
     "guest_pc": "0x08AB2B38",
     "instruction": "0xAE220004",
@@ -25,5 +28,5 @@
   "depth_writes": 0,
   "ge_writer_observed": false,
   "graphics_output_proven": false,
-  "events_sha256": "956565659c500780888190d405d36ca1e2b9cbfac6ae07ba692c72da4389c48d"
+  "events_sha256": "26dd4607202d819d5516386ad7f4d5e7d73fdb266ed4c469a103a3f40ddeadfb"
 }

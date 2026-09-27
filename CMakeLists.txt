@@ -45,6 +45,7 @@ add_library(p3p3ds_core
     core/src/hle/threadman.cpp
     core/src/hle/display.cpp
     core/src/hle/ge.cpp
+    core/src/hle/umd.cpp
 )
 
 target_include_directories(p3p3ds_core PUBLIC
@@ -191,6 +192,9 @@ endif()
 
 # Focused dispatch, resumable setup execution and zero-valued VRAM write accounting.
 add_executable(test_hle_graphics tests/test_hle_graphics.cpp)
+add_executable(test_hle_umd tests/test_hle_umd.cpp)
+target_link_libraries(test_hle_umd PRIVATE p3p3ds_core)
+add_test(NAME p3p_hle_umd COMMAND test_hle_umd)
 target_link_libraries(test_hle_graphics PRIVATE p3p3ds_core)
 add_test(NAME p3p_hle_graphics COMMAND test_hle_graphics)
 

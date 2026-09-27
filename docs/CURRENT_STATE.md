@@ -2,7 +2,23 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current Phase 2 result
+## Current micro-sprint: UMD callback registration
+
+Source base: `0e6eca51292ce77ca40b78e9eeb6be094327e6a8`; no frontier expansion or generated-code changes in this sprint.
+
+- [VERIFIED] `ThreadManager::create_callback/get_callback` now owns callback UID, name, guest function, common argument and owner thread. Threads and callbacks share the existing UID sequence with type-specific lookup. The former hardcoded UID 1 stub is removed. Creation is **PARTIAL**: ownership/identity only; no callback scheduling, notification queue, delivery, deletion or callback-aware waits. Invalid name pointers stop explicitly rather than pretending success.
+- [VERIFIED] `UmdState::register_callback` rejects zero, invalid and non-callback UIDs with `0x80010016`; accepts valid and repeated valid registration with zero; preserves registration on failure and replaces it on another valid registration. References: `references/uofw/src/kd/mediaman/mediaman.c:590` (`sceUmdRegisterUMDCallBack`), `references/uofw/include/mediaman_user.h:54`, `references/pspautotests/tests/umd/register.expected:1`. No PPSSPP implementation code was copied.
+- [VERIFIED] P3P creates callback `SDK_UMD`, UID **4**, owner **user_main / UID 2**, common argument zero. The recorded call `0x08AA15D4 -> 0x08B80114` registers UID 4 with result **0**; the following `guest_enter` at **`0x08AA15DC`** proves return to guest execution. The earlier `Persona3PSP` callback receives UID 3.
+- [VERIFIED] Next genuine blocker: **missing HLE**, `sceUmdUser::sceUmdCheckMedium` (NID `0x46EBB729`), final PC **`0x08B800EC`**, caller **`0x08AA15E4`**, thread **user_main / UID 2**. Execution stops here; this service is not implemented by the sprint.
+- [VERIFIED] VRAM activity remains four unclassified-resource writes, 16 bytes touched, 10 changed; CPU color/depth writes zero. GE lists 1/2 complete once with 212/29 commands; no GE writer. **Graphics milestone: NO.** Allocator metadata remains an inference, not graphics output.
+- [VERIFIED] Release build and all **11/11 CTest** tests pass, including `p3p_hle_umd`, stable bootstrap and frontier regressions. The UMD test checks real callback identity/fields, thread UID rejection, invalid/zero UID, valid/repeat registration, state preservation/replacement and independent kernel state. Expected registration results match the limited pspautotests cases above; no hardware test run is claimed.
+- [VERIFIED] `build/p3p_pc_bootstrap.exe --verify-bootstrap` passes. Two `--run-until-blocker --dump-events .tmp/umd-replay-{1,2}.json` runs are byte-identical, SHA-256 **`26DD4607202D819D5516386AD7F4D5E7D73FDB266ED4C469A103A3F40DDEADFB`**. `callback_create`, `umd_callback_register`, subsequent `guest_enter`, and `missing_hle` events provide the evidence. `git diff --check` is clean.
+
+Immediate blocker: missing `sceUmdCheckMedium` HLE.
+
+Next smallest step: implement and test `sceUmdCheckMedium` against a documented mounted-media state, without assuming unconditional media presence.
+
+## Phase 2 result (historical, superseded above)
 
 - Source base: `2d520e30f9cac063707cb9d3b26055288a9967eb`; checkpoint commit: `ea7374b5a63fa73c05af8fdc27a552a23e60f470`. The intervening commit contains only maintainer README/ignore changes.
 - [VERIFIED] Execution now passes four non-render-target CPU VRAM writes and one further proven direct call: `0x08AA1564 -> 0x08AA0F8C`. The unchanged conservative validator accepts a two-instruction closed CFG. There are now 18 managed seeds, 126 manual function groups, 221 import wrappers and 1,487 registered entries (`frontier_seeds.csv`, generated output, canonical log).
@@ -15,9 +31,9 @@ This is the current source of truth. Historical audits describe their stated bas
 - [VERIFIED] Final Release build, full CTest (10/10, including frontier safety/workflow and stable bootstrap), and two identical event replays passed via `python -B tools/chase_frontier.py --check-only --output .tmp/frontier-vram-final`. New safety cases cover bounded continuation, mirror/wrap boundaries, active versus pending display targets, depth-target stop and direct-color texture stride.
 - [VERIFIED] Current generated AOT SHA-256: `ED5466486F6173C6C97EE47C99E596BDAE90EA344A2E7D415F9BFB1D71888C3A`; independent regeneration is byte-identical. Current event SHA-256: `956565659C500780888190D405D36CA1E2B9CBFAC6AE07BA692C72DA4389C48D`. Evidence: `.tmp/frontier-vram-classified/report.json`, `.tmp/frontier-vram-final/report.json`, `logs/p3p_bootstrap_latest.log` and `profiles/p3p/config/frontier_checkpoint.json`.
 
-Immediate blocker: missing UMD callback registration HLE (category 2: missing HLE service).
+Phase 2 blocker: missing UMD callback registration HLE (category 2: missing HLE service).
 
-Next smallest step: implement and test `sceUmdRegisterUMDCallBack` with callback UID validation and registration state, using `references/ppsspp/Core/HLE/sceUmd.cpp::sceUmdRegisterUMDCallBack` as the reference; do not substitute unconditional success.
+The registration blocker was resolved by the micro-sprint above.
 
 ## Phase 1 checkpoint provenance (historical)
 

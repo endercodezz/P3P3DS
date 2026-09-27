@@ -47,7 +47,19 @@ void ThreadManager::reset() {
     current_thread_id_ = 0;
     next_stack_top_ = 0x09FF0000u;
     threads_.clear();
+    callbacks_.clear();
     ready_queue_.clear();
+}
+
+std::int32_t ThreadManager::create_callback(std::string_view name, std::uint32_t function, std::uint32_t common_argument) {
+    const auto uid = next_uid_++;
+    callbacks_.emplace(uid, CallbackObject{uid, current_thread_id_, std::string(name.substr(0,31)), function, common_argument});
+    return uid;
+}
+
+const CallbackObject *ThreadManager::get_callback(std::int32_t uid) const noexcept {
+    const auto it = callbacks_.find(uid);
+    return it == callbacks_.end() ? nullptr : &it->second;
 }
 
 std::int32_t ThreadManager::init_root_thread(std::string_view name, std::uint32_t entry_pc, std::uint32_t sp, std::uint32_t gp) {
@@ -319,6 +331,20 @@ std::int32_t ThreadManager::change_current_thread_attr(std::uint32_t clear_attr,
 
 void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kernel) {
     g_active_kernel = &kernel;
+
+    // PARTIAL: create owned identity only; no notification/scheduling subsystem.
+    runtime.register_hle("ThreadManForUser", 0xE81CAF8Fu,
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            if (!rt.memory().contains(ctx.gpr[4], 1)) {
+                rt.stop("sceKernelCreateCallback invalid name pointer requires semantics"); return;
+            }
+            const auto name = read_safe_string(rt.memory(), ctx.gpr[4], 31);
+            const auto uid = kernel.threads().create_callback(name, ctx.gpr[5], ctx.gpr[6]);
+            ctx.set_gpr(2, static_cast<std::uint32_t>(uid));
+            rt.event("callback_create", {{"uid",static_cast<std::uint32_t>(uid)}, {"function",ctx.gpr[5]},
+                {"common",ctx.gpr[6]}, {"owner",static_cast<std::uint32_t>(kernel.threads().current_thread_id())},
+                {"caller",ctx.gpr[31]-8}}, name);
+        });
 
     // Register thread-return trampoline sentinel
     runtime.register_function(ThreadManager::kThreadReturnSentinel, &thread_return_trampoline, "thread_return_trampoline");

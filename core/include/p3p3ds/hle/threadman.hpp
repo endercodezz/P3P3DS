@@ -57,6 +57,13 @@ struct ThreadControlBlock {
     psprecomp::AllegrexContext context{};
 };
 
+// Ownership/identity only: notification and callback execution are not implemented.
+struct CallbackObject {
+    std::int32_t uid{}, owner_thread_uid{};
+    std::string name;
+    std::uint32_t function{}, common_argument{};
+};
+
 class ThreadManager {
 public:
     static constexpr std::uint32_t kThreadReturnSentinel = 0x00000020u;
@@ -65,6 +72,8 @@ public:
     ThreadManager();
 
     void reset();
+    std::int32_t create_callback(std::string_view name, std::uint32_t function, std::uint32_t common_argument);
+    [[nodiscard]] const CallbackObject *get_callback(std::int32_t uid) const noexcept;
 
     std::int32_t init_root_thread(std::string_view name, std::uint32_t entry_pc, std::uint32_t sp, std::uint32_t gp);
 
@@ -101,6 +110,8 @@ private:
     std::int32_t current_thread_id_{0};
     std::uint32_t next_stack_top_{0x09FF0000u};
     std::map<std::int32_t, ThreadControlBlock> threads_;
+    // Shares next_uid_ with threads; type-specific lookup prevents UID confusion.
+    std::map<std::int32_t, CallbackObject> callbacks_;
     std::vector<std::int32_t> ready_queue_;
 };
 
