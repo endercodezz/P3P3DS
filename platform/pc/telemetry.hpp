@@ -60,6 +60,8 @@ inline void dump_events(const std::filesystem::path &path, const psprecomp::Runt
                         const KernelState &k, const BootstrapCheckpoint &check) {
     std::ofstream o(path); if(!o) throw std::runtime_error("cannot open event output");
     const auto &t=r.last_transfer; const auto &w=r.memory().vram_writes(); const auto &g=k.ge().state();
+    std::uint64_t cpu_color=0,cpu_depth=0;
+    for(const auto &e:r.events) if(e.type=="vram_activity_summary") {cpu_color=e.fields.at("color");cpu_depth=e.fields.at("depth");}
     o << "{\n\"schema\":1,\n\"bootstrap_passed\":" << (check.passed?"true":"false")
       << ",\n\"blocker\":{\"type\":" << json_string(blocker_type(r,k)) << ",\"pc\":" << r.cpu().pc
       << ",\"caller\":" << t.pc << ",\"word\":" << t.word << ",\"target\":" << t.target
@@ -69,8 +71,8 @@ inline void dump_events(const std::filesystem::path &path, const psprecomp::Runt
       << ",\"reason\":" << json_string(r.stop_reason()) << "},\n\"registered_entries\":" << r.function_count()
       << ",\n\"graphics\":{\"writer\":" << (k.ge().writer_observed()?"true":"false")
       << ",\"writer_pc\":" << k.ge().writer_pc() << ",\"vram_operations\":" << w.operations
-      << ",\"bytes\":" << w.bytes << ",\"changed\":" << w.changed << ",\"color_writes\":" << w.color
-      << ",\"depth_writes\":" << w.depth << ",\"color\":" << g.color_address() << ",\"depth\":" << g.depth_address()
+      << ",\"bytes\":" << w.bytes << ",\"changed\":" << w.changed << ",\"color_writes\":" << w.color+cpu_color
+      << ",\"depth_writes\":" << w.depth+cpu_depth << ",\"color\":" << g.color_address() << ",\"depth\":" << g.depth_address()
       << ",\"stride\":" << g.color_stride() << ",\"format\":" << g.format() << ",\"display\":" << k.display().info().topaddr << "},\n\"events\":[\n";
     bool first=true;
     for(const auto &e:r.events) {

@@ -1,4 +1,4 @@
-P3P3DS bootstrap: entry=0x08804108 relocations=178513 registered_entries=1486
+P3P3DS bootstrap: entry=0x08804108 relocations=178513 registered_entries=1487
 [THREAD CREATE] uid=2 name=user_main entry=0x880421c priority=32 stack=0x9fb0000-0x9ff0000
 [THREAD START] uid=2 name=user_main args=0
 [THREAD EXIT] uid=1 name=root status=0 ready=1
@@ -20,12 +20,13 @@ P3P3DS bootstrap: entry=0x08804108 relocations=178513 registered_entries=1486
 ====================================================
 
 [VRAM FIRST STORE] pc=0x8ab2af4 address=0x4154004 bytes=4
-Stop Reason: CPU VRAM write observed; inspect target and producer
-Final Guest PC: 0x08AB2B38
-Blocker type: cpu_vram_write
-Last executed transfer: 0x08AB2B24 word=0x14400003 target=0x08AB2B34
+Stop Reason: Missing HLE import sceUmdUser::sceUmdRegisterUMDCallBack
+Final Guest PC: 0x08B80114
+Blocker type: missing_hle
+Last executed transfer: 0x08AA15D4 word=0x0E2E0045 target=0x08B80114
 Stable bootstrap: PASS
 [GE STATE] color=0x04000000 stride=512 format=3 depth=0x04110000 stride=512
 [GE LIST] id=1 pc=0x08BB4424 status=0 stall=0x00000000 commands=212 completions=1 cb=-1
 [GE LIST] id=2 pc=0x08D14674 status=0 stall=0x08D14674 commands=29 completions=1 cb=0
-[VRAM WRITES] operations=1 bytes=4 changed=3 color=0 depth=0 nonzero=3
+[VRAM WRITES] operations=4 bytes=16 changed=10 color=0 depth=0 nonzero=10
+[CPU VRAM ACTIVITY] resource=4 texture=0 color=0 depth=0 suppressed=0

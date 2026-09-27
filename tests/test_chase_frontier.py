@@ -31,6 +31,8 @@ class ChaserTests(unittest.TestCase):
         e = self.event(); e["bootstrap_passed"] = False
         self.assertIsNotNone(chase.candidate(e))
         e = self.event(); e["graphics"]["vram_operations"] = 1
+        self.assertIsNone(chase.candidate(e))  # metadata is not rendering
+        e["graphics"]["color_writes"] = 1
         self.assertEqual(chase.candidate(e), "graphics writer")
 
     def test_manifest_duplicate_and_containment(self):

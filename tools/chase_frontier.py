@@ -63,7 +63,7 @@ def candidate(event):
     b = event["blocker"]
     if b["type"] != "missing_guest_function":
         return b["type"]
-    if event["graphics"]["writer"] or event["graphics"]["vram_operations"]:
+    if event["graphics"]["writer"] or event["graphics"].get("color_writes", 0) or event["graphics"].get("depth_writes", 0):
         return "graphics writer"
     if b["target"] != b["pc"] or b["word"] >> 26 != 3 or b["ra"] != b["caller"] + 8:
         return "unproven executed edge"

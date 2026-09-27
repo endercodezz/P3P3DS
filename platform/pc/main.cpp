@@ -2,6 +2,7 @@
 #include "psprecomp/elf32.hpp"
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "telemetry.hpp"
+#include "p3p3ds/vram_activity.hpp"
 #include <iostream>
 #include <optional>
 namespace psprecomp {void register_generated_functions(Runtime &);}
@@ -9,7 +10,7 @@ int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path;
         std::uint64_t budget=100000;
-        bool verify=false, chase=false;
+        bool verify=false, chase=false, stop_any_vram=false;
         std::optional<std::uint32_t> expected;
         for(int i=1;i<argc;++i) {
             const std::string a=argv[i];
@@ -20,11 +21,12 @@ int main(int argc,char **argv) {
             else if(a=="--expect-frontier") expected=std::stoul(value(),nullptr,0);
             else if(a=="--verify-bootstrap" || a=="--verify-milestone" || a=="--verify") verify=true;
             else if(a=="--run-until-blocker") chase=true;
+            else if(a=="--stop-on-any-vram-write") stop_any_vram=true;
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
                 std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
                          <<"--run-until-blocker --expect-frontier <address> --dump-events <json>\n"
-                         <<"--elf <path> --max-dispatches <count>\n";return 0;
+                         <<"--elf <path> --max-dispatches <count> --stop-on-any-vram-write\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -54,19 +56,8 @@ int main(int argc,char **argv) {
         };
         psprecomp::set_runtime_pre_dispatch_hook([](auto &r,auto &,auto pc,auto) {r.diagnostic_pc=pc;r.event("guest_enter",{{"target",pc}});});
         psprecomp::set_runtime_pre_chained_call_hook([](auto &r,auto &,auto pc,auto) {r.diagnostic_pc=pc;r.event("guest_enter",{{"target",pc}});});
-        rt.memory().vram_write_observer=[&](std::uint32_t address,std::size_t bytes) {
-            const auto a=psprecomp::GuestMemory::kVramPhysicalBase+((address-psprecomp::GuestMemory::kVramPhysicalBase)%psprecomp::GuestMemory::kVramSize);
-            const auto &g=kernel.ge().state();
-            const auto color_size=g.color_stride()*272u*(g.format()==3?4u:2u);
-            const auto depth_size=g.depth_stride()*272u*2u;
-            const bool color=color_size && a<g.color_address()+color_size && std::uint64_t(a)+bytes>g.color_address();
-            const bool depth=depth_size && a<g.depth_address()+depth_size && std::uint64_t(a)+bytes>g.depth_address();
-            rt.cpu().pc=rt.diagnostic_pc;
-            rt.event("cpu_vram_write",{{"address",a},{"bytes",bytes},{"color",color},{"depth",depth},
-                {"instruction",rt.memory().contains(rt.diagnostic_pc,4)?rt.memory().load32(rt.diagnostic_pc):0}},psprecomp::runtime_thread_name());
-            rt.stop("CPU VRAM write observed; inspect target and producer");
-            throw psprecomp::FrontierHalt{};
-        };
+        p3p3ds::VramActivity activity;
+        rt.memory().vram_write_observer=[&](std::uint32_t address,std::size_t bytes) {activity.observe(rt,kernel,address,bytes,stop_any_vram);};
         std::cout<<"P3P3DS bootstrap: entry="<<psprecomp::hex32(entry)<<" relocations="<<reloc.total
                  <<" registered_entries="<<rt.function_count()<<"\n";
         try {rt.run(entry,budget);}
@@ -76,6 +67,8 @@ int main(int argc,char **argv) {
             rt.stop((reason.find("memory")!=std::string::npos?"Memory fault: ":"Runtime exception: ")+reason);
         }
         rt.event_observer={};
+        rt.event("vram_activity_summary",{{"unclassified_resource",activity.resource},{"bound_texture_resource",activity.texture},
+            {"color",activity.color},{"depth",activity.depth},{"suppressed",activity.suppressed}});
         if(!rt.stopped())rt.stop("Dispatch budget exhausted");
         const auto type=p3p3ds::blocker_type(rt,kernel);
         rt.event("blocker",{{"target",rt.cpu().pc}},rt.stop_reason());
@@ -89,6 +82,8 @@ int main(int argc,char **argv) {
         for(auto b:rt.memory().vram_bytes()) nonzero+=b!=0;
         std::cout<<"[VRAM WRITES] operations="<<w.operations<<" bytes="<<w.bytes<<" changed="<<w.changed
                  <<" color="<<w.color<<" depth="<<w.depth<<" nonzero="<<nonzero<<"\n";
+        std::cout<<"[CPU VRAM ACTIVITY] resource="<<activity.resource<<" texture="<<activity.texture
+                 <<" color="<<activity.color<<" depth="<<activity.depth<<" suppressed="<<activity.suppressed<<"\n";
         if(!events_path.empty())p3p3ds::dump_events(events_path,rt,kernel,checkpoint);
         if(expected && (type!="missing_guest_function" || rt.cpu().pc!=*expected))return 4;
         if(!checkpoint.passed)return 3;

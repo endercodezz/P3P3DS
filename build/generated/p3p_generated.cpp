@@ -20741,6 +20741,45 @@ void sub_08A9B198(Runtime &rt, AllegrexContext &ctx) {
     sub_08A9B198_entry(rt, ctx, 0u, aot_mem);
 }
 
+static const std::uint16_t kEntryIds_sub_08AA0F8C[1] = {
+    1,
+};
+void sub_08AA0F8C_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
+    std::uint32_t jump_target = 0u;
+    std::uint32_t local_transfers = 0u;
+    std::uint32_t local_pc = ctx.pc;
+    std::uint32_t entry_id = direct_entry_id;
+LOCAL_DISPATCH:
+    {
+    if (entry_id == 0u) {
+        const std::uint32_t entry_delta = local_pc - 0x08AA0F8Cu;
+        entry_id = (entry_delta < 4u && (entry_delta & 3u) == 0u) ? kEntryIds_sub_08AA0F8C[entry_delta >> 2u] : 0u;
+    }
+    switch (entry_id) {
+    case 1u: goto L_08AA0F8C;
+    default:
+        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
+        else ctx.pc = local_pc;
+        return;
+    }
+    }
+L_08AA0F8C:
+    ctx.set_gpr(2, 2262u << 16u);
+    jump_target = ctx.gpr[31];
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AA0F94u;
+    rt.memory().aot_store32(ctx.gpr[2] + static_cast<std::uint32_t>(11028), 0u);
+    rt.record_transfer(0x08AA0F90u, 0x03E00008u, jump_target);
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    ctx.pc = jump_target;
+    return;
+}
+
+void sub_08AA0F8C(Runtime &rt, AllegrexContext &ctx) {
+    auto aot_mem = rt.memory().aot_fast_view();
+    sub_08AA0F8C_entry(rt, ctx, 0u, aot_mem);
+}
+
 static void import_0(Runtime &rt, AllegrexContext &ctx) {
     const RuntimeExecutionContextToken caller_context = capture_runtime_execution_context();
     const std::uint32_t import_pc = ctx.pc;
@@ -24057,6 +24096,7 @@ void register_generated_functions(Runtime &runtime) {
     runtime.register_function(0x08B16E64u, &sub_08B16D24, "sub_08B16D24");
     runtime.register_function(0x08A9B094u, &sub_08A9B198, "sub_08A9B198");
     runtime.register_function(0x08A9B198u, &sub_08A9B198, "sub_08A9B198");
+    runtime.register_function(0x08AA0F8Cu, &sub_08AA0F8C, "sub_08AA0F8C");
     runtime.register_function(0x08B7FD9Cu, &import_0, "sceAudio::0x01562BA3");
     runtime.register_function(0x08B7FDA4u, &import_1, "sceAudio::0x2D53F36E");
     runtime.register_function(0x08B7FDACu, &import_2, "sceAudio::0x43196845");

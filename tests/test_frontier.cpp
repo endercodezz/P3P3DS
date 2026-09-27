@@ -1,4 +1,5 @@
 #include "p3p3ds/frontier.hpp"
+#include "p3p3ds/vram_activity.hpp"
 #include "../platform/pc/telemetry.hpp"
 #include <iostream>
 static int failures;
@@ -63,6 +64,38 @@ int main() {
         m.store16(0x04000004,0);m.store8(0x04000006,0);m.zero(0x04000010,4);
         const std::uint8_t bytes[]={1,2};m.copy_in(0x04000020,bytes);
         CHECK(count==5);CHECK(m.vram_writes().operations==5);
+    }
+    {
+        using V=p3p3ds::VramActivity;
+        CHECK(V::overlaps(0x04400000,4,0x04000000,4));
+        CHECK(V::overlaps(0x041FFFFE,4,0x04000000,4));
+        CHECK(!V::overlaps(0x04154000,4,0x04110000,512*272*2));
+        CHECK(!V::overlaps(0x04000000,4,0,4));
+        Runtime r;p3p3ds::KernelState k;V activity;r.frontier_diagnostics=true;
+        r.cpu().pc=0x08800000;r.diagnostic_pc=0x08801000;
+        for(unsigned i=0;i<40;++i)activity.observe(r,k,0x04154004,4);
+        CHECK(!r.stopped());CHECK(r.cpu().pc==0x08800000);
+        CHECK(activity.resource==40);CHECK(activity.suppressed==8);CHECK(r.events.size()==32);
+        // Pending display target is not active until vblank.
+        k.display().set_framebuf(0x04088000,512,3,1);
+        activity.observe(r,k,0x04088000,4);CHECK(!r.stopped());
+        k.display().advance_vblank();
+        try {activity.observe(r,k,0x04088000,4);CHECK(false);}catch(const FrontierHalt &){}
+        CHECK(r.stopped());CHECK(r.cpu().pc==0x08801000);CHECK(activity.color==1);
+    }
+    {
+        Runtime r;p3p3ds::KernelState k;p3p3ds::VramActivity activity;r.frontier_diagnostics=true;
+        // GE color, depth and bound direct-color texture state, followed by FINISH/END.
+        const std::uint32_t words[]={0x9C000000,0x9D000200,0xD2000003,0x9E110000,0x9F000200,
+            0x1E000001,0xA0180000,0xA8040003,0xB8000101,0xC3000003,0x0F000000,0x0C000000};
+        for(unsigned i=0;i<std::size(words);++i)r.memory().store32(0x08800000+i*4,words[i]);
+        k.ge().enqueue_list(r,0x08800000,0,-1,0);
+        activity.observe(r,k,0x04180000,4);CHECK(activity.texture==1);CHECK(!r.stopped());
+        activity.observe(r,k,0x0418001F,1);CHECK(activity.texture==2); // minimum stride is four pixels
+        activity.observe(r,k,0x04180020,1);CHECK(activity.resource==1);
+        activity.observe(r,k,0x04154004,4);CHECK(activity.resource==2);CHECK(!r.stopped());
+        try {activity.observe(r,k,0x04110000,4);CHECK(false);}catch(const FrontierHalt &){}
+        CHECK(activity.depth==1);CHECK(activity.color==0);CHECK(r.stopped());
     }
     std::cout<<"frontier checks failures="<<failures<<"\n";return failures?1:0;
 }
