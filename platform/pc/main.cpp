@@ -41,6 +41,9 @@ int main(int argc,char **argv) {
         rt.cpu().gpr[31]=p3p3ds::hle::ThreadManager::kThreadReturnSentinel;
         psprecomp::register_generated_functions(rt);
         p3p3ds::KernelState kernel;
+        // Explicit PC game-launch environment: medium present. This does not
+        // imply implemented UMD activation, drive readiness or filesystem mounting.
+        kernel.umd().set_medium_present(true);
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
         p3p3ds::hle::register_all_hle_modules(rt,kernel);
         rt.frontier_diagnostics=true;

@@ -32,6 +32,15 @@ int main() {
     CHECK(second!=uid && second!=thread);CHECK(reg(second)==0);
     CHECK(k.umd().registered_callback()==second);
     p3p3ds::KernelState independent;CHECK(independent.umd().registered_callback()==0);
+    auto check_medium=[&]() {r.invoke_import("sceUmdUser",0x46EBB729,c);return c.gpr[2];};
+    CHECK(!k.umd().medium_present());CHECK(check_medium()==0);
+    k.umd().set_medium_present(false);CHECK(check_medium()==0);
+    k.umd().set_medium_present(true);CHECK(k.umd().medium_present());CHECK(check_medium()==1);
+    CHECK(!independent.umd().medium_present());
+    CHECK(k.umd().registered_callback()==second);
+    independent.umd().set_medium_present(true);
+    k.umd().set_medium_present(false);CHECK(!k.umd().medium_present());CHECK(check_medium()==0);
+    CHECK(independent.umd().medium_present());CHECK(k.umd().registered_callback()==second);
     CHECK(!independent.threads().get_callback(uid));CHECK(!r.stopped());
     std::cout<<"UMD callback failures="<<failures<<'\n';return failures?1:0;
 }

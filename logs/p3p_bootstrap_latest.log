@@ -20,10 +20,10 @@ P3P3DS bootstrap: entry=0x08804108 relocations=178513 registered_entries=1487
 ====================================================
 
 [VRAM FIRST STORE] pc=0x8ab2af4 address=0x4154004 bytes=4
-Stop Reason: Missing HLE import sceUmdUser::sceUmdCheckMedium
-Final Guest PC: 0x08B800EC
+Stop Reason: Missing HLE import sceUmdUser::sceUmdActivate
+Final Guest PC: 0x08B80124
 Blocker type: missing_hle
-Last executed transfer: 0x08AA15E4 word=0x0E2E003B target=0x08B800EC
+Last executed transfer: 0x08AA15F8 word=0x0E2E0049 target=0x08B80124
 Stable bootstrap: PASS
 [GE STATE] color=0x04000000 stride=512 format=3 depth=0x04110000 stride=512
 [GE LIST] id=1 pc=0x08BB4424 status=0 stall=0x00000000 commands=212 completions=1 cb=-1

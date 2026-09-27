@@ -1,11 +1,14 @@
 {
   "schema": 1,
-  "source_base": "0e6eca51292ce77ca40b78e9eeb6be094327e6a8",
+  "source_base": "8cf9b70caf5af42be7663a674c5b9424701b93a8",
   "phase1_checkpoint": "ea7374b5a63fa73c05af8fdc27a552a23e60f470",
   "blocker_type": "missing_hle",
-  "blocker_service": "sceUmdUser::sceUmdCheckMedium",
-  "blocker_pc": "0x08B800EC",
-  "blocker_caller": "0x08AA15E4",
+  "blocker_service": "sceUmdUser::sceUmdActivate",
+  "blocker_pc": "0x08B80124",
+  "blocker_caller": "0x08AA15F8",
+  "umd_medium_present": true,
+  "umd_check_medium_result": 1,
+  "umd_check_medium_guest_return": "0x08AA15EC",
   "umd_callback_uid": 4,
   "umd_registration_result": 0,
   "umd_registration_guest_return": "0x08AA15DC",
@@ -28,5 +31,5 @@
   "depth_writes": 0,
   "ge_writer_observed": false,
   "graphics_output_proven": false,
-  "events_sha256": "26dd4607202d819d5516386ad7f4d5e7d73fdb266ed4c469a103a3f40ddeadfb"
+  "events_sha256": "33505f22b89f16d42b3ebca31a2c808a550ba56dc68f0d33e55202bad9861566"
 }

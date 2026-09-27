@@ -2,7 +2,21 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current micro-sprint: UMD callback registration
+## Current micro-sprint: UMD medium presence
+
+Source base: `8cf9b70caf5af42be7663a674c5b9424701b93a8`.
+
+- [VERIFIED] `UmdState` defaults to medium absent; setter/getter expose per-kernel presence. `sceUmdCheckMedium` reads it and returns 0/1 without drive-state, activation or callback effects. `platform/pc/main.cpp` explicitly configures presence for the game-launch environment; this is not proof of filesystem mounting or drive readiness. References: `references/uofw/include/mediaman_user.h:74-79`, `references/uofw/src/kd/mediaman/mediaman.c::sceUmdCheckMedium/sub_000004DC`, `psp/pspsdk/src/umd/pspumd.h:69-73`; PPSSPP `sceUmd.cpp::sceUmdCheckMedium` used only as behavioral reference, no source copied.
+- [VERIFIED] Call `0x08AA15E4 -> 0x08B800EC` returns **1** with configured presence; subsequent `guest_enter` at **`0x08AA15EC`** proves continuation. SDK_UMD registration still succeeds with UID 4. Next blocker is **missing HLE `sceUmdUser::sceUmdActivate`**, NID `0xC6183D47`, PC **`0x08B80124`**, caller **`0x08AA15F8`**, user_main / UID 2. No implementation or further frontier work beyond this blocker.
+- [VERIFIED] VRAM: four unclassified-resource writes, 16 bytes touched, 10 changed; CPU color/depth writes zero. GE setup lists remain 212/29 commands, one completion each, no writer. **Graphics milestone: NO**.
+- [VERIFIED] `cmake --build build --config Release --parallel 2`, `ctest --test-dir build --output-on-failure` (**11/11**), `build/p3p_pc_bootstrap.exe --verify-bootstrap` and `git diff --check` pass. Focused UMD tests cover default/absent/present/removal through the actual HLE, preserved callback registration and independent kernel presence states.
+- [VERIFIED] Two `--run-until-blocker --dump-events .tmp/medium-replay-{1,2}.json` runs match SHA-256 **`33505F22B89F16D42B3EBCA31A2C808A550BA56DC68F0D33E55202BAD9861566`**. Evidence: `umd_check_medium` followed by `guest_enter`, next `missing_hle`, and VRAM/GE counters. No generated AOT/profile-seed changes.
+
+Immediate blocker: missing `sceUmdActivate` HLE.
+
+Next smallest step: establish the minimal `sceUmdActivate` activation contract for the observed call against uOFW/PSPSDK before implementing it.
+
+## UMD callback registration (historical)
 
 Source base: `0e6eca51292ce77ca40b78e9eeb6be094327e6a8`; no frontier expansion or generated-code changes in this sprint.
 
@@ -14,9 +28,8 @@ Source base: `0e6eca51292ce77ca40b78e9eeb6be094327e6a8`; no frontier expansion o
 - [VERIFIED] Release build and all **11/11 CTest** tests pass, including `p3p_hle_umd`, stable bootstrap and frontier regressions. The UMD test checks real callback identity/fields, thread UID rejection, invalid/zero UID, valid/repeat registration, state preservation/replacement and independent kernel state. Expected registration results match the limited pspautotests cases above; no hardware test run is claimed.
 - [VERIFIED] `build/p3p_pc_bootstrap.exe --verify-bootstrap` passes. Two `--run-until-blocker --dump-events .tmp/umd-replay-{1,2}.json` runs are byte-identical, SHA-256 **`26DD4607202D819D5516386AD7F4D5E7D73FDB266ED4C469A103A3F40DDEADFB`**. `callback_create`, `umd_callback_register`, subsequent `guest_enter`, and `missing_hle` events provide the evidence. `git diff --check` is clean.
 
-Immediate blocker: missing `sceUmdCheckMedium` HLE.
+Previous blocker: missing `sceUmdCheckMedium` HLE, resolved above.
 
-Next smallest step: implement and test `sceUmdCheckMedium` against a documented mounted-media state, without assuming unconditional media presence.
 
 ## Phase 2 result (historical, superseded above)
 

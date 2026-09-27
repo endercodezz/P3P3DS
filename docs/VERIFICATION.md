@@ -8,6 +8,8 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ## UMD callback registration micro-sprint
 
+- [VERIFIED] Medium presence is explicit per-kernel state, absent by default and present by PC bootstrap configuration. `sceUmdCheckMedium` returns 0/1 from that state; tests exercise both states and removal. Contract: `references/uofw/include/mediaman_user.h:74-79`, `psp/pspsdk/src/umd/pspumd.h:69-73`. Native replay returns 1 to `0x08AA15EC`, then stops at missing `sceUmdActivate` (`0x08B80124`). Two event traces match SHA-256 `33505F22B89F16D42B3EBCA31A2C808A550BA56DC68F0D33E55202BAD9861566`; see CURRENT_STATE. Presence does not imply implemented activation/readiness/mounting.
+
 - [VERIFIED] Registration requires a Callback-type UID; zero/invalid/non-callback return `0x80010016`, valid/repeat return zero and retain one registered UID. Primary sources: `references/uofw/src/kd/mediaman/mediaman.c:590-607`, `references/uofw/include/mediaman_user.h:54-62`, `references/pspautotests/tests/umd/register.expected:1-6`. Implementation: `core/include/p3p3ds/hle/umd.hpp::UmdState::register_callback`; deterministic regression: `tests/test_hle_umd.cpp`.
 - [VERIFIED] P3P registers owned callback UID 4 at stub `0x08B80114`, returns zero and enters guest `0x08AA15DC`; next missing service is `sceUmdCheckMedium` at `0x08B800EC`. Two native replays match SHA-256 `26DD4607202D819D5516386AD7F4D5E7D73FDB266ED4C469A103A3F40DDEADFB`. See CURRENT_STATE for reproduction and limitations; callback delivery and visual output remain unimplemented/unproven.
 
