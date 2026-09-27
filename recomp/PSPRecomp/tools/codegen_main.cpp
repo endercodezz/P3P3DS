@@ -97,6 +97,13 @@ std::string emit_regular(const psprecomp::DecodedInstruction &d, std::uint32_t p
     const auto imm = static_cast<std::int32_t>(d.immediate);
     const auto uimm = static_cast<std::uint16_t>(d.immediate);
     std::ostringstream out;
+    // P3P3DS: exact fault/store PC in diagnostic mode; no instruction events.
+    using K = psprecomp::OpcodeKind;
+    if (d.kind==K::Sw || d.kind==K::Swl || d.kind==K::Swr || d.kind==K::Sh || d.kind==K::Sb ||
+        d.kind==K::Swc1 || d.kind==K::Svs || d.kind==K::Svq || d.kind==K::Lw || d.kind==K::Lh ||
+        d.kind==K::Lhu || d.kind==K::Lb || d.kind==K::Lbu || d.kind==K::Lwl || d.kind==K::Lwr ||
+        d.kind==K::Lwc1 || d.kind==K::Lvs || d.kind==K::Lvq)
+        out << "    if (rt.frontier_diagnostics) rt.diagnostic_pc = " << psprecomp::hex32(pc) << "u;\n";
     switch (d.kind) {
     case psprecomp::OpcodeKind::Nop: out << "    // nop\n"; break;
     case psprecomp::OpcodeKind::Sync:
@@ -1051,15 +1058,19 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                     if (likely_branch) {
                         body << "    if (" << condition << ") {\n"
                              << emit_regular(slot, pc + 4u);
+                        body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, " << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(target) << "u);\n";
                         emit_target(body, target, function.entry_labels, "        ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
                         body << "    }\n";
+                        body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, " << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(fallthrough) << "u);\n";
                         emit_target(body, fallthrough, function.entry_labels, "    ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
                     } else {
                         body << "    { const bool branch_taken = " << condition << ";\n"
                              << emit_regular(slot, pc + 4u)
                              << "      if (branch_taken) {\n";
+                        body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, " << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(target) << "u);\n";
                         emit_target(body, target, function.entry_labels, "          ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
                         body << "      }\n";
+                        body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, " << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(fallthrough) << "u);\n";
                         emit_target(body, fallthrough, function.entry_labels, "      ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
                         body << "    }\n";
                     }
@@ -1070,6 +1081,10 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                         body << "    ctx.set_gpr(31, " << psprecomp::hex32(pc + 8u) << "u);\n";
                     }
                     body << emit_regular(slot, pc + 4u);
+                    // P3P3DS frontier proof: record the edge actually executed,
+                    // after its delay slot, even when the callee cannot chain.
+                    body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, "
+                         << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(target) << "u);\n";
                     if (decoded.kind == psprecomp::OpcodeKind::J) {
                         emit_target(body, target, function.entry_labels, "    ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
                     } else if (function.entry_labels.contains(target)) {
@@ -1121,6 +1136,8 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                         body << "    ctx.set_gpr(" << link << ", " << psprecomp::hex32(pc + 8u) << "u);\n";
                     }
                     body << emit_regular(slot, pc + 4u);
+                    body << "    rt.record_transfer(" << psprecomp::hex32(pc) << "u, "
+                         << psprecomp::hex32(decoded.word) << "u, jump_target);\n";
                     if (decoded.kind == psprecomp::OpcodeKind::Jalr) {
                         // Indirect call: same bounded chaining as a direct one.
                         // The runtime rejects import wrappers, so a JALR into

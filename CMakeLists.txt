@@ -23,17 +23,23 @@ set(P3P_GENERATED_CPP "${P3P_GENERATED_DIR}/p3p_generated.cpp")
 # Generation command using psp_recomp
 set(P3P_ELF "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/game/eboot.elf")
 set(P3P_FUNCTIONS_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/p3p_functions.csv")
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(P3P_FRONTIER_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/frontier_seeds.csv")
+set(P3P_MERGED_CSV "${P3P_GENERATED_DIR}/frontier_functions.csv")
 
 add_custom_command(
     OUTPUT "${P3P_GENERATED_CPP}"
-    COMMAND psp_recomp "${P3P_ELF}" "${P3P_FUNCTIONS_CSV}" "${P3P_GENERATED_CPP}"
-    DEPENDS psp_recomp "${P3P_ELF}" "${P3P_FUNCTIONS_CSV}"
+    BYPRODUCTS "${P3P_MERGED_CSV}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py" --merge "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${P3P_MERGED_CSV}"
+    COMMAND psp_recomp "${P3P_ELF}" "${P3P_MERGED_CSV}" "${P3P_GENERATED_CPP}"
+    DEPENDS psp_recomp "${P3P_ELF}" "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py"
     COMMENT "Generating P3P recompiled translation units..."
     VERBATIM
 )
 
 # Core P3P3DS Target-Agnostic Runtime & HLE Library
 add_library(p3p3ds_core
+    core/src/frontier.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
@@ -150,7 +156,7 @@ set_tests_properties(p3p_hle_threadman PROPERTIES
 
 add_test(
     NAME p3p_pc_bootstrap_smoke
-    COMMAND p3p_pc_bootstrap --verify-milestone --max-dispatches 100000
+    COMMAND p3p_pc_bootstrap --verify-bootstrap --max-dispatches 100000
 )
 set_tests_properties(p3p_pc_bootstrap_smoke PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -189,3 +195,9 @@ target_link_libraries(test_hle_graphics PRIVATE p3p3ds_core)
 add_test(NAME p3p_hle_graphics COMMAND test_hle_graphics)
 
 set_tests_properties(p3p_hle_graphics PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+add_executable(p3p_frontier_check platform/pc/frontier_check.cpp)
+target_link_libraries(p3p_frontier_check PRIVATE p3p3ds_core)
+add_executable(test_frontier tests/test_frontier.cpp)
+target_link_libraries(test_frontier PRIVATE p3p3ds_core)
+add_test(NAME p3p_frontier_safety COMMAND test_frontier)
+add_test(NAME p3p_frontier_workflow COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_chase_frontier.py")

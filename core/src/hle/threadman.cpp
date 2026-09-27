@@ -349,6 +349,7 @@ void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kerne
             const std::int32_t result = kernel.threads().create_thread(
                 name, entry, prio, stack_size, attr, option_ptr, rt.memory());
             ctx.set_gpr(2, static_cast<std::uint32_t>(result));
+            rt.event("thread_create", {{"uid",static_cast<std::uint32_t>(result)}, {"entry",entry}}, name);
         });
 
     // ThreadManForUser::0xF475845D (sceKernelStartThread)
@@ -360,6 +361,8 @@ void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kerne
 
             const std::int32_t result = kernel.threads().start_thread(
                 thid, arg_size, arg_ptr, rt.memory(), ctx);
+            rt.event("thread_start", {{"uid",static_cast<std::uint32_t>(thid)}, {"result",static_cast<std::uint32_t>(result)}});
+            rt.event("thread_switch", {{"uid",static_cast<std::uint32_t>(kernel.threads().current_thread_id())}, {"entry",ctx.pc}});
             if (result < 0) {
                 ctx.set_gpr(2, static_cast<std::uint32_t>(result));
             }

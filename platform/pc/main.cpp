@@ -1,460 +1,97 @@
 #include "psprecomp/common.hpp"
 #include "psprecomp/elf32.hpp"
-#include "psprecomp/runtime.hpp"
-
-#include "p3p3ds/kernel_state.hpp"
 #include "p3p3ds/hle/hle_modules.hpp"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../../recomp/Yakumo/profiles/mhp3rd/third_party/stb_image_write.h"
-
-#include <cstdint>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
+#include "telemetry.hpp"
 #include <iostream>
-#include <string>
-#include <string_view>
-#include <vector>
-
-namespace psprecomp {
-// Defined in the generated AOT translation unit
-void register_generated_functions(Runtime &runtime);
-}
-
-namespace {
-
-constexpr std::uint32_t kExpectedEntryPc = 0x08804108u;
-constexpr std::uint32_t kExpectedStopPc = 0x08B1C594u;
-constexpr std::uint32_t kExpectedStopCallerPc = 0x08AB315Cu;
-constexpr std::uint32_t kExpectedStopInstruction = 0x0E2C7165u; // jal 0x08B1C594
-constexpr std::string_view kExpectedStopReason = "No recompiled function registered at 0x08B1C594";
-constexpr std::uint32_t kExpectedSdkVersion = 0x06020010u;
-constexpr std::uint32_t kExpectedCompilerVersion = 0x00030306u;
-constexpr std::int32_t kExpectedThreadUid = 2;
-constexpr std::string_view kExpectedThreadName = "user_main";
-
-void print_registers(const psprecomp::AllegrexContext &ctx) {
-    static const char *const kGprNames[32] = {
-        "zero", "at", "v0", "v1", "a0", "a1", "a2", "a3",
-        "t0",   "t1", "t2", "t3", "t4", "t5", "t6", "t7",
-        "s0",   "s1", "s2", "s3", "s4", "s5", "s6", "s7",
-        "t8",   "t9", "k0", "k1", "gp", "sp", "fp", "ra"
-    };
-
-    std::cout << "\n=== Guest Register State ===\n";
-    std::cout << "  PC: " << psprecomp::hex32(ctx.pc) << "\n";
-    for (std::size_t i = 0; i < 32; ++i) {
-        if (i % 4 == 0) std::cout << "  ";
-        std::cout << std::left << std::setw(4) << kGprNames[i] << " = "
-                  << psprecomp::hex32(ctx.gpr[i]) << "  ";
-        if (i % 4 == 3) std::cout << "\n";
-    }
-    std::cout << std::right;
-}
-
-struct MilestoneVerificationResult {
-    bool passed{false};
-    bool stopped{false};
-    bool entry_matched{false};
-    bool pc_matched{false};
-    bool stop_instruction_matched{false};
-    bool thread_uid_matched{false};
-    bool thread_name_matched{false};
-    bool sdk_version_matched{false};
-    bool compiler_version_matched{false};
-    bool stop_reason_matched{false};
-    std::string failure_detail;
-};
-
-MilestoneVerificationResult verify_milestone(
-    std::uint32_t entry_addr,
-    const psprecomp::Runtime &runtime,
-    const p3p3ds::KernelState &kernel)
-{
-    MilestoneVerificationResult res;
-    res.stopped = runtime.stopped();
-    res.entry_matched = (entry_addr == kExpectedEntryPc);
-    res.pc_matched = (runtime.cpu().pc == kExpectedStopPc);
-    res.stop_instruction_matched =
-        runtime.memory().contains(kExpectedStopCallerPc, sizeof(std::uint32_t)) &&
-        runtime.memory().load32(kExpectedStopCallerPc) == kExpectedStopInstruction;
-    res.thread_uid_matched = (kernel.threads().current_thread_id() == kExpectedThreadUid);
-    res.thread_name_matched = (kernel.threads().current_thread() != nullptr &&
-                               kernel.threads().current_thread()->name == kExpectedThreadName);
-    res.sdk_version_matched = (kernel.compiled_sdk_version() == kExpectedSdkVersion);
-    res.compiler_version_matched = (kernel.compiler_version() == kExpectedCompilerVersion);
-
-    const std::string &reason = runtime.stop_reason();
-    res.stop_reason_matched = (reason.find(kExpectedStopReason) != std::string::npos);
-
-    if (!res.stopped) {
-        res.failure_detail = "Runtime did not stop (dispatch budget exhausted without hitting HLE/stop)";
-    } else if (!res.entry_matched) {
-        res.failure_detail = "Entry PC mismatch: expected " + psprecomp::hex32(kExpectedEntryPc) +
-                             ", got " + psprecomp::hex32(entry_addr);
-    } else if (!res.sdk_version_matched) {
-        res.failure_detail = "Kernel SDK version mismatch: expected " + psprecomp::hex32(kExpectedSdkVersion) +
-                             ", got " + psprecomp::hex32(kernel.compiled_sdk_version());
-    } else if (!res.compiler_version_matched) {
-        res.failure_detail = "Kernel compiler version mismatch: expected " + psprecomp::hex32(kExpectedCompilerVersion) +
-                             ", got " + psprecomp::hex32(kernel.compiler_version());
-    } else if (!res.pc_matched) {
-        res.failure_detail = "Stop PC mismatch: expected " + psprecomp::hex32(kExpectedStopPc) +
-                             ", got " + psprecomp::hex32(runtime.cpu().pc);
-    } else if (!res.stop_instruction_matched) {
-        res.failure_detail = "Expected frontier call instruction at " + psprecomp::hex32(kExpectedStopCallerPc);
-    } else if (!res.thread_uid_matched) {
-        res.failure_detail = "Current thread UID mismatch: expected " + std::to_string(kExpectedThreadUid) +
-                             ", got " + std::to_string(kernel.threads().current_thread_id());
-    } else if (!res.thread_name_matched) {
-        res.failure_detail = "Current thread name mismatch: expected " + std::string(kExpectedThreadName) +
-                             ", got " + (kernel.threads().current_thread() ? kernel.threads().current_thread()->name : "null");
-    } else if (!res.stop_reason_matched) {
-        res.failure_detail = "Stop reason mismatch: expected \"" + std::string(kExpectedStopReason) +
-                             "\", got: \"" + reason + "\"";
-    } else {
-        res.passed = true;
-    }
-    return res;
-}
-
-void inspect_and_dump_framebuffers(const psprecomp::GuestMemory &memory, const p3p3ds::KernelState &kernel) {
-    std::cout << "\n====================================================\n";
-    std::cout << "   P3P3DS GUEST VRAM & FRAMEBUFFER PROBE\n";
-    std::cout << "====================================================\n";
-
-    const auto &disp = kernel.display().info();
-    std::cout << "Display State:\n";
-    std::cout << "  Active:           " << (disp.active ? "YES" : "NO") << "\n";
-    std::cout << "  Registered Addr:  0x" << std::hex << disp.topaddr << std::dec << "\n";
-    std::cout << "  Dimensions:       " << disp.width << "x" << disp.height << "\n";
-    std::cout << "  Buffer Stride:    " << disp.bufferwidth << " pixels\n";
-    std::cout << "  Pixel Format:     " << disp.pixelformat << " (3 = RGBA8888)\n";
-    std::cout << "  Sync Mode:        " << disp.sync << "\n\n";
-
-    constexpr std::uint32_t kBuf0Addr = 0x04000000u;
-    constexpr std::uint32_t kBuf1Addr = 0x04088000u;
-    constexpr std::uint32_t kVisibleWidth = 480u;
-    constexpr std::uint32_t kVisibleHeight = 272u;
-    constexpr std::uint32_t kStridePixels = 512u;
-    constexpr std::uint32_t kBytesPerPixel = 4u;
-    constexpr std::size_t kFbTotalBytes = static_cast<std::size_t>(kStridePixels) * kVisibleHeight * kBytesPerPixel; // 557,056 bytes (0x88000)
-
-    // Helper to probe a specific buffer
-    auto probe_buf = [&](std::uint32_t addr, std::string_view label) {
-        std::cout << "--- Probing " << label << " at 0x" << std::hex << addr << std::dec << " ---\n";
-        const bool backed = memory.contains(addr, kFbTotalBytes);
-        std::cout << "  Backed by VRAM:   " << (backed ? "YES" : "NO") << "\n";
-        if (!backed) return;
-
-        const std::uint8_t *raw = memory.raw_pointer(addr, kFbTotalBytes);
-        std::cout << "  Raw pointer:      " << (raw != nullptr ? "VALID" : "NULL") << "\n";
-        if (raw == nullptr) return;
-
-        std::size_t non_zero_bytes = 0;
-        std::size_t first_non_zero = static_cast<std::size_t>(-1);
-        std::size_t last_non_zero = 0;
-        for (std::size_t i = 0; i < kFbTotalBytes; ++i) {
-            if (raw[i] != 0) {
-                ++non_zero_bytes;
-                if (first_non_zero == static_cast<std::size_t>(-1)) first_non_zero = i;
-                last_non_zero = i;
-            }
-        }
-
-        std::cout << "  Buffer size:      " << kFbTotalBytes << " bytes (0x" << std::hex << kFbTotalBytes << std::dec << ")\n";
-        std::cout << "  Non-zero bytes:   " << non_zero_bytes << " / " << kFbTotalBytes
-                  << " (" << std::fixed << std::setprecision(2) << (100.0 * non_zero_bytes / kFbTotalBytes) << "%)\n";
-
-        if (non_zero_bytes > 0) {
-            std::cout << "  First non-zero:   offset 0x" << std::hex << first_non_zero
-                      << " (byte value: 0x" << static_cast<int>(raw[first_non_zero]) << ")" << std::dec << "\n";
-            std::cout << "  Last non-zero:    offset 0x" << std::hex << last_non_zero
-                      << " (byte value: 0x" << static_cast<int>(raw[last_non_zero]) << ")" << std::dec << "\n";
-
-            // Sample some non-zero pixels
-            std::cout << "  Sample non-zero pixels:\n";
-            int samples_printed = 0;
-            for (std::size_t p = 0; p < kFbTotalBytes / 4 && samples_printed < 5; ++p) {
-                const std::uint32_t px = *reinterpret_cast<const std::uint32_t *>(raw + p * 4);
-                if (px != 0) {
-                    const std::uint32_t y = static_cast<std::uint32_t>(p / kStridePixels);
-                    const std::uint32_t x = static_cast<std::uint32_t>(p % kStridePixels);
-                    std::cout << "    [x=" << x << ", y=" << y << "]: 0x" << std::hex << px
-                              << " (R=" << (px & 0xFF) << ", G=" << ((px >> 8) & 0xFF)
-                              << ", B=" << ((px >> 16) & 0xFF) << ", A=" << ((px >> 24) & 0xFF) << ")\n" << std::dec;
-                    ++samples_printed;
-                }
-            }
-
-            // Convert stride 512 to contiguous 480x272 RGBA
-            std::vector<std::uint8_t> visible_pixels(kVisibleWidth * kVisibleHeight * kBytesPerPixel, 0);
-            for (std::uint32_t y = 0; y < kVisibleHeight; ++y) {
-                const std::uint8_t *src_row = raw + y * kStridePixels * kBytesPerPixel;
-                std::uint8_t *dst_row = visible_pixels.data() + y * kVisibleWidth * kBytesPerPixel;
-                std::memcpy(dst_row, src_row, kVisibleWidth * kBytesPerPixel);
-            }
-
-            std::filesystem::create_directories(".tmp");
-            std::string out_png = ".tmp/p3p_framebuffer_0x" + psprecomp::hex32(addr).substr(2) + ".png";
-            int res = stbi_write_png(out_png.c_str(), kVisibleWidth, kVisibleHeight, 4,
-                                     visible_pixels.data(), kVisibleWidth * kBytesPerPixel);
-            if (res != 0) {
-                std::cout << "  -> DUMPED FRAMEBUFFER PNG: " << out_png << " (SUCCESS)\n";
-            } else {
-                std::cerr << "  -> FAILED to write PNG to " << out_png << "\n";
-            }
-        } else {
-            std::cout << "  Status:           EMPTY (All 0x00 bytes)\n";
-        }
-    };
-
-    probe_buf(kBuf0Addr, "Buffer 0 (Primary / Front Target)");
-    probe_buf(kBuf1Addr, "Buffer 1 (Alternate / sceDisplaySetFrameBuf Target)");
-
-    // Also scan entire 2 MiB VRAM
-    const auto &vram = memory.vram_bytes();
-    std::size_t vram_non_zero = 0;
-    for (std::uint8_t b : vram) {
-        if (b != 0) ++vram_non_zero;
-    }
-    std::cout << "\n--- Entire 2 MiB PSP VRAM Summary ---\n";
-    std::cout << "  VRAM total size:  " << vram.size() << " bytes (2 MiB)\n";
-    std::cout << "  Non-zero bytes:   " << vram_non_zero << " / " << vram.size()
-              << " (" << std::fixed << std::setprecision(2) << (100.0 * vram_non_zero / vram.size()) << "%)\n";
-
-    // Trace submitted GE display lists
-    auto dump_ge_list = [&](std::uint32_t addr, std::size_t count, std::string_view label) {
-        const std::uint32_t c = psprecomp::GuestMemory::canonical(addr);
-        std::cout << "\n--- GE Display List Inspection: " << label << " (0x" << std::hex << addr << " -> 0x" << c << ") ---\n" << std::dec;
-        if (!memory.contains(c, count * 4)) {
-            std::cout << "  Not inside guest memory!\n";
-            return;
-        }
-        for (std::size_t i = 0; i < count; ++i) {
-            const auto pc = c + static_cast<std::uint32_t>(i) * 4;
-            if (!memory.contains(pc, 4u)) break;
-            const std::uint32_t w = memory.load32(pc);
-            const std::uint32_t op = (w >> 24) & 0xFFu;
-            const std::uint32_t arg = w & 0x00FFFFFFu;
-            std::cout << "  [" << std::right << std::setw(2) << std::setfill('0') << i << "] 0x"
-                      << std::hex << std::right << std::setw(8) << std::setfill('0') << w
-                      << " -> OP=0x" << std::right << std::setw(2) << std::setfill('0') << op
-                      << ", ARG=0x" << std::right << std::setw(6) << std::setfill('0') << arg << std::dec;
-
-            // Decode known GE opcodes
-            switch (op) {
-            case 0x00: std::cout << " (NOP)"; break;
-            case 0x01: std::cout << " (VADDR: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x02: std::cout << " (IADDR: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x04: std::cout << " (PRIM: count=" << (arg & 0xFFFF) << ", type=" << ((arg >> 16) & 7) << ")"; break;
-            case 0x08: std::cout << " (JUMP: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x0A: std::cout << " (CALL: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x0B: std::cout << " (RET)"; break;
-            case 0x0C: std::cout << " (END)"; break;
-            case 0x0E: std::cout << " (SIGNAL)"; break;
-            case 0x0F: std::cout << " (FINISH)"; break;
-            case 0x10: std::cout << " (BASE: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x12: std::cout << " (VERTEXTYPE: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x13: std::cout << " (OFFSETADDR: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x14: std::cout << " (ORIGIN)"; break;
-            case 0x15: std::cout << " (REGION1)"; break;
-            case 0x16: std::cout << " (REGION2)"; break;
-            case 0x9C: std::cout << " (FRAMEBUFPTR: 0x" << std::hex << arg << std::dec << ")"; break;
-            case 0x9D: std::cout << " (FRAMEBUFWIDTH: " << arg << ")"; break;
-            case 0xD2: std::cout << " (FRAMEBUFPIXFORMAT: " << arg << ")"; break;
-            case 0xD3: std::cout << " (CLEARMODE: color=" << (arg & 1) << ", alpha/stencil=" << ((arg >> 1) & 1) << ", depth=" << ((arg >> 2) & 1) << ")"; break;
-            case 0xD4: std::cout << " (SCISSOR1)"; break;
-            case 0xD5: std::cout << " (SCISSOR2)"; break;
-            case 0xD6: std::cout << " (MINZ)"; break;
-            case 0xD7: std::cout << " (MAXZ)"; break;
-            default: break;
-            }
-            std::cout << "\n";
-            if (op == 0x0B || op == 0x0C) break;
-        }
-    };
-
-    for (const auto &[id, list] : kernel.ge().lists()) {
-        // Only inspect the prefix actually consumed, never the unbuilt live tail.
-        dump_ge_list(list.list_address, static_cast<std::size_t>(list.commands), "Consumed GE prefix");
-    }
-    kernel.ge().report();
-    const auto &writes = memory.vram_writes();
-    std::cout << "[VRAM WRITES] operations=" << writes.operations << " bytes=" << writes.bytes
-              << " changed=" << writes.changed << " color=" << writes.color << " depth=" << writes.depth
-              << " min=" << psprecomp::hex32(writes.operations ? writes.minimum : 0)
-              << " max=" << psprecomp::hex32(writes.maximum) << " nonzero=" << vram_non_zero << "\n";
-
-    std::cout << "====================================================\n\n";
-}
-
-} // namespace
-
-int main(int argc, char **argv) {
-    std::filesystem::path elf_path = "profiles/p3p/game/eboot.elf";
-    std::uint64_t max_dispatches = 1000u;
-    bool verbose = false;
-    bool verify_mode = false;
-
-    for (int i = 1; i < argc; ++i) {
-        std::string_view arg(argv[i]);
-        if (arg == "--elf" && i + 1 < argc) {
-            elf_path = argv[++i];
-        } else if (arg == "--max-dispatches" && i + 1 < argc) {
-            max_dispatches = std::stoull(argv[++i]);
-        } else if (arg == "--verbose" || arg == "-v") {
-            verbose = true;
-        } else if (arg == "--verify-milestone" || arg == "--verify") {
-            verify_mode = true;
-        } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: p3p_pc_bootstrap [options]\n"
-                      << "  --elf <path>            Path to decrypted P3P ELF (default: profiles/p3p/game/eboot.elf)\n"
-                      << "  --max-dispatches <N>    Maximum dispatch count (default: 1000)\n"
-                      << "  --verify-milestone      Strict milestone verification (returns 0 only on exact milestone match)\n"
-                      << "  --verbose, -v           Enable verbose runtime traces\n";
-            return 0;
-        }
-    }
-
-    std::cout << "====================================================\n";
-    std::cout << "   P3P3DS PC Bootstrap Execution Harness\n";
-    std::cout << "====================================================\n";
-    std::cout << "Target ELF:       " << elf_path.string() << "\n";
-    std::cout << "Dispatch budget:  " << max_dispatches << "\n";
-    std::cout << "Verify mode:      " << (verify_mode ? "STRICT (--verify-milestone)" : "standard") << "\n";
-
+#include <optional>
+namespace psprecomp {void register_generated_functions(Runtime &);}
+int main(int argc,char **argv) {
     try {
-        // 1. Load decrypted P3P ELF
-        if (!std::filesystem::exists(elf_path)) {
-            std::cerr << "Error: ELF file not found at " << elf_path.string() << "\n";
-            return 1;
+        std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path;
+        std::uint64_t budget=100000;
+        bool verify=false, chase=false;
+        std::optional<std::uint32_t> expected;
+        for(int i=1;i<argc;++i) {
+            const std::string a=argv[i];
+            auto value=[&]() -> std::string {if(++i>=argc)throw std::runtime_error("missing value for "+a);return argv[i];};
+            if(a=="--elf") elf_path=value();
+            else if(a=="--dump-events") events_path=value();
+            else if(a=="--max-dispatches") budget=std::stoull(value());
+            else if(a=="--expect-frontier") expected=std::stoul(value(),nullptr,0);
+            else if(a=="--verify-bootstrap" || a=="--verify-milestone" || a=="--verify") verify=true;
+            else if(a=="--run-until-blocker") chase=true;
+            else if(a=="--verbose" || a=="-v") {}
+            else if(a=="--help" || a=="-h") {
+                std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
+                         <<"--run-until-blocker --expect-frontier <address> --dump-events <json>\n"
+                         <<"--elf <path> --max-dispatches <count>\n";return 0;
+            } else throw std::runtime_error("unknown option: "+a);
         }
-        const auto elf = psprecomp::Elf32Image::from_file(elf_path);
-        const std::uint32_t load_base = psprecomp::kDefaultPspUserLoadBase;
-        const std::uint32_t entry_addr = elf.runtime_entry(load_base);
-
-        std::cout << "ELF Type:         " << elf.type()
-                  << (elf.is_psp_prx() ? " (PSP PRX relocatable)" : " (Static ELF)") << "\n";
-        std::cout << "Runtime Entry:    " << psprecomp::hex32(entry_addr) << "\n";
-
-        // 2. Initialize PSPRecomp Runtime with 32 MiB PSP RAM
-        psprecomp::Runtime runtime(32u * 1024u * 1024u);
-
-        // 3. Load & relocate ELF into GuestMemory
-        const auto rel_stats = elf.load_and_relocate(runtime.memory(), load_base);
-        std::cout << "Relocations:      " << rel_stats.total << " total (R_26="
-                  << rel_stats.r_mips_26 << ", R_32=" << rel_stats.r_mips_32
-                  << ", R_HI=" << rel_stats.r_mips_hi16 << ", R_LO=" << rel_stats.r_mips_lo16 << ")\n";
-
-        // 4. Find relocated PSP module info
-        const auto module = elf.find_module_info(runtime.memory(), load_base);
-        if (!module) {
-            std::cerr << "Error: Failed to find relocated PSP module info in ELF\n";
-            return 2;
+        const auto elf=psprecomp::Elf32Image::from_file(elf_path);
+        const auto entry=elf.runtime_entry();
+        psprecomp::Runtime rt;
+        const auto reloc=elf.load_and_relocate(rt.memory());
+        const auto module=elf.find_module_info(rt.memory());
+        if(!module)throw std::runtime_error("missing module info");
+        const auto sp=p3p3ds::profile::stack_top-0x100;
+        rt.memory().zero(p3p3ds::profile::stack_top-p3p3ds::profile::stack_size,p3p3ds::profile::stack_size);
+        rt.cpu().gpr[28]=module->gp;rt.cpu().gpr[29]=sp;rt.cpu().gpr[26]=sp;
+        rt.cpu().gpr[31]=p3p3ds::hle::ThreadManager::kThreadReturnSentinel;
+        psprecomp::register_generated_functions(rt);
+        p3p3ds::KernelState kernel;
+        kernel.threads().init_root_thread("root",entry,sp,module->gp);
+        p3p3ds::hle::register_all_hle_modules(rt,kernel);
+        rt.frontier_diagnostics=true;
+        p3p3ds::BootstrapCheckpoint checkpoint;
+        rt.event_observer=[&] {
+            const bool previous=checkpoint.passed;
+            checkpoint.observe(rt,kernel);
+            if(!previous && checkpoint.passed && verify && !chase && !expected) {
+                rt.cpu().pc=rt.last_transfer.target;
+                rt.stop("Stable bootstrap checkpoint reached");
+                throw psprecomp::FrontierHalt{};
+            }
+        };
+        psprecomp::set_runtime_pre_dispatch_hook([](auto &r,auto &,auto pc,auto) {r.diagnostic_pc=pc;r.event("guest_enter",{{"target",pc}});});
+        psprecomp::set_runtime_pre_chained_call_hook([](auto &r,auto &,auto pc,auto) {r.diagnostic_pc=pc;r.event("guest_enter",{{"target",pc}});});
+        rt.memory().vram_write_observer=[&](std::uint32_t address,std::size_t bytes) {
+            const auto a=psprecomp::GuestMemory::kVramPhysicalBase+((address-psprecomp::GuestMemory::kVramPhysicalBase)%psprecomp::GuestMemory::kVramSize);
+            const auto &g=kernel.ge().state();
+            const auto color_size=g.color_stride()*272u*(g.format()==3?4u:2u);
+            const auto depth_size=g.depth_stride()*272u*2u;
+            const bool color=color_size && a<g.color_address()+color_size && std::uint64_t(a)+bytes>g.color_address();
+            const bool depth=depth_size && a<g.depth_address()+depth_size && std::uint64_t(a)+bytes>g.depth_address();
+            rt.cpu().pc=rt.diagnostic_pc;
+            rt.event("cpu_vram_write",{{"address",a},{"bytes",bytes},{"color",color},{"depth",depth},
+                {"instruction",rt.memory().contains(rt.diagnostic_pc,4)?rt.memory().load32(rt.diagnostic_pc):0}},psprecomp::runtime_thread_name());
+            rt.stop("CPU VRAM write observed; inspect target and producer");
+            throw psprecomp::FrontierHalt{};
+        };
+        std::cout<<"P3P3DS bootstrap: entry="<<psprecomp::hex32(entry)<<" relocations="<<reloc.total
+                 <<" registered_entries="<<rt.function_count()<<"\n";
+        try {rt.run(entry,budget);}
+        catch(const psprecomp::FrontierHalt &) {}
+        catch(const psprecomp::Error &e) {
+            const std::string reason=e.what();
+            rt.stop((reason.find("memory")!=std::string::npos?"Memory fault: ":"Runtime exception: ")+reason);
         }
-        std::cout << "Module Info:      " << module->name << " v"
-                  << static_cast<int>(module->major_version) << "."
-                  << static_cast<int>(module->minor_version) << "\n";
-        std::cout << "Module GP:        " << psprecomp::hex32(module->gp) << "\n";
-        std::cout << "Module Stubs:     " << psprecomp::hex32(module->stub_top)
-                  << " - " << psprecomp::hex32(module->stub_end) << "\n";
-
-        // 5. Set $gp from module info
-        runtime.cpu().set_gpr(28, module->gp);
-
-        // 6. Setup minimal valid module_start stack
-        constexpr std::uint32_t kStackTop = 0x0A000000u;
-        constexpr std::uint32_t kStackSize = 0x10000u; // 64 KiB
-        constexpr std::uint32_t kStackBottom = kStackTop - kStackSize;
-        const std::uint32_t initial_sp = kStackTop - 0x100u;
-
-        runtime.memory().zero(kStackBottom, kStackSize);
-        std::cout << "Stack Arena:      " << psprecomp::hex32(kStackBottom)
-                  << " - " << psprecomp::hex32(kStackTop) << "\n";
-
-        // 7. Set $sp and $k0 (thread context block at stack top - 256)
-        runtime.cpu().set_gpr(29, initial_sp);
-        runtime.cpu().set_gpr(26, kStackTop - 0x100u); // $k0
-
-        // 8. Set $ra = thread return sentinel, $a0 = 0, $a1 = 0
-        runtime.cpu().set_gpr(31, p3p3ds::hle::ThreadManager::kThreadReturnSentinel);
-        runtime.cpu().set_gpr(4, 0u);
-        runtime.cpu().set_gpr(5, 0u);
-
-        std::cout << "Initial SP:       " << psprecomp::hex32(initial_sp) << "\n";
-        std::cout << "Initial RA:       " << psprecomp::hex32(p3p3ds::hle::ThreadManager::kThreadReturnSentinel)
-                  << " (Thread return sentinel)\n";
-        std::cout << "Initial A0 / A1:  0x00000000 / 0x00000000\n";
-
-        // 9. Register generated recompiled functions and import wrappers
-        psprecomp::register_generated_functions(runtime);
-        std::cout << "Registered Entries: " << runtime.function_count()
-                  << " (functions, block labels, and import wrappers)\n";
-
-        // 10. Register target-agnostic HLE service modules
-        p3p3ds::KernelState kernel_state;
-        kernel_state.threads().init_root_thread("root", entry_addr, initial_sp, module->gp);
-        p3p3ds::hle::register_all_hle_modules(runtime, kernel_state);
-
-        if (verbose) {
-            std::cout << "\nStarting execution at " << psprecomp::hex32(entry_addr) << "...\n";
-        }
-
-        // 11. Execute recompiled code
-        runtime.run(entry_addr, max_dispatches);
-
-        // 12. Diagnostic summary
-        std::cout << "\n=== Execution Result ===\n";
-        std::cout << "Stop Reason:      " << runtime.stop_reason() << "\n";
-        std::cout << "Stopped:          " << (runtime.stopped() ? "yes" : "no") << "\n";
-        std::cout << "Final Guest PC:   " << psprecomp::hex32(runtime.cpu().pc) << "\n";
-        std::cout << "Kernel SDK Ver:   " << psprecomp::hex32(kernel_state.compiled_sdk_version()) << "\n";
-
-        print_registers(runtime.cpu());
-        if (runtime.memory().contains(runtime.cpu().gpr[29], 32u)) {
-            std::cout << "  Stack words:";
-            for (std::uint32_t offset=0;offset<32;offset+=4)
-                std::cout << " " << psprecomp::hex32(runtime.memory().load32(runtime.cpu().gpr[29]+offset));
-            std::cout << "\n";
-        }
-
-        // 12b. Inspect Guest VRAM and dump real framebuffers if present
-        inspect_and_dump_framebuffers(runtime.memory(), kernel_state);
-
-        // 13. Milestone Verification
-        const auto v = verify_milestone(entry_addr, runtime, kernel_state);
-        std::cout << "\n=== Milestone Verification ===\n";
-        std::cout << "Target:           module_start -> GE/Display init -> 0x08B1C594 frontier\n";
-        std::cout << "Entry (0x" << std::hex << kExpectedEntryPc << "):   "
-                  << (v.entry_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "SDK Ver (0x" << std::hex << kExpectedSdkVersion << "): "
-                  << (v.sdk_version_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Compiler Ver (0x" << std::hex << kExpectedCompilerVersion << "): "
-                  << (v.compiler_version_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Final PC (0x" << std::hex << kExpectedStopPc << "): "
-                  << (v.pc_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Blocker opcode:    "
-                  << (v.stop_instruction_matched ? "OK (jal 0x08B1C594 at 0x08AB315C)" : "FAILED") << "\n";
-        std::cout << "Thread UID (" << std::dec << kExpectedThreadUid << "):      "
-                  << (v.thread_uid_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Thread Name (" << kExpectedThreadName << "): "
-                  << (v.thread_name_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Stop Reason:      " << (v.stop_reason_matched ? "OK" : "FAILED") << "\n";
-        std::cout << "Result:           " << (v.passed ? "[VERIFIED] Milestone passed" : "[FAILED] " + v.failure_detail) << "\n";
-
-        if (v.passed) {
-            std::cout << "\nExecution milestone reached and verified successfully.\n";
-            return 0;
-        } else {
-            std::cerr << "\nMilestone verification failed: " << v.failure_detail << "\n";
-            return 3;
-        }
-
-    } catch (const std::exception &e) {
-        std::cerr << "Fatal Exception: " << e.what() << "\n";
-        return 1;
-    }
+        rt.event_observer={};
+        if(!rt.stopped())rt.stop("Dispatch budget exhausted");
+        const auto type=p3p3ds::blocker_type(rt,kernel);
+        rt.event("blocker",{{"target",rt.cpu().pc}},rt.stop_reason());
+        rt.event("final_blocker",{{"target",rt.cpu().pc}},type);
+        std::cout<<"Stop Reason: "<<rt.stop_reason()<<"\nFinal Guest PC: "<<psprecomp::hex32(rt.cpu().pc)
+                 <<"\nBlocker type: "<<type<<"\nLast executed transfer: "<<psprecomp::hex32(rt.last_transfer.pc)
+                 <<" word="<<psprecomp::hex32(rt.last_transfer.word)<<" target="<<psprecomp::hex32(rt.last_transfer.target)
+                 <<"\nStable bootstrap: "<<(checkpoint.passed?"PASS":"FAIL")<<"\n";
+        kernel.ge().report();
+        const auto &w=rt.memory().vram_writes();std::size_t nonzero=0;
+        for(auto b:rt.memory().vram_bytes()) nonzero+=b!=0;
+        std::cout<<"[VRAM WRITES] operations="<<w.operations<<" bytes="<<w.bytes<<" changed="<<w.changed
+                 <<" color="<<w.color<<" depth="<<w.depth<<" nonzero="<<nonzero<<"\n";
+        if(!events_path.empty())p3p3ds::dump_events(events_path,rt,kernel,checkpoint);
+        if(expected && (type!="missing_guest_function" || rt.cpu().pc!=*expected))return 4;
+        if(!checkpoint.passed)return 3;
+        return 0;
+    } catch(const std::exception &e) {std::cerr<<"Fatal: "<<e.what()<<"\n";return 1;}
 }

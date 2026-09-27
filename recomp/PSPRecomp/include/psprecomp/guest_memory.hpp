@@ -7,6 +7,7 @@
 #include <span>
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace psprecomp {
 
@@ -31,6 +32,11 @@ public:
     [[nodiscard]] const VramWrites &vram_writes() const noexcept { return vram_writes_; }
     void set_vram_write_kind(VramWriteKind kind) noexcept { vram_write_kind_ = kind; }
     void reset_vram_writes() noexcept { vram_writes_ = {}; }
+    // P3P3DS diagnostic observer runs AFTER committed stores, including zero.
+    std::function<void(std::uint32_t,std::size_t)> vram_write_observer;
+    void notify_vram_write(std::uint32_t address,std::size_t size) {
+        if(size && vram_write_observer && is_vram_window(canonical(address))) vram_write_observer(canonical(address),size);
+    }
     static constexpr std::uint32_t kVramPhysicalBase = 0x04000000u;
     static constexpr std::uint32_t kVramSize = 2u * 1024u * 1024u;
     static constexpr std::uint32_t kVramMirrorCount = 4u;

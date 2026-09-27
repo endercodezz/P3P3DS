@@ -10,11 +10,12 @@ namespace p3p3ds::hle {
 void register_display_module(psprecomp::Runtime &runtime, KernelState &kernel) {
     // sceDisplay::0x0E20F177 - sceDisplaySetMode
     runtime.register_hle("sceDisplay", 0x0E20F177u,
-        [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const int mode = static_cast<int>(ctx.gpr[4]);
             const int width = static_cast<int>(ctx.gpr[5]);
             const int height = static_cast<int>(ctx.gpr[6]);
             kernel.display().set_mode(mode, width, height);
+            rt.event("display_mode", {{"mode",ctx.gpr[4]}, {"width",ctx.gpr[5]}, {"height",ctx.gpr[6]}});
             std::cout << "[DISPLAY] sceDisplaySetMode(mode=" << mode
                       << ", width=" << width << ", height=" << height << ")\n";
             ctx.set_gpr(2, 0u);
@@ -22,12 +23,13 @@ void register_display_module(psprecomp::Runtime &runtime, KernelState &kernel) {
 
     // sceDisplay::0x289D82FE - sceDisplaySetFrameBuf
     runtime.register_hle("sceDisplay", 0x289D82FEu,
-        [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const std::uint32_t topaddr = ctx.gpr[4];
             const int bufferwidth = static_cast<int>(ctx.gpr[5]);
             const int pixelformat = static_cast<int>(ctx.gpr[6]);
             const int sync = static_cast<int>(ctx.gpr[7]);
             kernel.display().set_framebuf(topaddr, bufferwidth, pixelformat, sync);
+            rt.event("display_framebuffer", {{"address",topaddr},{"stride",ctx.gpr[5]},{"format",ctx.gpr[6]},{"sync",ctx.gpr[7]}});
             std::cout << "\n====================================================\n"
                       << "   [P3P3DS VISUAL PROBE] REAL PSP FRAMEBUFFER SET!\n"
                       << "====================================================\n"

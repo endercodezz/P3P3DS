@@ -1090,11 +1090,38 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
     }
 }
 
-void Runtime::stop(std::string reason) { stopped_ = true; stop_reason_ = std::move(reason); }
+void Runtime::event(std::string type, std::map<std::string, std::uint64_t> fields, std::string detail) {
+    if (!frontier_diagnostics) return;
+    if (events.size() >= 50000u) {
+        if (stopped_) return;
+        stopped_ = true; stop_reason_ = "Diagnostic event budget exceeded";
+        throw FrontierHalt{};
+    }
+    events.push_back({std::move(type), diagnostic_pc, runtime_thread_uid(), std::move(fields), std::move(detail)});
+    if (event_observer) event_observer();
+}
+void Runtime::record_transfer_impl(std::uint32_t pc, std::uint32_t word, std::uint32_t target) {
+    diagnostic_pc = pc;
+    last_transfer = {pc, word, target, runtime_thread_uid()};
+    // Branches invalidate stale caller evidence but do not flood the event log
+    // in guest memset/math loops. Calls, jumps and returns form the bounded trace.
+    const auto op=word>>26;
+    if (op!=0 && op!=2 && op!=3) return;
+    if (recent_transfers.size() == 64u) recent_transfers.erase(recent_transfers.begin());
+    recent_transfers.push_back(last_transfer);
+    event("guest_transfer", {{"target", target}, {"word", word}});
+}
+void Runtime::stop(std::string reason) {
+    if (stopped_) return; // Preserve the first cause, including writer/callback stops.
+    stopped_ = true; stop_reason_ = std::move(reason);
+    event("stop", {{"target", cpu_.pc}}, stop_reason_);
+}
 bool Runtime::stopped() const noexcept { return stopped_; }
 const std::string &Runtime::stop_reason() const noexcept { return stop_reason_; }
 
 void Runtime::unsupported(std::uint32_t pc, std::uint32_t instruction, const std::string &reason) {
+    diagnostic_pc = pc;
+    event("unsupported_instruction", {{"word", instruction}}, reason);
     stop("Unsupported Allegrex instruction " + hex32(instruction) + " at " + hex32(pc) + ": " + reason);
 }
 
@@ -1148,6 +1175,7 @@ void Runtime::invoke_native_fast_path(std::uint32_t address, AllegrexContext &ct
 
 void Runtime::invoke_import_cached(std::uint32_t slot, std::string_view library,
                                    std::uint32_t nid, AllegrexContext &ctx) {
+    event("hle_hit", {{"nid", nid}, {"stub", ctx.pc}}, std::string(library));
     if (hle_histogram_enabled_) ++hle_histogram_[hle_key(library, nid)];
 
     const HleFunction *bound = slot < import_bindings_.size() ? import_bindings_[slot] : nullptr;
@@ -1158,6 +1186,7 @@ void Runtime::invoke_import_cached(std::uint32_t slot, std::string_view library,
         if (library_it == hle_.end() || function_it == library_it->second.end()) {
             const std::string library_name(library);
             const auto name = nids_.resolve(library_name, nid).value_or(hex32(nid));
+            event("missing_hle", {{"nid", nid}, {"stub", ctx.pc}}, library_name);
             stop("Missing HLE import " + library_name + "::" + name);
             return;
         }

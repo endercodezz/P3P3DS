@@ -1,5 +1,7 @@
 # PSP runtime gap analysis: first genuine VRAM write
 
+> Historical snapshot of `881fc223d7f7e875bbc9df914a3ccaeaafb3e9b1`. GE/HLE/frontier descriptions below are not current status. See [CURRENT_STATE.md](CURRENT_STATE.md) and its reproducible commands.
+
 Base inspected: `881fc223d7f7e875bbc9df914a3ccaeaafb3e9b1`; parent `3765e9d0f1bec55fd11c068f2516b7a65eaa1e9e`. Only documentation changes belong to this task. Source keys refer to the exact paths/symbols in [PSP_RUNTIME_REFERENCE.md](PSP_RUNTIME_REFERENCE.md). Classifications apply to the stated behavior, not an entire subsystem.
 
 ## Evidence actually examined

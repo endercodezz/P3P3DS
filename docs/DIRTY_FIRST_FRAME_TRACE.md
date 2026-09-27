@@ -2,6 +2,8 @@
 
 Iterative blocker chasing log advancing Persona 3 Portable initialization toward the first visible visual output.
 
+Stops below are historical checkpoints. [CURRENT_STATE.md](CURRENT_STATE.md) and the managed frontier report describe the latest verified execution.
+
 ---
 
 ### Stop #1
@@ -85,13 +87,15 @@ Iterative blocker chasing log advancing Persona 3 Portable initialization toward
 - **Type:** GUEST FUNCTION COVERAGE SPRINT.
 - **Action:** `[VERIFIED]` Added ten execution-driven `cfg` seeds after confirming direct-call evidence, executable layout, non-overlapping neighboring epilogues, and coherent return paths: `0x08B17054`, `0x08B16CCC`, `0x08B66824`, `0x08B1B70C`, `0x08B1B798`, `0x08AB33B0`, `0x08B1C298`, `0x08B1C4CC`, `0x08B1C3DC`, and `0x08B1C5F4`.
 - **Boundary evidence:** `[VERIFIED]` `0x08B17054` has direct callers at `0x08B1D130`, `0x08B1BBA8`, and `0x08B17574`, begins after the `0x08B1704C/50` epilogue, and returns at `0x08B17134/38` or `0x08B171E8/EC`; `0x08B16CCC` is a straight-line leaf called from `0x08B1BBE0`, `0x08B1BBE8`, `0x08B1C038`, and `0x08B1C064`, between the `0x08B16CC4/C8` and `0x08B16D1C/20` returns; `0x08B66824` is called at `0x08B1BC28`, follows the `0x08B6681C/20` return, and returns at `0x08B66850/54`; `0x08B1B70C` has multiple direct callers plus a tail-call at `0x08B1B7E4`, an independent prologue, and an epilogue at `0x08B1B780/784`; `0x08B1B798` is directly called from `0x08B1CF28` and `0x08B1CF54`, has a coherent list-manipulation CFG, and tail-calls `0x08B1B70C`; `0x08AB33B0`, `0x08B1C298`, `0x08B1C4CC`, `0x08B1C3DC`, and `0x08B1C5F4` each have a direct `jal` caller, a distinct prologue after a complete neighboring epilogue, and their own balanced return paths.
-- **Resulting frontier:** `[VERIFIED]` `0x08B1C594`, reached by executable word `0x0E2C7165` (`jal 0x08B1C594`) at `0x08AB315C`, with `$ra = 0x08AB3164`. The target begins with a distinct 32-byte stack-frame prologue immediately after the neighboring return at `0x08B1C5EC/F0`; it remains unregistered for the next iteration.
+- **Resulting frontier:** `[VERIFIED]` `0x08B1C594`, reached by executable word `0x0E2C7165` (`jal 0x08B1C594`) at `0x08AB315C`, with `$ra = 0x08AB3164`. The target begins with a distinct 32-byte stack-frame prologue immediately after the neighboring return at `0x08B1C58C/590` (corrected by fresh ELF disassembly; the previously listed `0x08B1C5EC/F0` belongs to its own end). It was left unregistered at this historical checkpoint.
 - **Scope of change:** `[VERIFIED]` Function coverage and the PC milestone verifier changed; runtime, HLE, and recompiler semantics did not.
 - **Graphics status:** `[VERIFIED]` No graphics-output milestone occurred. The final run still reports 0 draw commands, 0 VRAM write operations/bytes/changed bytes, and 0 non-zero bytes in both probed framebuffers and all 2 MiB of PSP VRAM.
 - **Probe cleanup:** `[VERIFIED]` Regeneration from `recomp/PSPRecomp/tools/codegen_main.cpp` removed all five temporary `[jal0-probe]` statements from `build/generated/p3p_generated.cpp`; no probe source exists in the generator/runtime tree.
 - **New Stop:** `0x08B1C594` (deterministic missing-function frontier).
 
 ### `jal 0` investigation at `0x0880433C`
+See also the later automated checkpoint in [CURRENT_STATE.md](CURRENT_STATE.md): [VERIFIED] 17 managed seeds advance `0x08B1C594` to a CPU VRAM store at `0x08AB2B38` / `0x04154004`. This is not a graphics result; metadata interpretation remains [INFERRED].
+
 - **Raw and runtime word:** `[VERIFIED]` Runtime address `0x0880433C` is PRX-relative vaddr `0x33C` in load segment 0 and maps to ELF file offset `0x3DC`. Raw bytes are `00 00 00 0C`, or little-endian word `0x0C000000`. The relocated runtime word is also `0x0C000000`.
 - **Relocation record:** `[VERIFIED]` None of the executable's 178,513 `SHT_PRX_RELOC` entries has `r_offset == 0x33C`. In `.rel.text`, adjacent direct-call relocations exist at `0x324`, `0x32C`, `0x334`, `0x344`, and `0x34C`, but not `0x33C`. Patch segment, target segment, and relocation addend are therefore not applicable at this site.
 - **Loader result:** `[VERIFIED]` P3P3DS copies the raw word and applies no patch because no relocation entry selects it. PPSSPP and uOFW likewise iterate relocation records and would leave this site untouched. If a hypothetical `R_MIPS_26` entry with patch segment 0 and target segment 0 existed, all three algorithms would encode `0x0E201000`, targeting `0x08804000`; that hypothetical is not the executable's relocation data.
@@ -151,4 +155,3 @@ Additional checkpoint debt:
 - GE callbacks run synchronously on a private temporary guest interrupt stack (`0x09FFE000`-`0x09FFF000`) whose previous bytes are restored afterward.
 - Display vblank waits advance deterministic counters; host-time scanout timing is not modeled.
 - The literal `jal 0` is not the current blocker and remains unregistered. Its exact link-time symbol is still unknown; current execution never reaches it.
-

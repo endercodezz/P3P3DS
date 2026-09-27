@@ -2,6 +2,8 @@
 
 This registry tracks the verification status of all technical claims, hardware parameters, memory addresses, and architectural assumptions in the P3P3DS project, adhering to the `MEASURE FIRST` engineering principle.
 
+Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md). Earlier milestone/decoder rows below record historical observations and must not be read as the latest frontier or current lowering coverage.
+
 ---
 
 ## Status Classification
@@ -13,6 +15,8 @@ This registry tracks the verification status of all technical claims, hardware p
 ---
 
 ## 1. Game & Executable (Persona 3 Portable `ULUS-10512`)
+
+[VERIFIED] Automated frontier checkpoint: 17 execution-proven managed seeds, native user execution, stable bootstrap and 10/10 tests. First committed CPU VRAM store: `0x08AB2B38` (`0xAE220004`) -> `0x04154004`, 4 bytes, UID 2. Sources: `profiles/p3p/config/frontier_checkpoint.json`, `platform/pc/main.cpp` VRAM observer, `GuestMemory::store32`; reproduction and hashes in `CURRENT_STATE.md`. [INFERRED] Allocator/resource metadata; not a verified pixel/frame.
 
 | Claim | Status | Primary Source / Citation | Notes |
 | :--- | :--- | :--- | :--- |

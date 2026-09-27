@@ -356,6 +356,7 @@ void GuestMemory::store8(std::uint32_t address, std::uint8_t value) {
     log_write_watch(address, 1u, "store8", old, value);
     account_vram_write(address, std::span<const std::uint8_t>(&value, 1));
     data[r.offset] = value;
+    notify_vram_write(address,1);
 }
 void GuestMemory::store16(std::uint32_t address, std::uint16_t value) {
     const std::uint16_t old = load16(address);
@@ -368,6 +369,7 @@ void GuestMemory::store16(std::uint32_t address, std::uint16_t value) {
     };
     write_byte(address, static_cast<std::uint8_t>(value & 0xFFu));
     write_byte(address + 1u, static_cast<std::uint8_t>((value >> 8u) & 0xFFu));
+    notify_vram_write(address,2);
 }
 void GuestMemory::store32(std::uint32_t address, std::uint32_t value) {
     const std::uint32_t old = load32(address);
@@ -382,6 +384,7 @@ void GuestMemory::store32(std::uint32_t address, std::uint32_t value) {
     write_byte(address + 1u, static_cast<std::uint8_t>((value >> 8u) & 0xFFu));
     write_byte(address + 2u, static_cast<std::uint8_t>((value >> 16u) & 0xFFu));
     write_byte(address + 3u, static_cast<std::uint8_t>((value >> 24u) & 0xFFu));
+    notify_vram_write(address,4);
 }
 void GuestMemory::store_word_left(std::uint32_t address, std::uint32_t value) {
     const std::uint32_t shift = (address & 3u) * 8u;
@@ -413,6 +416,7 @@ void GuestMemory::copy_in(std::uint32_t address, std::span<const std::uint8_t> s
                     data.begin() + static_cast<std::ptrdiff_t>(r.offset));
         copied += chunk;
     }
+    notify_vram_write(address,source.size());
 }
 void GuestMemory::copy_out(std::uint32_t address, std::span<std::uint8_t> destination) const {
     if (!contains(address, destination.size()))
@@ -445,6 +449,7 @@ void GuestMemory::zero(std::uint32_t address, std::size_t length) {
         std::fill_n(data.begin() + static_cast<std::ptrdiff_t>(r.offset), chunk, 0u);
         cleared += chunk;
     }
+    notify_vram_write(address,length);
 }
 std::string GuestMemory::read_c_string(std::uint32_t address, std::size_t max_length) const {
     std::string out;

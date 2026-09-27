@@ -1,4 +1,5 @@
 # P3P3DS — Comprehensive Architectural Audit of Modern Static Recompilation Ecosystems
+> Historical snapshot of `646fa1dfbd4d583bb70e936ad8f0a5f4a5b4cc77`. This audit is not the current runtime/codegen status. See [CURRENT_STATE.md](CURRENT_STATE.md).
 **Comparing XenonRecomp, ReXGlue, Xenia, and N64Recomp with P3P3DS/PSPRecomp**
 
 **Document Version:** 1.0.0  

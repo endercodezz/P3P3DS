@@ -3,6 +3,7 @@
 #include "psprecomp/allegrex_context.hpp"
 #include "psprecomp/guest_memory.hpp"
 #include "psprecomp/nid_registry.hpp"
+#include "psprecomp/execution_events.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -74,6 +75,20 @@ public:
     using NativeFastPath = void (*)(Runtime &, AllegrexContext &);
 
     explicit Runtime(std::uint32_t ram_size = 32u * 1024u * 1024u);
+
+    // P3P3DS: enabled only by diagnostic runners; generated transfers supply
+    // actual executed call sites, never a guess based on a stale $ra.
+    bool frontier_diagnostics{false};
+    std::uint32_t diagnostic_pc{};
+    ExecutedTransfer last_transfer;
+    std::vector<ExecutedTransfer> recent_transfers;
+    std::vector<ExecutionEvent> events;
+    std::function<void()> event_observer;
+    void event(std::string type, std::map<std::string, std::uint64_t> fields = {}, std::string detail = {});
+    void record_transfer(std::uint32_t pc, std::uint32_t word, std::uint32_t target) {
+        if (frontier_diagnostics) record_transfer_impl(pc, word, target);
+    }
+    void record_transfer_impl(std::uint32_t pc, std::uint32_t word, std::uint32_t target);
 
     GuestMemory &memory() noexcept { return memory_; }
     const GuestMemory &memory() const noexcept { return memory_; }

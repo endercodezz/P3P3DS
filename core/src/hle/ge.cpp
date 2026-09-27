@@ -57,6 +57,7 @@ std::int32_t GeManager::enqueue_list(psprecomp::Runtime &rt, std::uint32_t start
     list.stall_address=stall&0x0FFFFFFF; list.callback_id=cb; list.opt_param=opt;
     list.context_address=context; list.stack_count=stack_count; list.stack_address=stack;
     lists_.emplace(id,list); head ? queue_.push_front(id) : queue_.push_back(id);
+    rt.event("ge_enqueue", {{"list",static_cast<unsigned>(id)}, {"start",start}, {"stall",stall}, {"callback",static_cast<std::uint32_t>(cb)}});
     std::cout << "[GE ENQUEUE] id=" << id << " start=" << psprecomp::hex32(start)
               << " stall=" << psprecomp::hex32(stall) << " cb=" << cb
               << " context=" << psprecomp::hex32(context) << " stacks=" << stack_count
@@ -68,6 +69,7 @@ std::int32_t GeManager::update_stall(psprecomp::Runtime &rt, int id, std::uint32
     if(i->second.status==GeStatus::Completed) return already;
     if(stall&3) return invalid_pointer;
     i->second.stall_address=stall&0x0FFFFFFF;
+    rt.event("ge_stall_update", {{"list",static_cast<unsigned>(id)}, {"stall",stall}});
     pump(rt); return 0;
 }
 std::int32_t GeManager::sync(psprecomp::Runtime &rt, int id, int mode, bool all) {
@@ -83,6 +85,15 @@ std::int32_t GeManager::sync(psprecomp::Runtime &rt, int id, int mode, bool all)
 }
 void GeManager::capture_writer(psprecomp::Runtime &rt, const GeListInfo &l, std::uint32_t word) {
     writer_observed_=true; writer_pc_=l.pc;
+    rt.event("first_graphics_writer", {{"list",l.id}, {"ge_pc",l.pc}, {"word",word},
+        {"opcode",word>>24}, {"argument",word&0xFFFFFF}, {"callback",static_cast<std::uint32_t>(l.callback_id)},
+        {"stall",l.stall_address}, {"color",state_.color_address()}, {"depth",state_.depth_address()},
+        {"stride",state_.color_stride()}, {"format",state_.format()}, {"vertex",state_.vertex},
+        {"index",state_.index}, {"offset",state_.offset}});
+    // Complete bounded state snapshot, including viewport/texture/blend/depth.
+    for (unsigned op=0;op<256;++op) rt.event("ge_register", {{"register",op},{"value",state_.registers[op]}});
+    for (auto a:{state_.vertex,state_.index}) for(unsigned off=0;off<64 && rt.memory().contains(a+off,4);off+=4)
+        rt.event("writer_memory", {{"address",a+off},{"word",rt.memory().load32(a+off)}});
     std::cout << "[GE FIRST WRITER] id=" << l.id << " pc=" << psprecomp::hex32(l.pc)
               << " word=" << psprecomp::hex32(word) << " op=" << psprecomp::hex32(word>>24)
               << " arg=" << psprecomp::hex32(word&0xFFFFFF) << " cb=" << l.callback_id
@@ -104,6 +115,7 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     if (l.callback_id<0) return;
     const auto &callback=callbacks_.at(l.callback_id);
     if (!callback.finish) return;
+    rt.event("ge_callback", {{"list",l.id}, {"target",callback.finish}, {"end_pc",end_pc}});
     // DIRTY_FIRST_FRAME: model the kernel interrupt stack with a private guest
     // scratch window. Reusing the interrupted user SP corrupts live frames.
     constexpr std::uint32_t callback_stack_base=0x09FFE000u;
@@ -130,6 +142,7 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     }
     rt.memory().copy_in(callback_stack_base,saved_stack);
     if (!rt.stopped() && callback_ctx.pc!=0x20) rt.stop("GE finish callback dispatch budget exceeded");
+    if (!rt.stopped()) rt.event("ge_callback_complete", {{"list",l.id}, {"target",callback.finish}});
     if (!rt.stopped()) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
                                  << " token=" << l.finish_token << " end=" << psprecomp::hex32(end_pc) << "\n";
 }
@@ -151,6 +164,7 @@ void GeManager::pump(psprecomp::Runtime &rt) {
             ++l.commands; l.pc+=4; ++l.completions; l.status=GeStatus::Completed;
             std::cout << "[GE COMPLETED] id=" << l.id << " commands=" << l.commands << " completions=" << l.completions << "\n";
             queue_.pop_front();
+            rt.event("ge_finish", {{"list",l.id},{"ge_pc",l.pc},{"commands",l.commands},{"completions",l.completions}});
             deliver_finish_callback(rt,l,l.pc);
             continue;
         }

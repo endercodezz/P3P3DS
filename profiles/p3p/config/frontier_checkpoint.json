@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "source_base": "25b014886934434ba6c524f5c77b7408724c9c80",
+  "blocker_type": "cpu_vram_write",
+  "guest_pc": "0x08AB2B38",
+  "instruction": "0xAE220004",
+  "address": "0x04154004",
+  "bytes": 4,
+  "thread_uid": 2,
+  "thread_name": "user_main",
+  "managed_seed_count": 17,
+  "aot_function_groups": 125,
+  "registered_entries": 1486,
+  "ge_writer_observed": false,
+  "graphics_output_proven": false,
+  "interpretation": "allocator/resource metadata (INFERRED)",
+  "events_sha256": "f7debc6c97b1893fa94761c6a1dd6cc240656d53a34ebf3d0a5d5de812cba2f5"
+}
