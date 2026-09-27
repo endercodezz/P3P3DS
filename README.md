@@ -254,6 +254,33 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 - All reverse engineering data and HLE implementations are derived from independent analysis, open-source references (`pspsdk`, `uofw`), and publicly available community research.
 
 ---
+## Support development
+
+P3P3DS is a personal research project developed in my spare time.
+
+The project involves reverse engineering, static recompilation, runtime development, testing on real hardware, and maintaining development infrastructure.
+
+If you find this project interesting and want to support its development, donations are appreciated.
+
+Support helps cover:
+- development tools and infrastructure
+- AI/API usage for research and development
+- testing hardware and related expenses
+
+### Crypto
+
+| Asset | Network | Address |
+| --- | --- | --- |
+| Bitcoin (BTC) | Bitcoin | `12bg49c1rUcuBkmmz1uDcrc1b53y1rKc6J` |
+| Ethereum (ETH) | Ethereum | `0x10c5babc98271e427f65bdc11246d1abdcf4e86a` |
+| USDC | Ethereum / ERC-20 | `0x10c5babc98271e427f65bdc11246d1abdcf4e86a` |
+| USDT | BNB Smart Chain / BEP-20 | `0x10c5babc98271e427f65bdc11246d1abdcf4e86a` |
+| USDT | TRON / TRC-20 | `TYXrXb76fPwfbKCD3C8FqERK2ybmN73Cbv` |
+
+> Please verify the selected network before sending funds.
+> Sending assets through an unsupported network may result in permanent loss.
+
+Donations are completely optional and do not provide additional access, features, priority, or influence over development decisions.
 
 ## Upstream References & Credits
 

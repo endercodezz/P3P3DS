@@ -95,3 +95,4 @@ references/static-recomp/xenia/tools/build/
 *.sln.docstates
 Thumbs.db
 .DS_Store
+tools/CriPakTools/Build/CriPakTools.exe
