@@ -56,11 +56,16 @@ Every non-trivial architectural or technical assertion in documentation and repo
 
 ## 4. Source Hierarchy
 
-When technical sources or observations conflict, resolve in this strict order:
+Establish the observed guest behavior first. For PSP API semantics, research in this order when available:
+**uOFW -> PSPSDK -> pspautotests -> PPSSPP (behavioral reference only).**
+Do not copy PPSSPP implementation code. Record disagreements rather than silently selecting convenient behavior; direct game/hardware evidence constrains the implementation.
+
+For evidence provenance (not a competing API research order):
+
 1. **Real P3P Executable (`ULUS-10512`) / Live Runtime Observations**
 2. **PSP Hardware Tests / `references/pspautotests`**
-3. **PPSSPP (`references/ppsspp`) & uOFW (`references/uofw`) Implementations**
-4. **Official Open-Source PSP SDK (`psp/pspsdk`) Documentation**
+3. **uOFW (`references/uofw`) and PSPSDK (`psp/pspsdk`) contracts**
+4. **PPSSPP (`references/ppsspp`) behavioral reference, not implementation source**
 5. **PSPRecomp (`recomp/PSPRecomp`) & Yakumo (`recomp/Yakumo`) Observed Behaviors**
 6. **Existing P3P Community Patches & Reverse Engineering (`p3p/p3p-patches`, Mod Menu)**
 7. **General Internet / Forum Documentation**
@@ -93,7 +98,26 @@ If an experiment requires modifying an upstream file in a third-party directory,
 
 ---
 
-## 6. Development Order (Small Verifiable Steps)
+## 6. P3P3DS Development Workflow
+
+Work in micro-sprints: exactly one real runtime blocker or one clearly defined milestone per sprint. Start from `docs/CURRENT_STATE.md`, record HEAD and inspect the working tree; preserve unfinished or unrelated work.
+
+For a blocker sprint:
+
+1. Reproduce and identify the current blocker.
+2. Prove the observed guest call: PC, caller/return PC, relevant registers and pointed-to arguments, thread/UID, state, and how the guest consumes the return value. Inspect surrounding guest/AOT code as needed; API names alone are not evidence.
+3. Research only the required semantics using Section 4; implement the smallest correct behavior and focused regression tests.
+4. Perform Section 7 verification; confirm the next frontier is reproducible.
+5. Update `docs/CURRENT_STATE.md` when the verified frontier materially changes. Record the next blocker and one next task.
+6. Create one NEW local commit under Sections 16-17, then STOP. Never fold a sprint into its predecessor or mix unrelated work.
+
+STOP means do not fix the next missing HLE/function, unsupported instruction, scheduler/callback issue, memory-semantic problem, ambiguous control flow, architectural blocker or meaningful graphics milestone in this sprint. Verification and documentation of the completed step still belong to this sprint. Research-only/instruction-only tasks retain their requested scope; they do not require runtime changes or guest execution.
+
+Do not add unconditional-success stubs, speculative PSP subsystems or unrelated refactors; do not quietly weaken validators/tests to advance. When real game-generated GE workload appears, capture and classify its commands/resources first, then target that workload incrementally: no speculative large GE-to-PICA200 renderer. Setup lists or VRAM activity alone are not rendered pixels/frames. Expand VFS/sceIo only when observed P3P execution requires it, not as a complete PSP filesystem in advance.
+
+The loop is: **observed blocker -> evidence -> minimal semantics -> regression test -> deterministic replay -> next blocker -> STOP**.
+
+### Long-term development order
 
 Do not attempt to fix Allegrex decoding, write the HLE kernel, port the graphics renderer, and compile for 3DS simultaneously.
 
@@ -128,6 +152,8 @@ Every functional change must include a verifiable test method:
 - Known P3P boot milestone (e.g. `module_start` reached, CRI initialization, first `sceIoOpen`).
 
 *"Compiled successfully" is never proof of behavioral correctness.*
+
+For runtime frontier changes, normally run a Release build, full CTest and stable bootstrap, then run `--run-until-blocker --dump-events <path>` twice with identical inputs/configuration and separate output paths under `.tmp/`. Compare the actual event files (bytes or hashes) and both final blocker/frontier identities; record commands, comparison result and evidence paths. Reaching the same PC alone does not prove deterministic execution. Run `git diff --check`; if generation changed, independently compare regenerated output too. Report missing/failed verification as such, never as a pass. For instruction-only changes, validate skill structure, references and consistency instead of claiming unrun runtime tests.
 
 ---
 
@@ -300,5 +326,3 @@ git log -2 --oneline
 `HEAD^` MUST equal the recorded HEAD before the task.
 
 Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
-
-

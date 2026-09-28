@@ -35,6 +35,8 @@ Before using PPSSPP, capture the current P3P3DS execution state:
 - GP (global pointer)
 - Thread/context information if available
 
+Also identify the executed caller (not merely an assumed RA minus 8), relevant pointed-to arguments and pre-call state. Inspect surrounding guest disassembly/AOT code to establish how the caller consumes the return value: branch, error check, stored UID/pointer or other effect. An API name is not a sufficient behavioral specification. This evidence can come from the native trace and static code; use PPSSPP only where comparison adds missing evidence, never as implementation code to copy.
+
 Example frontier:
 
 ```
@@ -144,6 +146,7 @@ After Step Out, record:
 - V0 (primary return value);
 - V1 (secondary return value, if used);
 - Any memory regions modified during execution.
+- The next guest instructions using the result, and whether the expected return PC was actually executed.
 
 Example investigation record:
 

@@ -56,17 +56,7 @@ Every non-trivial architectural or technical assertion in documentation and repo
 
 ## 4. Source Hierarchy
 
-When technical sources or observations conflict, resolve in this strict order:
-1. **Real P3P Executable (`ULUS-10512`) / Live Runtime Observations**
-2. **PSP Hardware Tests / `references/pspautotests`**
-3. **PPSSPP (`references/ppsspp`) & uOFW (`references/uofw`) Implementations**
-4. **Official Open-Source PSP SDK (`psp/pspsdk`) Documentation**
-5. **PSPRecomp (`recomp/PSPRecomp`) & Yakumo (`recomp/Yakumo`) Observed Behaviors**
-6. **Existing P3P Community Patches & Reverse Engineering (`p3p/p3p-patches`, Mod Menu)**
-7. **General Internet / Forum Documentation**
-8. **Hypotheses & Assumptions**
-
-*Never present an assumption as a verified fact.*
+Read and follow [AGENTS.md Section 4](AGENTS.md#4-source-hierarchy) for the canonical source policy, including PSP API research order and the prohibition on copying PPSSPP implementation code.
 
 ---
 
@@ -94,6 +84,8 @@ If an experiment requires modifying an upstream file in a third-party directory,
 ---
 
 ## 6. Development Order (Small Verifiable Steps)
+
+Read and follow [AGENTS.md Section 6](AGENTS.md#6-p3p3ds-development-workflow) for the canonical micro-sprint workflow and hard STOP rule, and Section 7 for frontier verification. Keep that operational policy in one place; the sequence below is only the long-term roadmap.
 
 Do not attempt to fix Allegrex decoding, write the HLE kernel, port the graphics renderer, and compile for 3DS simultaneously.
 
@@ -300,5 +292,4 @@ git log -2 --oneline
 `HEAD^` MUST equal the recorded HEAD before the task.
 
 Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
-
 

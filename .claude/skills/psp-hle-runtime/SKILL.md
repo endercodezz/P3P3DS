@@ -23,11 +23,17 @@ Do not copy hundreds of unused stubs from general-purpose emulators.
 
 ## 2. Key References
 
-- `references/ppsspp/Core/HLE/` — Primary reference for exact functional semantics and return codes.
-  - `sceKernelThread.cpp`, `sceKernelMemory.cpp`, `sceIo.cpp`, `sceDisplay.cpp`, `sceCtrl.cpp`, `sceSas.cpp`.
-- `references/uofw/src/` — Reverse-engineered Sony kernel sources for low-level edge cases.
-- `psp/pspsdk/include/` — Official C function prototypes, structs, and NID tables.
-- `references/pspautotests/tests/` — Test cases for validating edge behavior.
+Research PSP API semantics in this order when available:
+
+1. `references/uofw/src/` and `references/uofw/include/` — kernel behavior and contracts.
+2. `psp/pspsdk/src/` — public prototypes, structs and NID tables.
+3. `references/pspautotests/tests/` — focused cases and recorded expected behavior.
+4. `references/ppsspp/Core/HLE/` — supplementary behavioral reference only.
+
+Do not copy or line-by-line translate PPSSPP implementation code. Record source disagreements and resolve them against observed guest/hardware evidence, not convenience.
+
+Other implementation examples (not replacements for PSP contract research):
+
 - `recomp/PSPRecomp/profiles/vcs/host/vcs_profile.cpp` — Proven minimal HLE host implementation.
 - `recomp/PSP-recompilation-project/src/rt/hle.c` — Clean, lightweight pure C HLE dispatch table.
 
@@ -37,21 +43,21 @@ Do not copy hundreds of unused stubs from general-purpose emulators.
 
 When a missing NID call is logged by the runtime:
 
-1. **Verify Usage:** Confirm that P3P actually calls this NID (check call-site PC and arguments in registers $a0–$a3).
-2. **Lookup Prototype:** Find function signature and parameter types in `psp/pspsdk/include/`.
-3. **Inspect Semantics:** Read the corresponding function in `references/ppsspp/Core/HLE/` and check error return codes.
-4. **Locate Autotests:** Check if a test exists in `references/pspautotests/tests/` for this subsystem.
+1. **Prove the observed call:** Record guest/stub PC, executed caller, RA/return PC, relevant argument registers and pointed-to data, current thread/UID and state. Inspect the surrounding guest/AOT instructions to establish how the caller uses the return value. Do not implement from the API name alone.
+2. **Establish the contract:** Use the ordered references above to identify only the arguments, return value, relevant errors and externally observable state changes needed by this call.
+3. **Locate focused tests:** Compare applicable pspautotests cases and expected results; distinguish source inspection from actually running hardware tests.
+4. **Bound the implementation:** Document unsupported behavior explicitly. Do not prebuild a complete subsystem or use unconditional success to bypass missing semantics.
 5. **Implement Minimal Valid Behavior:**
    - Read arguments from guest memory / registers.
    - Perform the required state change.
-   - Return 0 (`SCE_KERNEL_ERROR_OK`) on success or specific negative error code on failure.
+   - Return the contract's actual result (status, UID, count, boolean or error); success is not universally zero.
    - Set return value into register $v0.
 6. **Classify Implementation State:**
    - `[STUB]`: Returns a fixed dummy value (e.g. 0) with a warning log. *A stub is never counted as implemented.*
    - `[PARTIAL]`: Implements common code paths but ignores complex flags or edge cases.
    - `[IMPLEMENTED]`: Full functional implementation matching PSP specifications.
    - `[VERIFIED]`: Passed deterministic unit tests or hardware autotests.
-7. **Add Diagnostic Logging:** Always include thread UID, calling PC, and arguments in debug traces.
+7. **Verify and trace:** Add focused regression tests and bounded diagnostics with thread UID, caller, arguments, result and return PC. Confirm actual guest continuation, not just entry into the HLE handler. Follow the repository's verification/commit/stop workflow in `AGENTS.md`, rather than expanding the next blocker.
 
 ---
 
@@ -79,6 +85,6 @@ Module:         <e.g. IoFileMgrForUser | ThreadManForUser>
 Function:       <Function Name> (NID: 0xXXXXXXXX)
 Call Site:      PC=0x088xxxxx ($ra=0x088xxxxx)
 Implementation: [STUB | PARTIAL | IMPLEMENTED | VERIFIED]
-Reference:      references/ppsspp/Core/HLE/<file.cpp:line>
+Reference:      <contract/test source path and line or symbol>
 Behavior:       <Summary of parameters handled and return value set>
 ```

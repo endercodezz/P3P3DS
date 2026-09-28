@@ -29,15 +29,7 @@ Never state unmeasured assumptions as facts.
 ## 2. Verification Checklist
 
 1. **Identify the claim:** Extract the specific technical assertion (e.g. memory limit, instruction semantic, hook address).
-2. **Consult the Source Hierarchy:**
-   - Level 1: Real P3P executable (`ULUS-10512`) / live runtime traces.
-   - Level 2: `references/pspautotests/` hardware test results.
-   - Level 3: `references/ppsspp/Core/` or `references/uofw/` implementations.
-   - Level 4: `psp/pspsdk/include/` headers and prototypes.
-   - Level 5: `recomp/PSPRecomp/` and `recomp/Yakumo/` tested behaviors.
-   - Level 6: `p3p/p3p-patches/` and `p3p/Persona-3-Portable-Mod-Menu/`.
-   - Level 7: General internet/wiki documentation.
-   - Level 8: Unverified hypotheses.
+2. **Consult the Source Policy:** Follow `AGENTS.md` Section 4. For PSP semantics, consult uOFW -> PSPSDK -> pspautotests -> PPSSPP as behavioral reference only; do not copy PPSSPP implementation code. Keep direct guest/hardware observations distinct from inferred contracts and record unresolved disagreements.
 3. **Inspect primary source code:**
    - Locate the exact file and line number.
    - Verify that the code actually does what is claimed.
@@ -53,6 +45,8 @@ Never state unmeasured assumptions as facts.
 ---
 
 ## 3. Anti-Patterns (Strictly Forbidden)
+
+For execution-determinism claims, run at least two replays with the same executable, inputs, configuration and limits, retaining separate traces. Compare actual events/output (bytes or hashes) and final blocker identity; record the comparison and commands. A matching PC alone, or two runs without comparison, is not proof. Do not silently filter differences; explain any intentionally normalized fields and limit the claim accordingly. Use the project-specific build/test/replay gate in `AGENTS.md` Section 7 for runtime-frontier changes.
 
 - **Inventing framerates or execution times:** Do not predict exact FPS without profiling on hardware or Citra with cycle counters.
 - **Inventing function counts or memory sizes:** Do not write "P3P has ~500 functions" without running `psp_analyze` or `prxtool`.
