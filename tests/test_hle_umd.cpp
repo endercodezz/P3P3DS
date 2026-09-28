@@ -66,6 +66,17 @@ int main() {
     CHECK(activate(1,alias_ptr)==0u); // Observed P3P mode and guest string.
     CHECK(k.umd().activation_requested());CHECK(k.umd().medium_present());
     CHECK(k.umd().registered_callback()==second);
+    r.frontier_diagnostics=true;
+    c.gpr[4]=0x20u;c.gpr[2]=0xDEADBEEFu;c.gpr[31]=0x08AA1610u;
+    r.invoke_import("sceUmdUser",0x8EF08FCEu,c);
+    CHECK(c.gpr[2]==0u);CHECK(!r.stopped());
+    CHECK(!r.events.empty() && r.events.back().type=="umd_wait_drive_stat");
+    if(!r.events.empty() && r.events.back().type=="umd_wait_drive_stat") {
+        CHECK(r.events.back().fields.at("mask")==0x20u);
+        CHECK(r.events.back().fields.at("caller")==0x08AA1608u);
+        CHECK(r.events.back().fields.at("return_pc")==0x08AA1610u);
+    }
+    CHECK(k.umd().medium_present() && k.umd().activation_requested());
     CHECK(activate(2,alias_ptr)==0u); // Also accepted by uOFW; no mount claim.
     CHECK(k.umd().activation_requested());CHECK(check_medium()==1u);
     CHECK(!independent.umd().activation_requested());
@@ -81,5 +92,21 @@ int main() {
     CHECK(independent.umd().medium_present());CHECK(independent.umd().registered_callback()==0);
     CHECK(k.umd().registered_callback()==second);
     CHECK(!independent.threads().get_callback(uid));CHECK(!r.stopped());
+    for (int scenario=0;scenario<3;++scenario) {
+        psprecomp::Runtime waiting_runtime; p3p3ds::KernelState waiting_kernel;
+        waiting_runtime.frontier_diagnostics=true;
+        p3p3ds::hle::register_umd_module(waiting_runtime,waiting_kernel);
+        if(scenario!=0)waiting_kernel.umd().set_medium_present(true);
+        if(scenario!=1)CHECK(waiting_kernel.umd().activate(1,"disc0:")==0u);
+        auto &waiting_cpu=waiting_runtime.cpu();
+        waiting_cpu.gpr[4]=scenario==2?0x10u:0x20u;
+        waiting_cpu.gpr[2]=0xDEADBEEFu;waiting_cpu.gpr[31]=0x08AA1610u;
+        waiting_runtime.invoke_import("sceUmdUser",0x8EF08FCEu,waiting_cpu);
+        CHECK(waiting_runtime.stopped());CHECK(waiting_cpu.gpr[2]==0xDEADBEEFu);
+        CHECK(waiting_runtime.stop_reason()==(scenario==2?"Unsupported UMD wait mask":"UMD readable wait would block"));
+        CHECK(waiting_runtime.events.size()>=2 &&
+              waiting_runtime.events[waiting_runtime.events.size()-2].type==
+                  (scenario==2?"umd_wait_unsupported":"umd_wait_blocked"));
+    }
     std::cout<<"UMD callback failures="<<failures<<'\n';return failures?1:0;
 }

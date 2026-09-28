@@ -3,7 +3,7 @@
 #include <string_view>
 namespace p3p3ds::hle {
 // Presence, callback identity and accepted activation request only.
-// No drive readiness, filesystem mount, notifications, waits or delivery.
+// The observed readable wait checks these states without storing mount/readiness.
 class UmdState {
 public:
     void set_medium_present(bool present) noexcept { medium_present_ = present; }

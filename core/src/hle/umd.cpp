@@ -2,6 +2,26 @@
 #include "psprecomp/common.hpp"
 namespace p3p3ds::hle {
 void register_umd_module(psprecomp::Runtime &runtime, KernelState &kernel) {
+    // P3P's executed call at 0x08AA1608 requests bit 0x20. uOFW names it
+    // SCE_UMD_READABLE; do not claim support for other drive-state waits.
+    runtime.register_hle("sceUmdUser", 0x8EF08FCEu,
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            const auto mask = ctx.gpr[4];
+            const bool present = kernel.umd().medium_present();
+            const bool activated = kernel.umd().activation_requested();
+            if (mask != 0x20u || !present || !activated) {
+                rt.event(mask != 0x20u ? "umd_wait_unsupported" : "umd_wait_blocked",
+                    {{"mask",mask}, {"medium_present",present},
+                    {"activation_requested",activated}, {"caller",ctx.gpr[31]-8u},
+                    {"return_pc",ctx.gpr[31]}});
+                rt.stop(mask != 0x20u ? "Unsupported UMD wait mask" : "UMD readable wait would block");
+                return;
+            }
+            ctx.set_gpr(2, 0u);
+            rt.event("umd_wait_drive_stat", {{"mask",mask}, {"result",0u},
+                {"medium_present",present}, {"activation_requested",activated},
+                {"caller",ctx.gpr[31]-8u}, {"return_pc",ctx.gpr[31]}});
+        });
     runtime.register_hle("sceUmdUser", 0xC6183D47u,
         [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const auto mode = ctx.gpr[4];

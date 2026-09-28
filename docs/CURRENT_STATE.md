@@ -2,7 +2,21 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current micro-sprint: UMD activation request
+## Current micro-sprint: observed UMD drive wait
+
+Source base: `92e67180fc84c7df04c8e61d8c22ea47bca7dcbf`.
+
+- [VERIFIED] Pre-change `build/p3p_pc_bootstrap.exe --run-until-blocker --dump-events .tmp/umd-wait-before.json` reproduced missing `sceUmdUser::sceUmdWaitDriveStat` (NID `0x8EF08FCE`) at stub `0x08B8010C`, caller `0x08AA1608`, return PC `0x08AA1610`, `user_main` / UID 2. The executed transfer word is `0x0E2E0043`. `build/generated/p3p_generated.cpp:L_08AA1608` sets `A0=0x20` in the call delay slot, with no intervening write; the single-argument API has no pointed-to argument. `L_08AA1610` does not branch on `V0`: it writes three zero values and returns. The result is not consumed on this executed path.
+- [VERIFIED] uOFW `references/uofw/include/mediaman.h:55-67` names bit `0x20` `SCE_UMD_READABLE`; `references/uofw/src/kd/mediaman/mediaman.c:646-663` validates supported wait bits and waits on the matching event flag with OR semantics, returning the wait status. PSPSDK `psp/pspsdk/src/umd/pspumd.h:46-53` labels `0x20` `PSP_UMD_READY`, a naming disagreement. `references/pspautotests/tests/umd/wait/wait.c:72,79-81` and `wait.expected:8,18-20` show zero after an activated medium for the tested waits; this hardware fixture was inspected, not run here. PPSSPP `references/ppsspp/Core/HLE/sceUmd.cpp::__KernelUmdGetState/sceUmdWaitDriveStat` is a secondary behavioral reference: present plus activated yields the readable bit, and matching waits return zero.
+- [VERIFIED] The host implements only P3P's observed `0x20` path: it returns zero when the existing per-kernel `medium_present` and `activation_requested` flags are both true. Any other mask or an unsatisfied condition stops explicitly instead of reporting success. Focused `p3p_hle_umd` tests cover success, both missing prerequisites, unsupported mask, telemetry and unchanged state. No mount, drive-ready state, wait queue, callback delivery or filesystem service was added. [INFERRED] The two existing flags are sufficient as a narrow readable-wait proxy for this configured PC game launch; they do not prove an actual PSP filesystem mount.
+- [VERIFIED] Release build, full CTest (**11/11**), stable `--verify-bootstrap`, and `git diff --check` pass. `--run-until-blocker --dump-events .tmp/umd-wait-final-{1,2}.json` produced identical event files, SHA-256 **`E9CBBB420D3549174813B41B762171D4C78E5F0392C6EBA5135386A758044368`**. `umd_wait_drive_stat` records mask 32, result zero, presence and activation true; subsequent `guest_enter` at `0x08AA1610` proves guest continuation. Both runs stop at the next genuine frontier: `missing_guest_function` at **`0x08A9B934`**, direct caller **`0x08AB29BC`**, word **`0x0E2A6E4D`**, thread **UID 2**. No seed was added.
+- [VERIFIED] Graphics milestone: **NO**. No GE writer, color or depth write was observed. Four unclassified-resource VRAM operations still touch 16 bytes (10 changed); the two setup GE lists still complete with 212/29 commands.
+
+Immediate blocker: missing guest function at `0x08A9B934`.
+
+Next smallest step: prove the executed call and independent function boundary at `0x08A9B934` in a separate sprint before adding one managed seed.
+
+## UMD activation request (historical)
 
 Source base: `cfb9d61599befd7942b0ac0f5be85874432d9691`.
 

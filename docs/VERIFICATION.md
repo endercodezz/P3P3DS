@@ -6,6 +6,13 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## Observed UMD wait micro-sprint
+
+- [VERIFIED] The executed P3P call at `0x08AA1608` passes `A0=0x20` to `sceUmdWaitDriveStat` and resumes at `0x08AA1610` without testing `V0`; evidence: `build/generated/p3p_generated.cpp:L_08AA1608/L_08AA1610`, `.tmp/umd-wait-before.json`, `.tmp/umd-wait-final-1.json`. uOFW calls this bit `SCE_UMD_READABLE` (`references/uofw/include/mediaman.h:55-67`); PSPSDK labels the same numeric bit `PSP_UMD_READY` (`psp/pspsdk/src/umd/pspumd.h:46-53`).
+- [VERIFIED] The limited host handler succeeds only for mask `0x20` with medium present and activation requested; otherwise it stops explicitly. Full CTest is 11/11; two final event files are identical at SHA-256 `E9CBBB420D3549174813B41B762171D4C78E5F0392C6EBA5135386A758044368`, reaching missing guest function `0x08A9B934` from `0x08AB29BC`. [INFERRED] The existing flags approximate readable status for this PC launch; no physical drive or filesystem mount was verified. See `docs/CURRENT_STATE.md` for full evidence and limits.
+
+---
+
 ## New reference snapshot and oracle research (2026-09-28)
 
 - [VERIFIED] Seven source snapshots and exact imported SHAs are recorded in `docs/UPSTREAMS.md`. The imported directories have no nested `.git`; upstream license files remain present where supplied. GLASS has an MPL-2.0 notice in `references/GLASS/Include/GLASS.h:4-8` but no root license file. The comparative evidence and limits are in `docs/REPOSITORIES.md` section 2.
