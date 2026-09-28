@@ -45,6 +45,145 @@ class ChaserTests(unittest.TestCase):
             with self.assertRaises(ValueError):chase.merge(a, b, out)
         with self.assertRaises(ValueError):chase.contained(ROOT.parent / "escape")
 
+    def test_invalid_cadence(self):
+        for value in ("0", "-1"):
+            with self.subTest(value=value), self.assertRaises(SystemExit):
+                chase.parse_args(["--verify-every", value])
+
+
+class FakeOps:
+    def __init__(self, chain, *, fail_at=None, ambiguous_at=None, bad_at=None):
+        self.chain, self.index = chain, 0
+        self.fail_at, self.ambiguous_at, self.bad_at = fail_at, ambiguous_at, bad_at
+        self.full_calls, self.build_calls, self.proof_calls = [], [], []
+        self.restored = False
+
+    def manifest(self):
+        return str(self.index).encode()
+
+    def restore(self, content):
+        self.index = int(content)
+        self.restored = True
+
+    def managed_seeds(self):
+        return [{"name": str(i)} for i in range(self.index)]
+
+    def seed_count(self):
+        return 18 + self.index
+
+    def append_seed(self, blocker):
+        self.index += 1
+
+    def build(self):
+        self.build_calls.append(self.index)
+
+    def event(self):
+        pc = 0x1000 + self.index * 0x100
+        caller = 0x200 + self.index * 8
+        word = 0x0C000000 | (pc >> 2)
+        if self.index >= self.chain:
+            return {"schema": 1, "bootstrap_passed": True,
+                    "blocker": {"type": "missing_hle", "pc": pc, "caller": caller},
+                    "graphics": {"writer": False},
+                    "events": [{"type": "missing_hle", "detail": "sceUmdUser",
+                                "fields": {"nid": 0x8EF08FCE}}]}
+        return {"schema": 1, "bootstrap_passed": True,
+                "blocker": {"type": "missing_guest_function", "pc": pc,
+                            "caller": caller, "word": word, "target": pc,
+                            "ra": caller + 8, "thread": 2},
+                "graphics": {"writer": False},
+                "events": [{"type": "guest_transfer", "pc": caller, "thread": 2,
+                            "fields": {"word": word, "target": pc}}]}
+
+    def capture(self, additions):
+        event = self.event()
+        if self.bad_at == self.index:
+            event = {"schema": 1, "bootstrap_passed": True, "blocker": []}
+        return {"event": event, "hashes": [f"hash-{self.index}"] * 2}
+
+    def full_verify(self, additions):
+        self.full_calls.append(self.index)
+        if self.fail_at == self.index:
+            raise RuntimeError("fixture verification failure")
+        return self.capture(additions)
+
+    def prove(self, blocker):
+        self.proof_calls.append(self.index)
+        if self.ambiguous_at == self.index:
+            return {"accepted": False, "reason": "ambiguous target"}
+        return {"accepted": True, "reason": "closed CFG"}
+
+
+class WorkflowTests(unittest.TestCase):
+    def run_chase(self, ops, *, fast, cadence=2, budget=128, check_only=False):
+        return chase.chase_loop(ops, {}, fast=fast, max_additions=budget,
+                                verify_every=cadence, check_only=check_only)
+
+    def test_safe_fully_verifies_every_addition(self):
+        ops = FakeOps(4)
+        report = self.run_chase(ops, fast=False)
+        self.assertEqual(ops.full_calls, [0, 1, 2, 3, 4])
+        self.assertEqual(report["verified_additions"], 4)
+        self.assertEqual(report["final_verification"], "PASS")
+        self.assertEqual(report["stop"], "missing_hle")
+
+    def test_fast_cadence_and_final_checkpoint(self):
+        ops = FakeOps(5)
+        report = self.run_chase(ops, fast=True, cadence=2)
+        self.assertEqual(ops.full_calls, [0, 2, 4, 5])
+        self.assertEqual(ops.build_calls, [1, 3, 5])
+        self.assertEqual(len(report["accepted_candidates"]), 5)
+        self.assertEqual(report["tentative_additions"], 0)
+        self.assertEqual(report["final_blocker"]["module"], "sceUmdUser")
+        self.assertEqual(report["final_blocker"]["nid"], 0x8EF08FCE)
+
+    def test_verification_failure_restores_checkpoint(self):
+        ops = FakeOps(4, fail_at=4)
+        report = self.run_chase(ops, fast=True, cadence=2)
+        self.assertTrue(report["error"])
+        self.assertEqual(ops.index, 2)
+        self.assertTrue(ops.restored)
+        self.assertEqual(report["rollback"]["tentative_additions"], 2)
+        self.assertEqual(report["last_known_good_seed_count"], 20)
+        self.assertEqual(ops.build_calls[-1], 2)
+
+    def test_malformed_tentative_event_rolls_back(self):
+        ops = FakeOps(4, bad_at=3)
+        report = self.run_chase(ops, fast=True, cadence=2)
+        self.assertTrue(report["error"])
+        self.assertEqual(ops.index, 2)
+        self.assertEqual(report["rollback"]["tentative_additions"], 1)
+
+    def test_ambiguous_semantic_and_budget_stops(self):
+        ops = FakeOps(3, ambiguous_at=0)
+        report = self.run_chase(ops, fast=True)
+        self.assertEqual(ops.index, 0)
+        self.assertTrue(report["stop"].startswith("ambiguous_boundary"))
+        ops = FakeOps(0)
+        report = self.run_chase(ops, fast=True)
+        self.assertEqual(ops.index, 0)
+        self.assertEqual(report["stop"], "missing_hle")
+        ops = FakeOps(3)
+        report = self.run_chase(ops, fast=True, budget=1)
+        self.assertEqual(ops.index, 1)
+        self.assertEqual(ops.full_calls, [0, 1])
+        self.assertEqual(report["stop"], "addition_budget")
+        self.assertEqual(ops.proof_calls, [0, 1])
+
+    def test_check_only_still_proves_candidate(self):
+        ops = FakeOps(1)
+        report = self.run_chase(ops, fast=False, check_only=True)
+        self.assertEqual(ops.proof_calls, [0])
+        self.assertEqual(ops.index, 0)
+        self.assertEqual(report["stop"], "check_only")
+
+    def test_semantic_after_tentative_addition_gets_final_checkpoint(self):
+        ops = FakeOps(1)
+        report = self.run_chase(ops, fast=True, cadence=10)
+        self.assertEqual(ops.full_calls, [0, 1])
+        self.assertEqual(report["stop"], "missing_hle")
+        self.assertEqual(report["final_verification"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()
