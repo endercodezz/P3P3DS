@@ -1,0 +1,97 @@
+# Patapon per-game manifest (issue #46, #47 Phase 4).
+#
+# Consumed by `psprecomp recompile --config games/patapon/game.toml`:
+#   - [recompile] feeds the force-entry passes (formerly hardcoded consts in
+#     crates/psp-cli/src/recompile.rs)
+#   - [game]/[boot]/[module]/[runtime] are emitted into
+#     output/include/recomp_game_config.h (the runtime never parses TOML)
+#
+# The address-keyed runtime hooks live in games/patapon/runtime/ and are
+# compiled in via -DPSPRECOMP_GAME=patapon (the default).
+
+[game]
+id    = "patapon"
+title = "Patapon (UCUS-98643)"   # informational only
+
+[boot]
+boot_path = "disc0:/PSP_GAME/SYSDIR/BOOT.BIN"   # PSP-universal default, stated for clarity
+
+# [module] heap_base intentionally unset: the generic align-to-16MB policy
+# (RECOMP_HEAP_BASE 0x08AE0000 -> 0x09000000, #47 P11) already reproduces
+# Patapon's historical heap layout bit-identically.
+
+[runtime]
+asset_layer = "bnd"   # disc0:/PSP_GAME/USRDIR/DATA_CMN.BND archive layer
+
+[recompile]
+# Function starts Ghidra merged into larger functions — confirmed valid via
+# the PPSSPP behavioral oracle but rejected by is_inside_function because
+# Ghidra's boundary is too wide.
+force_entries = [
+    "0x0887E6C0",  # GE display list builder; blocks all PRIM submission (quick-19)
+]
+
+# D2 (19G/19H): vtable-adapter thunks in the Ghidra gap 0x088273FC..0x08827480.
+# No xref of any kind; reached only by `j 0x08827470` inside the
+# RAW_SCAN-recovered FUN_08858C48 (and `j 0x0882744C` inside FUN_08858C40).
+# Each is a tiny `lw t9,0(a0); lw t9,0x34(t9); jr t9` vtable+0x34 dispatch.
+# Without a function entry they LOOKUP_MISS -> noop_stub, dropping the
+# loadinggroup inflate-destination allocator dispatch — which keeps the
+# BROKEN decompressor at 0x089D7xxx from running. Recovering them makes it
+# run and stall at the D3 inflate-heap wall (regression below D1 baseline),
+# so they are only active under PSPRECOMP_CROSS_MID=1 together with D3a.
+force_entries_cross_mid = [
+    "0x08827470",  # no-arg vtable+0x34 dispatch (j-target of FUN_08858C48)
+    "0x0882744C",  # with-args variant (j-target of FUN_08858C40)
+]
+
+# Mid-entries Ghidra missed, observed as repeated LOOKUP_MISS in the runtime.
+#
+# These pairs were authored for the AUGMENTED (grafted) baseline, where the
+# coalesce pass makes FUN_08827E7C the single owner of EA0/EB0/F44/F9C. On that
+# baseline (the documented Patapon path, 14104/2022/283) the parents below are
+# correct and inject verbatim. On a FRESH analyze (no vtable_miss graft),
+# enhanced discovery instead promotes EA0/EB0 to standalone functions and moves
+# the F44/F9C bodies into FUN_08827EB0 — so these parents go stale and a naive
+# inject would emit cross-function gotos. The issue #65 collision guard in
+# inject_force_mid_entries (recompile.rs) resolves each entry's real owner: it
+# SKIPS EA0/EB0 (now standalone, reached via RECOMP_LOOKUP) and RE-POINTS F44/F9C
+# to FUN_08827EB0. The entries are therefore left here (the guard handles both
+# layouts); they are load-bearing on the augmented baseline.
+
+[[recompile.force_mid_entries]]
+# Mid-entry inside FUN_08827E7C, tail-called from FUN_08827F7C via
+# RECOMP_LOOKUP(0x08827F44). 121 hits/run observed pre-fix.
+entry  = "0x08827F44"
+parent = "0x08827E7C"
+
+[[recompile.force_mid_entries]]
+# Vtable-referenced mid-entries inside FUN_08827E7C (the thread-lock
+# acquire/release helper reached through FUN_0895B410's object vtable).
+# analysis.json records DATA xrefs for both — they are stored as function
+# pointers in the vtable at 0x08A44480 (slot +12 -> 0x08827EA0, slot +48 ->
+# 0x08827EB0) — but the older analysis pass left them out of mid_entries.
+# Without the mid-entry stub, an indirect vtable call to 0x08827EA0
+# LOOKUP_MISSes -> noop_stub: the helper body never runs, the caller's stack
+# frame is left unbalanced (48-byte leak observed), and the callee-saved
+# registers r16/r17 the caller restores from its frame come back corrupted.
+# That corruption lands in FUN_0885FE90's state-2 body: r16 (the asset
+# manager) and r17 (the asset object) are garbage when it calls the by-name
+# resolver FUN_088623E0, so every loadinggroup asset request fails and boot
+# stalls before any draw. (D1, doc 19F.)
+entry  = "0x08827EA0"
+parent = "0x08827E7C"
+
+[[recompile.force_mid_entries]]
+entry  = "0x08827EB0"
+parent = "0x08827E7C"
+
+[[recompile.force_mid_entries]]
+# Mid-entry 0x08827F9C inside FUN_08827F7C. The coalesce pass merges
+# FUN_08827F7C into its owner FUN_08827E7C; the existing-mid re-point there
+# carries this parent to the owner, so the owner's prologue switch gains
+# `case 0x08827F9C`. The runtime band-aid hle_mid_08827F9C must therefore
+# call FUN_08827E7C (see psp_hle_kernel_memory.cpp). Without this entry the
+# band-aid's entry_point=0x08827F9C falls through.
+entry  = "0x08827F9C"
+parent = "0x08827F7C"

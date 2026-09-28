@@ -1,0 +1,19 @@
+.fvec projection[4]
+
+.out outpos position
+.out outclr color
+
+.in inpos v0
+.in inclr v1
+
+.proc main
+    ; Force 1 on the W component and do projection * inpos.
+    dph outpos.x, inpos, projection[0]
+    dph outpos.y, inpos, projection[1]
+    dph outpos.z, inpos, projection[2]
+    dph outpos.w, inpos, projection[3]
+
+    ; Set the output color.
+    mov outclr, inclr
+    end
+.end

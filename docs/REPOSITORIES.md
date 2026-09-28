@@ -12,8 +12,11 @@ This document contains a structured inventory of all repositories currently inte
 | [TeamGDB/Yakumo](https://github.com/TeamGDB/Yakumo) | `recomp/Yakumo` | `PRIMARY`, `STATIC RECOMPILER`, `PSP HLE`, `VFPU`, `GPU / GE`, `AUDIO` | **CRITICAL** | MIT | Working, playable native static recompilation port of *Monster Hunter Portable 3rd HD Ver.* Proven capability compiling 355 code overlays, ARM compatibility, runtime logging, and HLE subsystems. | `src/`, `profiles/mhp3rd/host/`, `profiles/mhp3rd/scripts/`, `AGENTS.md` | Cloned & Analyzed |
 | [sal063/PSP-recompilation-project](https://github.com/sal063/PSP-recompilation-project) | `recomp/PSP-recompilation-project` | `STATIC RECOMPILER`, `PSP HLE`, `REFERENCE`, `CPU / ALLEGREX`, `VFPU` | **HIGH** | GPL-2.0+ | Original PSP static recompiler toolkit with offline Python analyzer (`analyze.py`, `codegen.py`) and a pure **C** runtime (`src/rt/`). Extremely relevant for lightweight C emission compatible with devkitARM GCC. | `tools/codegen.py`, `tools/analyze.py`, `src/rt/recomp.c`, `src/rt/hle.c`, `src/rt/ge.c`, `src/rt/sched.c` | Cloned & Analyzed |
 | [sp00nznet/psprecomp](https://github.com/sp00nznet/psprecomp) | `recomp/psprecomp-sp00nz` | `STATIC RECOMPILER`, `REFERENCE`, `CPU / ALLEGREX` | **MEDIUM** | MIT | Clean-room, permissively licensed rewrite effort targeting standalone MIPS-to-C recompilation inspired by N64Recomp and sal063. Excellent design notes on oracle-based verification. | `README.md`, `ROADMAP.md`, `docs/ORACLE.md`, `src/` | Cloned (renamed to avoid NTFS case conflict) |
+| [wizardengineer/psprecomp](https://github.com/wizardengineer/psprecomp) | `recomp/psprecomp-wizardengineer` | `STATIC RECOMPILER`, `REFERENCE`, `HLE`, `GE`, `VFPU`, `ORACLE` | **HIGH** | GPL-2.0-or-later | [VERIFIED] Ghidra analysis JSON feeds a Rust AOT emitter and C++ runtime; Patapon-specific work and scheduler limits make it a useful comparison, not a drop-in P3P runtime. | `crates/psp-parser/src/analysis_json.rs`, `runtime/src/hle/`, `runtime/src/psp_scheduler.cpp`, `tools/ppsspp_trace/` | Vendored & examined |
 | [N64Recomp/N64Recomp](https://github.com/N64Recomp/N64Recomp) | `recomp/N64Recomp` | `STATIC RECOMPILER`, `REFERENCE`, `CPU / ALLEGREX` | **HIGH** | MIT | Industry standard in MIPS static recompilation (Zelda 64 Recomp). State-of-the-art algorithms for basic block discovery, indirect jump/jump table resolution, and relocations. | `src/recompiler/`, `src/analysis/`, `include/` | Cloned & Evaluated |
 | [hrydgard/ppsspp](https://github.com/hrydgard/ppsspp) | `references/ppsspp` | `REFERENCE`, `PSP HLE`, `GPU / GE`, `VFPU`, `AUDIO`, `FILESYSTEM` | **CRITICAL** | GPL-2.0+ | Gold-standard PSP emulator. Serves as ground-truth oracle for all `sce*` HLE APIs, GE display list command interpretation, VFPU bit-exact math, and ATRAC3+ audio decoding. | `Core/HLE/`, `GPU/GPUCommon.cpp`, `GPU/GPUState.h`, `Core/MIPS/`, `GPU/Software/` | Cloned (Shallow depth 1) |
+| [jpcsp/jpcsp](https://github.com/jpcsp/jpcsp) | `references/jpcsp` | `REFERENCE`, `PSP HLE`, `VFPU`, `GE` | **MEDIUM** | GPL-3.0-or-later | [VERIFIED] Independent Java emulator with UMD HLE and Allegrex opcode tables. Compare behavior where uOFW, PSPSDK, pspautotests and PPSSPP leave questions; do not treat emulator behavior as firmware proof. | `src/jpcsp/HLE/modules/sceUmdUser.java`, `src/jpcsp/AllegrexOpcodes.java` | Vendored & examined |
+| [azahar-emu/azahar](https://github.com/azahar-emu/azahar) | `references/azahar` | `3DS PLATFORM`, `PICA200`, `GPU DEBUGGING` | **MEDIUM** | GPL-2.0-or-later | [VERIFIED] 3DS emulator GPU and shader tests can validate future target output; it does not execute PSP guest code. | `src/video_core/gpu.cpp`, `src/tests/video_core/shader.cpp` | Vendored & examined |
 | [hrydgard/pspautotests](https://github.com/hrydgard/pspautotests) | `references/pspautotests` | `TESTS`, `REFERENCE` | **HIGH** | BSD / Public Domain | Comprehensive test suite for PSP hardware behaviors: CPU instructions, VFPU math edges, GE commands, thread scheduling, synchronization primitives, and memory timing. | `tests/cpu/vfpu/`, `tests/gpu/`, `tests/threads/` | Cloned (Shallow depth 1) |
 | [uofw/uofw](https://github.com/uofw/uofw) | `references/uofw` | `REVERSE ENGINEERING`, `PSP HLE`, `REFERENCE` | **HIGH** | Reverse engineered / GPL-3.0 | Complete C reverse engineering of original Sony PSP firmware modules. Invaluable for edge cases in ThreadMan, SysMem, IoFileMgr, and ModuleMgr. | `src/kernel/`, `src/sysmem/`, `src/threadman/`, `src/iofilemgr/` | Cloned & Evaluated |
 | [MasterFeizz/DaedalusX64-3DS](https://github.com/MasterFeizz/DaedalusX64-3DS) | `references/DaedalusX64-3DS` | `3DS PLATFORM`, `DYNAMIC RECOMPILER`, `GPU / GE`, `AUDIO`, `REFERENCE` | **CRITICAL** | GPL-2.0 | Proven implementation of MIPS execution on 3DS ARM11, hardware-accelerated 3D rendering using `citro3d` / PICA200, and NDSP audio streaming. | `Source/SysCTR/Graphics/`, `Source/SysCTR/DynaRec/arm/`, `Source/SysCTR/HLEAudio/` | Cloned & Evaluated |
@@ -21,10 +24,14 @@ This document contains a structured inventory of all repositories currently inte
 | [pspdev/vfpu-docs](https://github.com/pspdev/vfpu-docs) | `psp/vfpu-docs` | `VFPU`, `REFERENCE` | **HIGH** | Creative Commons / Public | Complete reference documentation of Sony PSP Vector Floating Point Unit (VFPU) matrices, registers, rotation opcodes, and prefix mechanics. | `README.md`, instruction tables | Cloned & Evaluated |
 | [pspdev/prxtool](https://github.com/pspdev/prxtool) | `psp/prxtool` | `REVERSE ENGINEERING`, `ASSET TOOLS`, `CPU / ALLEGREX` | **HIGH** | Academic / Open | PSP PRX/ELF disassembler, relocation table parser, and NID symbol resolver. Useful for inspecting decrypted EBOOT sections and export/import tables. | `src/` | Cloned & Evaluated |
 | [kotcrab/ghidra-allegrex](https://github.com/kotcrab/ghidra-allegrex) | `psp/ghidra-allegrex` | `REVERSE ENGINEERING`, `CPU / ALLEGREX`, `VFPU` | **HIGH** | Apache-2.0 | Ghidra processor definition for MIPS Allegrex (PSP) including full VFPU instruction decoding. Essential for decompilation and cross-verifying game functions. | `data/languages/allegrex.slaspec` | Cloned & Evaluated |
+| [pspdev/psp-ghidra-scripts](https://github.com/pspdev/psp-ghidra-scripts) | `psp/psp-ghidra-scripts` | `REVERSE ENGINEERING`, `NID`, `GHIDRA` | **MEDIUM** | Apache-2.0 | [VERIFIED] PSP NID name resolution and hardware register annotation to speed import/caller review. | `SonyPSPResolveNIDs.py`, `SonyPSPMapHWRegisters.py` | Vendored & examined |
 | [devkitPro/libctru](https://github.com/devkitPro/libctru) | `3ds/libctru` | `3DS PLATFORM`, `PRIMARY` | **CRITICAL** | Zlib / devkitPro | Core runtime library for Nintendo 3DS homebrew. Direct interface to Horizon OS sys-calls: memory allocation, multi-threading, New 3DS speedup mode, NDSP audio, and SDMC. | `include/3ds/`, `source/` | Cloned & Evaluated |
 | [devkitPro/citro3d](https://github.com/devkitPro/citro3d) | `3ds/citro3d` | `3DS PLATFORM`, `GPU / GE`, `PRIMARY` | **CRITICAL** | Zlib / devkitPro | 3D graphics library for Nintendo 3DS PICA200 GPU. Manages command buffers, texture upload, render targets, vertex shaders, and texture combiners (Tev). | `include/c3d/`, `source/` | Cloned & Evaluated |
 | [devkitPro/citro2d](https://github.com/devkitPro/citro2d) | `3ds/citro2d` | `3DS PLATFORM`, `GPU / GE`, `OPTIONAL` | **MEDIUM** | Zlib / devkitPro | 2D hardware-accelerated drawing library on top of citro3d. Can be used for HUD, touch-screen overlays, or text dialogues. | `include/c2d/`, `source/` | Cloned & Evaluated |
 | [devkitPro/3ds-examples](https://github.com/devkitPro/3ds-examples) | `3ds/3ds-examples` | `3DS PLATFORM`, `REFERENCE` | **MEDIUM** | CC0 / Zlib | Official sample code demonstrating citro3d shaders, texture sampling, New 3DS clock speedup, multi-core threading, and NDSP audio streaming. | `graphics/gpu/`, `audio/streaming/` | Cloned & Evaluated |
+| [devkitPro/picasso](https://github.com/devkitPro/picasso) | `3ds/picasso` | `3DS PLATFORM`, `SHADER TOOL` | **HIGH** | MIT | [VERIFIED] PICA200 shader assembler used to inspect or build target shader programs after a measured GE workload exists. | `source/picasso_assembler.cpp`, `Manual.md` | Vendored & examined |
+| [neobrain/nihstro](https://github.com/neobrain/nihstro) | `3ds/nihstro` | `3DS PLATFORM`, `SHADER TOOL` | **MEDIUM** | BSD-3-Clause | [VERIFIED] Independent shader assembler/disassembler to cross-check PICA200 shader encoding. | `src/assembler.cpp`, `src/disassembler.cpp` | Vendored & examined |
+| [kynex7510/GLASS](https://github.com/kynex7510/GLASS) | `references/GLASS` | `3DS PLATFORM`, `PICA200`, `GRAPHICS API` | **LOW** | MPL-2.0 header; no root license file | [VERIFIED] Work-in-progress OpenGL ES 2 interface and PICA extensions for platform research; no demonstrated P3P3DS performance benefit. | `Include/GLASS.h`, `Include/GLASS/Defs.h`, `Docs/MISC.md` | Vendored & examined |
 | [zarroboogs/p3p-patches](https://github.com/zarroboogs/p3p-patches) | `p3p/p3p-patches` | `P3P-SPECIFIC`, `MODDING`, `REVERSE ENGINEERING` | **CRITICAL** | Unspecified / Public | CWCheat and xdelta patches for Persona 3 Portable (ULUS-10512). Documents key addresses for intro skipping and the canonical `ms0:/PSP/GAME/P3P/` mod loader hook. | `ULUS10512.ini` | Cloned & Analyzed |
 | [DniweTamp/Persona-3-Portable-Mod-Menu](https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu) | `p3p/Persona-3-Portable-Mod-Menu` | `P3P-SPECIFIC`, `MODDING`, `REVERSE ENGINEERING` | **HIGH** | Public Domain / Open | Mod menu written in Atlus Flow script (`.flow`) hooking into original event scripts (`.bf`). Maps all in-game field event script IDs (`h06_01` to `h37_02`). | `ModMenu.flow`, `hook/`, `Utilities.flow` | Cloned & Analyzed |
 | [tge-was-taken/Atlus-Script-Tools](https://github.com/tge-was-taken/Atlus-Script-Tools) | `tools/Atlus-Script-Tools` | `ASSET TOOLS`, `P3P-SPECIFIC`, `MODDING` | **HIGH** | MIT | AtlusScriptCompiler suite for compiling and decompiling Atlus `.flow` / `.msg` into binary `.bf` / `.bmd` script formats. Necessary for custom event scripting and dialogue patching. | `Source/AtlusScriptCompiler/` | Cloned & Evaluated |
@@ -43,7 +50,29 @@ This document contains a structured inventory of all repositories currently inte
 
 ---
 
-## 2. Repositories Evaluated and Rejected / Excluded
+## 2. wizardengineer/psprecomp comparison and decisions
+
+The observations below concern the imported revision in `docs/UPSTREAMS.md`. They are research findings, not P3P execution measurements. The project is GPL-2.0-or-later (`recomp/psprecomp-wizardengineer/README.md:406-412`); implementation code from it must not be copied into our `core/`.
+
+| Area | Observed reference design and evidence | P3P3DS consequence |
+| :--- | :--- | :--- |
+| Static recompilation | [VERIFIED] Headless Ghidra census plus ELF parser produce `analysis.json`; mid-entry and cross-jump data are represented (`README.md:40-42,78-92`, `crates/psp-parser/src/analysis_json.rs:70-126`). | [INFERRED] Compare its recovered targets with our conservative `profiles/p3p/config/frontier_seeds.csv` only when a missing guest-function frontier appears. Keep our CFG validator; an upstream target is not proof of a P3P boundary. |
+| HLE and ThreadMan | [VERIFIED] NID/import table generated from analysis binds named HLE handlers (`ARCHITECTURE.md:59,149`); thread, semaphore, mutex and eventflag handlers live in separate `runtime/src/hle/psp_hle_kernel_*.cpp` files. Our handler registration is in `core/src/hle/hle_modules.cpp`, with thread ownership/priority in `core/src/hle/threadman.cpp`. | [INFERRED] For the present `sceUmdActivate` call, the useful pattern is import identity plus call-site evidence, followed by uOFW/PSPSDK/pspautotests semantics. No broad ThreadMan transplant is justified. |
+| Scheduler | [VERIFIED] Upstream uses host threads with cooperative `sched_yield_point()` at chosen HLE calls (`runtime/src/psp_scheduler.cpp:160-216`, `docs/SCHEDULER-DESIGN.md:21-71`); its own design records busy-poll and timing limits. Our priority selection is in `core/src/hle/threadman.cpp:216-260`. | [INFERRED] Do not adopt HLE-only yields as a general PSP scheduling solution. When P3P exposes a scheduling divergence, capture thread states and the first differing event before changing policy. |
+| GE | [VERIFIED] Upstream queues lists without blocking (`runtime/src/psp_render_queue.cpp:60-89`), but its `sceGeListEnQueueHead` ignores priority and `sceGeListSync` uses all-list sync (`runtime/src/hle/psp_hle_ge.cpp:34-59`). Our GE implementation explicitly lacks scheduler wait integration (`core/src/hle/ge.cpp:81`). | [INFERRED] A bounded list UID/stall trace could help classify a future real game-generated GE workload; the two current setup lists and VRAM metadata writes do not warrant renderer work. |
+| VFPU | [VERIFIED] Decoder has prefix and matrix instruction handling plus regression cases (`crates/psp-decoder/src/vfpu.rs:516-545,1086-1263`). Our current decoder/lowering gap is recorded in `docs/CURRENT_STATE.md` as 62 generic VFPU words. | [INFERRED] Use opcode-level differential microtests only when a P3P-executed word reaches that gap. Upstream's matrix tests are a candidate test design, not a license to import code. |
+| PPSSPP oracle | [VERIFIED] `tools/ppsspp_trace/` contains WebSocket capture and breakpoint tooling; `DEBUGGING.md:119-155` warns about dropped resume replies, build-specific breakpoint crashes, and same-snapshot comparison. | [INFERRED] Start with one read-only observation at the current UMD call and a separate P3P3DS event capture; identify exact version, game hash, PC, thread and register state before comparing outcomes. |
+
+### Minimal differential oracle plan
+
+1. [VERIFIED] PPSSPP's JSON WebSocket subprotocol is `debugger.ppsspp.org`; request/response events and optional `ticket` are documented in `references/ppsspp/Core/Debugger/WebSocket.cpp:30-50`. Existing handlers expose `cpu.breakpoint.add`, `cpu.status`, `cpu.getAllRegs`, `memory.read`, `hle.thread.list`, `cpu.stepping` and `cpu.resume` (`Core/Debugger/WebSocket/{BreakpointSubscriber,CPUCoreSubscriber,MemorySubscriber,HLESubscriber}.cpp`).
+2. [UNVERIFIED] Launch a pinned PPSSPP build with the user's own ULUS-10512 image, record its hash and debugger endpoint, send `version`, then stop at guest call site `0x08AA15F8` or import `0x08B80124`. Capture PC, RA, SP, GP, A0-A3, V0-V1, thread UID, selected pointed-to bytes and emulated time. Test breakpoint support first: the upstream project documents a crash in one of its builds (`DEBUGGING.md:130-136`); no PPSSPP session was run for this import.
+3. [VERIFIED] Our runner already emits structured events with `--run-until-blocker --dump-events` (`platform/pc/main.cpp:19,60-90`, `platform/pc/telemetry.hpp:59-86`). Capture two runs with identical inputs, compare event bytes and final blocker. Add an explicit boundary-register event only when the corresponding oracle snapshot exists; do not infer values from an API name.
+4. [UNVERIFIED] Normalize only declared nonsemantic fields (host timestamp, absolute host paths). Compare ordered guest PC/call/return, thread UID and HLE result, then selected memory bytes from the *same* boot phase. Report first divergence with both raw snapshots and provenance. Do not silently normalize guest addresses or change runtime behavior to match PPSSPP alone.
+
+Current oracle status: [VERIFIED] API and existing trace paths inspected statically; [UNVERIFIED] no running PPSSPP WebSocket connection or original P3P capture was available in this research sprint.
+
+## 3. Repositories Evaluated and Rejected / Excluded
 
 The following repositories were examined during technical research but intentionally excluded from the main workspace:
 
@@ -57,7 +86,7 @@ The following repositories were examined during technical research but intention
 
 ---
 
-## 3. Directory Mapping Summary
+## 4. Directory Mapping Summary
 
 ```text
 P3P3DS/
@@ -65,6 +94,8 @@ P3P3DS/
 │   ├── 3ds-examples/
 │   ├── citro2d/
 │   ├── citro3d/
+│   ├── nihstro/
+│   ├── picasso/
 │   └── libctru/
 ├── core/                       # Reserved for P3P3DS runtime & bridge code
 ├── docs/                       # Architectural analysis and development guides
@@ -74,6 +105,7 @@ P3P3DS/
 │   └── p3p-patches/
 ├── psp/
 │   ├── ghidra-allegrex/
+│   ├── psp-ghidra-scripts/
 │   ├── prxtool/
 │   ├── pspsdk/
 │   └── vfpu-docs/
@@ -82,9 +114,13 @@ P3P3DS/
 │   ├── PSP-recompilation-project/
 │   ├── PSPRecomp/
 │   ├── psprecomp-sp00nz/
+│   ├── psprecomp-wizardengineer/
 │   └── Yakumo/
 ├── references/
 │   ├── DaedalusX64-3DS/
+│   ├── GLASS/
+│   ├── azahar/
+│   ├── jpcsp/
 │   ├── persona-3-dual/
 │   ├── ppsspp/
 │   ├── pspautotests/

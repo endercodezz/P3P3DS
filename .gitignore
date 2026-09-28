@@ -96,3 +96,11 @@ references/static-recomp/xenia/tools/build/
 Thumbs.db
 .DS_Store
 tools/CriPakTools/Build/CriPakTools.exe
+
+# Jpcsp research snapshot: do not commit bundled runtime binaries or firmware-like assets.
+references/jpcsp/lib/
+references/jpcsp/plugins/
+references/jpcsp/flash0/
+references/jpcsp/testresources/
+references/azahar/externals/open_source_archives/include/
+references/azahar/src/android/gradle/wrapper/gradle-wrapper.jar

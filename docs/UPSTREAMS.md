@@ -1,8 +1,10 @@
 # P3P3DS — Upstream Vendored Repositories & Provenance Registry
 
-This registry records the exact provenance, upstream source URLs, imported commit revisions, branches, licenses, and architectural purposes of all 32 vendored research and reference repositories included in the **P3P3DS** repository tree.
+This registry records the exact provenance, upstream source URLs, imported commit revisions, branches, licenses, and architectural purposes of all 39 vendored research and reference repositories included in the **P3P3DS** repository tree.
 
 All original `LICENSE`, `COPYING`, `NOTICE`, and copyright headers inside each vendored directory are preserved unchanged.
+
+The Jpcsp snapshot is source focused: bundled `lib/`, `plugins/`, `flash0/` and `testresources/` are excluded from the committed tree via `.gitignore` (prebuilt binaries and firmware-like/media assets). Azahar's generated system-archive byte arrays and Gradle wrapper JAR are likewise excluded. They remain in the local downloads. Imported revision names the upstream commit, not a claim that every upstream asset is committed. No nested `.git` directories or generated build/cache directories are included.
 
 ---
 
@@ -14,18 +16,25 @@ All original `LICENSE`, `COPYING`, `NOTICE`, and copyright headers inside each v
 | `3ds/citro2d` | `https://github.com/devkitPro/citro2d` | `147b02aae021da61b1f620446ad2892ecc45411e` | `master` | Zlib | 2D graphics hardware-accelerated drawing library on Nintendo 3DS |
 | `3ds/citro3d` | `https://github.com/devkitPro/citro3d` | `9f21cf7b380ce6f9e01a0420f19f0763e5443ca7` | `master` | Zlib | 3D graphics library for Nintendo 3DS DMP PICA200 GPU |
 | `3ds/libctru` | `https://github.com/devkitPro/libctru` | `36fe1ada5b7ebe53ba4decda36d764a55f8fefb6` | `master` | Zlib | Core Nintendo 3DS userland OS, hardware primitives, threading, and NDSP library |
+| `3ds/picasso` | `https://github.com/devkitPro/picasso` | `d522455ea59cd5cb9219c699b93eb7750039233c` | default at import | MIT (`COPYING`) | PICA200 shader assembler and shader binary format reference |
+| `3ds/nihstro` | `https://github.com/neobrain/nihstro` | `a969b1a6849b02679a1858847ba18bedd3a19d44` | default at import | BSD-3-Clause (`license.txt`) | Independent PICA200 shader assembler/disassembler cross-check |
 | `p3p/p3p-patches` | `https://github.com/zarroboogs/p3p-patches` | `e21f8d711fd4c89be1ded6f347d0a17df1db941f` | `master` | Unspecified / Public | Persona 3 Portable CWCheat patches, intro-skip, and mod loader memory hooks |
 | `p3p/Persona-3-Portable-Mod-Menu` | `https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu` | `d8e9d55d8240214c6529e839f3021b8c6b0b79a9` | `master` | Public Domain / Open | Persona 3 Portable event script mod menu & field hook mappings (`.flow`/`.bf`) |
 | `psp/ghidra-allegrex` | `https://github.com/kotcrab/ghidra-allegrex` | `8d5ca58e609ad7e732d550036126b6b0f99bd663` | `master` | Apache-2.0 | Ghidra processor definition for MIPS Allegrex and VFPU vector instructions |
+| `psp/psp-ghidra-scripts` | `https://github.com/pspdev/psp-ghidra-scripts` | `76bbf68b76504df5ba8dfd59042332343b1daa7d` | default at import | Apache-2.0 (`LICENSE`) | Ghidra PSP import/export NID resolution and hardware-register annotation scripts |
 | `psp/prxtool` | `https://github.com/pspdev/prxtool` | `08849d87fa8692f2ba29238ec1710f2706e3e021` | `master` | AFL-2.0 | PSP PRX/ELF disassembler, symbol resolver, and relocation analyzer |
 | `psp/pspsdk` | `https://github.com/pspdev/pspsdk` | `c1d856c1ff21b2098a4ea2aab9894d890b321040` | `master` | BSD-3-Clause | Official open-source Sony PSP SDK headers, structs, and NID tables |
 | `psp/vfpu-docs` | `https://github.com/pspdev/vfpu-docs` | `f283bbb8d2ed39b6fa3414bd9f62632143b63e06` | `master` | GPL-3.0 | Sony PSP Vector Floating Point Unit (VFPU) reference documentation |
 | `recomp/N64Recomp` | `https://github.com/N64Recomp/N64Recomp` | `ffb39cdad1da5de07eaaa48bd1db4a89a7986771` | `main` | MIT | MIPS-III static recompiler framework and basic-block analysis reference |
 | `recomp/PSP-recompilation-project` | `https://github.com/sal063/PSP-recompilation-project` | `da17b0e1db209206a407d097d132201e516e3855` | `main` | GPL-2.0+ | Standalone PSP static recompiler with lightweight pure C runtime (sal063) |
 | `recomp/PSPRecomp` | `https://github.com/jessicanataliagta/PSPRecomp` | `f6e7d415c7f447b934cc3865a31eb725f353d659` | `main` | MIT | PSP static recompilation framework with GTA VCS profile architecture |
+| `recomp/psprecomp-wizardengineer` | `https://github.com/wizardengineer/psprecomp` | `bd3c33eb3d7210e8f605a2ce1cd098ba830df6b8` | default at import | GPL-2.0-or-later (`LICENSE`, `README.md`) | Ghidra/Rust PSP AOT pipeline, HLE/GE/VFPU runtime and differential-debug workflow; research only, no GPL code copied into `core/` |
 | `recomp/psprecomp-sp00nz` | `https://github.com/sp00nznet/psprecomp` | `caca7595251410ae7887aa209ba56397a835d0e1` | `main` | MIT | Clean-room static recompilation toolkit and verification oracle design |
 | `recomp/Yakumo` | `https://github.com/TeamGDB/Yakumo` | `87bc4d9f5ad61829652ffb07bc8e477d39f706d5` | `main` | MIT | Production static recompilation port of Monster Hunter Portable 3rd HD |
 | `references/DaedalusX64-3DS` | `https://github.com/MasterFeizz/DaedalusX64-3DS` | `31c5e560d4cbd11d6e5b50e5e42c25b9598a68a9` | `master` | GPL-2.0 | Reference for MIPS dynarec on ARM11, citro3d PICA200 renderer, and NDSP audio |
+| `references/jpcsp` | `https://github.com/jpcsp/jpcsp` | `00ac4d6daedd89c0492093ae83fb0d3d819af414` | default at import | GPL-3.0-or-later (`COPYING`, `README.md`) | Independent Java PSP emulator for behavioral triangulation of HLE/VFPU/GE; not a PSP firmware specification |
+| `references/azahar` | `https://github.com/azahar-emu/azahar` | `662d412123305a9f4be94dd3dc73ddf91a18c55e` | default at import | GPL-2.0-or-later (`license.txt`, `src/video_core/gpu.cpp`) | 3DS/PICA200 emulator and GPU debugging reference; target-platform validation only |
+| `references/GLASS` | `https://github.com/kynex7510/GLASS` | `ae5aed58f6f094bd53353796003a9975f363b4d9` | default at import | MPL-2.0 header in `Include/GLASS.h`; no root license file | Work-in-progress 3DS OpenGL ES/PICA200 interface and extension reference; not a PSP GE backend |
 | `references/persona-3-dual` | `https://github.com/p3d-project/persona-3-dual` | `0c6dccac10e946f7850cfb10ef6a551d2a849c6d` | `main` | CC-BY-NC-SA-4.0 | Nintendo dual-screen Persona UI/presentation, handheld rendering and resource-management reference |
 | `references/ppsspp` | `https://github.com/hrydgard/ppsspp` | `a50fb6071f4b5ee71f3cd04b65d1cf4cbba22518` | `master` | GPL-2.0+ | Gold-standard PSP emulator: ground truth oracle for HLE, GE, VFPU, audio |
 | `references/pspautotests` | `https://github.com/hrydgard/pspautotests` | `6f03ee6457804144add92bfc47563cf60c443e4f` | `master` | BSD-3-Clause | Comprehensive test suite for PSP CPU, VFPU, GE, and kernel timing |

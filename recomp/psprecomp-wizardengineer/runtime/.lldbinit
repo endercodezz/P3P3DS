@@ -1,0 +1,13 @@
+# PSPrecomp lldb formatters -- auto-loaded when lldb starts in runtime/ directory
+#
+# Requires: settings set target.load-cwd-lldbinit true
+# (add to ~/.lldbinit if not already set)
+#
+# Available commands after loading:
+#   psp_thread   - Display current PspThread
+#   psp_threads  - List all active PSP threads
+#   psp_module   - Display NativeModule at PSP address
+#   psp_sema     - Display semaphore state by UID
+#   psp_heap     - Display dlmalloc arena and partition state
+
+command script import tools/psp_lldb.py

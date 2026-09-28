@@ -1,0 +1,9 @@
+[package]
+name = "psp-decoder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+psp-ir = { path = "../psp-ir" }
+byteorder = "1"
+thiserror = "2"

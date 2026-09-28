@@ -1,3 +1,13 @@
 # Existing Windows-generated artifacts use CRLF. Check real trailing spaces
 # without treating the CR half of that line ending as whitespace damage.
 * whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# Preserve imported upstream whitespace without mass-formatting third-party files.
+3ds/nihstro/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+3ds/picasso/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+psp/psp-ghidra-scripts/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+recomp/psprecomp-wizardengineer/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+references/GLASS/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+references/azahar/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+references/jpcsp/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+references/azahar/dist/qt_themes/qdarkstyle_midnight_blue/LICENSE.rst conflict-marker-size=8

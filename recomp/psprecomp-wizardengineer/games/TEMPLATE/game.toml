@@ -1,0 +1,70 @@
+# games/TEMPLATE/game.toml — per-game manifest skeleton (issue #68).
+#
+# Copy this directory to games/<id>/ and fill in the sections below. Every key
+# is OPTIONAL: an empty manifest (or no --config at all) recompiles to a fully
+# generic build. A well-behaved game should boot with NO manifest — the manifest
+# exists for curation (forced entries, asset layer, heap pin), never as bring-up
+# table stakes. See docs/ADDING_A_GAME.md for the end-to-end path and the
+# facts-vs-choices distinction.
+#
+# How it is consumed:
+#   psprecomp recompile <analysis.json> --config games/<id>/game.toml -o output
+#     - [game]/[boot]/[module]/[runtime] are emitted into
+#       output/include/recomp_game_config.h (the runtime never parses TOML).
+#     - [recompile] feeds the force-entry passes in the recompile pipeline.
+#   The address-keyed runtime hooks live in games/<id>/runtime/ and are compiled
+#   in via -DPSPRECOMP_GAME=<id>. The runtime cross-checks the compiled-in
+#   module id against RECOMP_GAME_ID from recomp_game_config.h and prints a loud
+#   (non-fatal) warning on mismatch — keep [game] id and -DPSPRECOMP_GAME=<id>
+#   in sync.
+#
+# Schema reference: crates/psp-cli/src/config.rs.
+
+[game]
+# id MUST match the runtime build's -DPSPRECOMP_GAME=<id> and the
+# games/<id>/ directory name. Compiled into recomp_game_config.h as
+# RECOMP_GAME_ID; "" (or no [game] table) means "no manifest / generic".
+id    = "TEMPLATE"
+# Informational only — never consumed programmatically. Convention is
+# "<Title> (<region-id>)", e.g. "Patapon (UCUS-98643)".
+title = "Replace Me (XXXX-00000)"
+
+[boot]
+# Guest exec path passed to module_start. The default below is correct for
+# disc-based UMD games (BOOT.BIN under SYSDIR). EBOOT-only / downloadable
+# titles override to ".../EBOOT.BIN". Leave commented to take the default.
+# boot_path = "disc0:/PSP_GAME/SYSDIR/BOOT.BIN"
+
+[module]
+# heap_base pins the runtime heap base, overriding the generic align-to-16MB
+# RECOMP_HEAP_BASE policy. Only set this if a title needs its historical heap
+# layout reproduced bit-identically (rare). Leave commented to use the policy.
+# heap_base = "0x09000000"
+
+[runtime]
+# Asset layer: "none" (default) or "bnd" (a disc archive layer). Most titles
+# are "none". Only set "bnd" if you have added a matching asset-layer hook in
+# games/<id>/runtime/ and a parser for the archive format. Leave commented for
+# the generic default.
+# asset_layer = "none"
+
+[recompile]
+# Curated emission inputs. Start EMPTY — only add entries once a concrete
+# LOOKUP_MISS or merged-boundary problem is observed in the runtime, and each
+# entry is confirmed a real function start (raw-word decode + behavioral oracle,
+# see docs/ADDING_A_GAME.md). Do NOT copy Patapon's addresses; they are
+# specific to that binary.
+#
+# force_entries: function starts Ghidra merged into a larger function (valid
+# starts the discovery passes rejected). Hex strings.
+# force_entries = []
+#
+# force_entries_cross_mid: like force_entries but only active under the
+# PSPRECOMP_CROSS_MID=1 recompile env (used for experimental graft baselines).
+# force_entries_cross_mid = []
+#
+# force_mid_entries: mid-entries Ghidra missed — an entry address inside an
+# existing parent function. Each is an {entry, parent} pair.
+# [[recompile.force_mid_entries]]
+# entry  = "0x00000000"
+# parent = "0x00000000"

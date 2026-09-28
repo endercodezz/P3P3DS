@@ -1,0 +1,6 @@
+# Assumes lldb is launched from the psprecomp repo root.
+command script import runtime/watchpoint.py
+breakpoint set -n psp_init_data_sections
+run
+wp_setup
+continue

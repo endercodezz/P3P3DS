@@ -1,0 +1,67 @@
+# Rust
+target/
+
+# C++ build
+runtime/build/
+runtime/build-debug/
+runtime/build-none/
+runtime/build-*/
+cmake-build-*/
+
+# External toolchain checkouts
+pspdev-gdb/
+
+# Generated recompiler output
+output/
+
+# Analysis artifacts (large generated JSON, not source)
+analysis.json
+analysis.ghidra_raw.json
+analysis.ghidra_raw.meta.json
+discovered_entries.json
+
+# Binary files
+*.bin
+*.BIN
+*.iso
+*.ISO
+*.elf
+*.prx
+BOOT.BIN
+
+# Disc content (extracted ISO, large)
+disc0
+
+# Test artifacts
+*.tga
+ge_test.tga
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Environment
+.env
+.env.*
+
+# Editor swap files
+*.swp
+*.swo
+*~
+
+# OS-specific
+Thumbs.db
+
+# Planning / agent state (not part of the public tree)
+.planning/
+.claude/
+*.log
+vtable_miss_addresses.txt
+
+# NID database is fetched locally, not committed
+data/
+
+# Issue-52 integration gate scratch outputs
+tmp-out/

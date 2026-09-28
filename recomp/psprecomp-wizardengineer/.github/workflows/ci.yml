@@ -1,0 +1,46 @@
+name: CI
+
+# Scope (issue #70): this workflow covers the Rust pipeline crates only —
+# the analysis/decode/emit half of the project (crates/psp-*). Those crates
+# build and unit-test with no external inputs.
+#
+# Deliberately NOT in CI:
+#   - `psprecomp analyze` needs a Ghidra install + the ghidra-allegrex
+#     processor extension, and a game BOOT.BIN — none of which are available
+#     (or distributable) in CI.
+#   - The C++ runtime (runtime/) needs SDL2 + OpenGL 3.3 (via CMake/pkg-config)
+#     and a recompiled output/ directory to link against; running it additionally
+#     needs the game's binary and disc assets.
+# The runtime build and the full analyze -> recompile -> run integration path
+# are verified locally on macOS (see docs/PLATFORMS.md). This job stays minimal
+# and green: it only guards the Rust workspace.
+#
+# Note: `cargo fmt --all --check` is intentionally NOT gated here. The existing
+# workspace predates rustfmt enforcement and is not yet format-clean; gating it
+# now would fail CI on legacy code unrelated to a given change. A one-time
+# workspace `cargo fmt` normalization is tracked separately.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  rust:
+    name: Rust workspace (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build workspace
+        run: cargo build --release --workspace
+
+      - name: Test workspace
+        run: cargo test --workspace

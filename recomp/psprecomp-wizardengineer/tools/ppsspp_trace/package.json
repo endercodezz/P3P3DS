@@ -1,0 +1,21 @@
+{
+  "name": "ppsspp-trace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 11.5 PPSSPP HLE behavioral-diff trace capture tooling. Installs logging-only breakpoints (enabled:false, log:true) on the 237 NID import stubs and captures resulting log push-events for diff against the runtime [HLE-TRACE] output.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "self-test": "node --import tsx capture.ts --self-test"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.29.2"
+}

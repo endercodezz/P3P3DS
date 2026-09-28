@@ -6,6 +6,15 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## New reference snapshot and oracle research (2026-09-28)
+
+- [VERIFIED] Seven source snapshots and exact imported SHAs are recorded in `docs/UPSTREAMS.md`. The imported directories have no nested `.git`; upstream license files remain present where supplied. GLASS has an MPL-2.0 notice in `references/GLASS/Include/GLASS.h:4-8` but no root license file. The comparative evidence and limits are in `docs/REPOSITORIES.md` section 2.
+- [VERIFIED] PPSSPP's WebSocket debugger event protocol is implemented in `references/ppsspp/Core/Debugger/WebSocket.cpp:30-50`; CPU state, breakpoint and memory handlers are under `Core/Debugger/WebSocket/`. This confirms an API surface, not a successful P3P capture.
+- [UNVERIFIED] The proposed differential oracle has not yet observed original ULUS-10512 execution in PPSSPP. No HLE or runtime conclusion follows from the static API survey alone.
+- [VERIFIED] Research-sprint regression on this HEAD: `cmake --build build --config Release --parallel 2`, full `ctest --test-dir build --output-on-failure` (11/11 on rerun), `build/p3p_pc_bootstrap.exe --verify-bootstrap` (PASS), and two `--run-until-blocker --dump-events .tmp/reference-replay-{1,2}.json` runs. Both JSON files have SHA-256 `33505F22B89F16D42B3EBCA31A2C808A550BA56DC68F0D33E55202BAD9861566`; both final blockers are missing `sceUmdActivate` at `0x08B80124` from `0x08AA15F8` on thread UID 2. An initial sandboxed CTest run could not create a temporary CSV inside workspace `.tmp`; the full rerun with workspace file access passed. No runtime frontier changed.
+
+---
+
 ## UMD callback registration micro-sprint
 
 - [VERIFIED] Medium presence is explicit per-kernel state, absent by default and present by PC bootstrap configuration. `sceUmdCheckMedium` returns 0/1 from that state; tests exercise both states and removal. Contract: `references/uofw/include/mediaman_user.h:74-79`, `psp/pspsdk/src/umd/pspumd.h:69-73`. Native replay returns 1 to `0x08AA15EC`, then stops at missing `sceUmdActivate` (`0x08B80124`). Two event traces match SHA-256 `33505F22B89F16D42B3EBCA31A2C808A550BA56DC68F0D33E55202BAD9861566`; see CURRENT_STATE. Presence does not imply implemented activation/readiness/mounting.

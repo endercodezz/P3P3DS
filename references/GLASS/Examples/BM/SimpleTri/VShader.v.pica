@@ -1,0 +1,15 @@
+.constf fixed(0.0, 0.0, 0.0, 1.0)
+
+.out outpos position
+.out outclr color
+
+.alias inpos v0
+.alias inclr v1
+
+.proc main
+	mov r0.xy, inpos
+	mov r0.zw, fixed
+	mov outpos, r0
+	mov outclr, inclr
+	end
+.end
