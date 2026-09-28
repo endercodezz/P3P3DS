@@ -41,6 +41,45 @@ int main() {
     independent.umd().set_medium_present(true);
     k.umd().set_medium_present(false);CHECK(!k.umd().medium_present());CHECK(check_medium()==0);
     CHECK(independent.umd().medium_present());CHECK(k.umd().registered_callback()==second);
+    // uOFW mediaman.c::sceUmdActivate: exact alias, mode 1/2, invalid argument 0x80010016.
+    constexpr std::uint32_t alias_ptr=0x08800120u;
+    constexpr char alias[]="disc0:";
+    for(std::size_t i=0;i<sizeof(alias);++i)r.memory().store8(alias_ptr+static_cast<std::uint32_t>(i),alias[i]);
+    auto activate=[&](std::uint32_t mode,std::uint32_t ptr) {
+        c.gpr[4]=mode;c.gpr[5]=ptr;c.gpr[31]=0x08AA1600u;
+        r.invoke_import("sceUmdUser",0xC6183D47u,c);return c.gpr[2];
+    };
+    CHECK(!k.umd().activation_requested());
+    CHECK(activate(0,alias_ptr)==0x80010016u);
+    CHECK(activate(3,alias_ptr)==0x80010016u);
+    CHECK(activate(1,0)==0x80010016u);
+    CHECK(activate(1,0x00010000u)==0x80010016u);
+    constexpr std::uint32_t wrong_ptr=0x08800140u;
+    constexpr char wrong_alias[]="umd0:";
+    for(std::size_t i=0;i<sizeof(wrong_alias);++i)r.memory().store8(wrong_ptr+static_cast<std::uint32_t>(i),wrong_alias[i]);
+    CHECK(activate(1,wrong_ptr)==0x80010016u);
+    for(std::uint32_t i=0;i<7u;++i)r.memory().store8(wrong_ptr+i,'x');
+    CHECK(activate(1,wrong_ptr)==0x80010016u);
+    CHECK(!k.umd().activation_requested());CHECK(!k.umd().medium_present());
+    CHECK(k.umd().registered_callback()==second);
+    k.umd().set_medium_present(true);
+    CHECK(activate(1,alias_ptr)==0u); // Observed P3P mode and guest string.
+    CHECK(k.umd().activation_requested());CHECK(k.umd().medium_present());
+    CHECK(k.umd().registered_callback()==second);
+    CHECK(activate(2,alias_ptr)==0u); // Also accepted by uOFW; no mount claim.
+    CHECK(k.umd().activation_requested());CHECK(check_medium()==1u);
+    CHECK(!independent.umd().activation_requested());
+    psprecomp::Runtime second_runtime;
+    p3p3ds::hle::register_umd_module(second_runtime,independent);
+    constexpr std::uint32_t second_alias_ptr=0x08800120u;
+    for(std::size_t i=0;i<sizeof(alias);++i)
+        second_runtime.memory().store8(second_alias_ptr+static_cast<std::uint32_t>(i),alias[i]);
+    auto &second_cpu=second_runtime.cpu();
+    second_cpu.gpr[4]=1;second_cpu.gpr[5]=second_alias_ptr;
+    second_runtime.invoke_import("sceUmdUser",0xC6183D47u,second_cpu);
+    CHECK(second_cpu.gpr[2]==0u);CHECK(independent.umd().activation_requested());
+    CHECK(independent.umd().medium_present());CHECK(independent.umd().registered_callback()==0);
+    CHECK(k.umd().registered_callback()==second);
     CHECK(!independent.threads().get_callback(uid));CHECK(!r.stopped());
     std::cout<<"UMD callback failures="<<failures<<'\n';return failures?1:0;
 }

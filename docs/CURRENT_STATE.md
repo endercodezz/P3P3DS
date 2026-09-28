@@ -2,7 +2,21 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current micro-sprint: UMD medium presence
+## Current micro-sprint: UMD activation request
+
+Source base: `cfb9d61599befd7942b0ac0f5be85874432d9691`.
+
+- [VERIFIED] The pre-change replay still stopped at `sceUmdActivate` (`0x08B80124`), SHA-256 `33505F22B89F16D42B3EBCA31A2C808A550BA56DC68F0D33E55202BAD9861566`. The executed AOT path at `build/generated/p3p_generated.cpp:L_08AA15EC/L_08AA15F4` sets `A0=1`, `A1=0x08BA7EB8`, and `RA=0x08AA1600`; the relocated ELF segment at file offset `0x3A3F58` contains `disc0:\0`. The post-change `umd_activate` event confirms these arguments at the HLE boundary, `V0_before=1`, `A2=0`, `A3=0x08FBB1F8`, `GP=0x08C42A50`, `SP=0x09FEF940`, `user_main` / UID 2, and medium present. `L_08AA1600` branches to the error path on negative `V0`, otherwise continues to `0x08AA1608`; the exact nonnegative value matters to that branch only.
+- [VERIFIED] `sceUmdUser::sceUmdActivate` NID `0xC6183D47` now accepts modes 1/2 and the exact readable NUL-terminated `disc0:` alias; invalid mode, alias or guest pointer returns `0x80010016`. A valid request returns zero and sets a per-kernel `activation_requested` flag. `sceUmdCheckMedium` presence and the registered callback remain separate and unchanged. This flag records acceptance of the call; it does **not** claim drive readiness, filesystem assignment or a successful `sceIoAssign`. Source: `references/uofw/src/kd/mediaman/mediaman.c:124-151,526-546`, `references/uofw/include/mediaman.h:45,75-77`, `psp/pspsdk/src/umd/pspumd.h:85-107`, `references/pspautotests/tests/umd/callbacks/umd.expected:2` and `references/pspautotests/tests/umd/wait/wait.expected:7`. uOFW stores the internal mount result as error status while returning zero from `sceUmdActivate`; no mount operation was implemented here.
+- [VERIFIED] Release build, full CTest (**11/11**), stable `--verify-bootstrap`, and `git diff --check` pass. Focused UMD tests cover observed mode 1, documented mode 2, invalid mode/alias/pointer, pre/post request state, medium/callback preservation and independent kernels. No generated AOT or profile-seed changes.
+- [VERIFIED] Two `--run-until-blocker --dump-events .tmp/umd-activate-final-{1,2}.json` runs are byte-identical, SHA-256 **`5101F5EF183480891A464AA2C25E7F0E7BCE80CED86B9D89E2B3C04672732D3E`**. `umd_activate` records result **0**; subsequent `guest_enter` at **`0x08AA1600`** proves return to P3P. Both runs stop at the next genuine blocker: missing HLE `sceUmdUser::sceUmdWaitDriveStat`, NID **`0x8EF08FCE`**, stub PC **`0x08B8010C`**, caller **`0x08AA1608`**, thread **user_main / UID 2**. No implementation of that service belongs to this sprint.
+- [VERIFIED] Graphics milestone: **NO**. Two setup GE lists still complete with 212/29 commands, no GE writer. Four unclassified-resource VRAM writes touch 16 bytes (10 changed); CPU color/depth writes remain zero. There is no rendered pixel or frame evidence.
+
+Immediate blocker: missing `sceUmdWaitDriveStat` HLE.
+
+Next smallest step: prove the observed wait mask and post-call use at `0x08AA1608`, then research only the required wait semantics before a separate implementation sprint.
+
+## UMD medium presence (historical)
 
 Source base: `8cf9b70caf5af42be7663a674c5b9424701b93a8`.
 
