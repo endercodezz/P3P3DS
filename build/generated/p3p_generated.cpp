@@ -20780,6 +20780,174 @@ void sub_08AA0F8C(Runtime &rt, AllegrexContext &ctx) {
     sub_08AA0F8C_entry(rt, ctx, 0u, aot_mem);
 }
 
+static const std::uint16_t kEntryIds_sub_08A9B934[17] = {
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 4,
+};
+void sub_08A9B934_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
+    std::uint32_t jump_target = 0u;
+    std::uint32_t local_transfers = 0u;
+    std::uint32_t local_pc = ctx.pc;
+    std::uint32_t entry_id = direct_entry_id;
+LOCAL_DISPATCH:
+    {
+    if (entry_id == 0u) {
+        const std::uint32_t entry_delta = local_pc - 0x08A9B934u;
+        entry_id = (entry_delta < 68u && (entry_delta & 3u) == 0u) ? kEntryIds_sub_08A9B934[entry_delta >> 2u] : 0u;
+    }
+    switch (entry_id) {
+    case 1u: goto L_08A9B934;
+    case 2u: goto L_08A9B958;
+    case 3u: goto L_08A9B96C;
+    case 4u: goto L_08A9B974;
+    default:
+        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
+        else ctx.pc = local_pc;
+        return;
+    }
+    }
+L_08A9B934:
+    { const std::int64_t product = static_cast<std::int64_t>(static_cast<std::int32_t>(ctx.gpr[5])) * static_cast<std::int64_t>(static_cast<std::int32_t>(ctx.gpr[4])); ctx.lo = static_cast<std::uint32_t>(product); ctx.hi = static_cast<std::uint32_t>(static_cast<std::uint64_t>(product) >> 32u); }
+    ctx.set_gpr(29, ctx.gpr[29] + static_cast<std::uint32_t>(-16));
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B93Cu;
+    rt.memory().aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(0), ctx.gpr[16]);
+    ctx.set_gpr(5, ctx.gpr[6] + 0u);
+    ctx.set_gpr(16, ctx.lo);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B948u;
+    rt.memory().aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(4), ctx.gpr[17]);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B94Cu;
+    rt.memory().aot_store32(ctx.gpr[29] + static_cast<std::uint32_t>(8), ctx.gpr[31]);
+    ctx.set_gpr(31, 0x08A9B958u);
+    ctx.set_gpr(4, ctx.gpr[16] + 0u);
+    rt.record_transfer(0x08A9B950u, 0x0E2A6E22u, 0x08A9B888u);
+    ctx.pc = 0x08A9B888u;
+    if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08A9B958u) goto L_08A9B958;
+    return;
+L_08A9B958:
+    ctx.set_gpr(17, ctx.gpr[2] + 0u);
+    ctx.set_gpr(6, ctx.gpr[16] + 0u);
+    ctx.set_gpr(4, ctx.gpr[2] + 0u);
+    { const bool branch_taken = ctx.gpr[2] == 0u;
+    ctx.set_gpr(5, 0u + 0u);
+      if (branch_taken) {
+    rt.record_transfer(0x08A9B964u, 0x10400003u, 0x08A9B974u);
+          goto L_08A9B974;
+      }
+    rt.record_transfer(0x08A9B964u, 0x10400003u, 0x08A9B96Cu);
+      goto L_08A9B96C;
+    }
+L_08A9B96C:
+    ctx.set_gpr(31, 0x08A9B974u);
+    // nop
+    rt.record_transfer(0x08A9B96Cu, 0x0E2DCF3Cu, 0x08B73CF0u);
+    ctx.pc = 0x08B73CF0u;
+    if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == 0x08A9B974u) goto L_08A9B974;
+    return;
+L_08A9B974:
+    ctx.set_gpr(2, ctx.gpr[17] + 0u);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B978u;
+    ctx.set_gpr(31, rt.memory().aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(8)));
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B97Cu;
+    ctx.set_gpr(17, rt.memory().aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(4)));
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08A9B980u;
+    ctx.set_gpr(16, rt.memory().aot_load32(ctx.gpr[29] + static_cast<std::uint32_t>(0)));
+    jump_target = ctx.gpr[31];
+    ctx.set_gpr(29, ctx.gpr[29] + static_cast<std::uint32_t>(16));
+    rt.record_transfer(0x08A9B984u, 0x03E00008u, jump_target);
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    ctx.pc = jump_target;
+    return;
+}
+
+void sub_08A9B934(Runtime &rt, AllegrexContext &ctx) {
+    auto aot_mem = rt.memory().aot_fast_view();
+    sub_08A9B934_entry(rt, ctx, 0u, aot_mem);
+}
+
+static const std::uint16_t kEntryIds_sub_08AC1ED8[19] = {
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3,
+};
+void sub_08AC1ED8_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {
+    std::uint32_t jump_target = 0u;
+    std::uint32_t local_transfers = 0u;
+    std::uint32_t local_pc = ctx.pc;
+    std::uint32_t entry_id = direct_entry_id;
+LOCAL_DISPATCH:
+    {
+    if (entry_id == 0u) {
+        const std::uint32_t entry_delta = local_pc - 0x08AC1ED8u;
+        entry_id = (entry_delta < 76u && (entry_delta & 3u) == 0u) ? kEntryIds_sub_08AC1ED8[entry_delta >> 2u] : 0u;
+    }
+    switch (entry_id) {
+    case 1u: goto L_08AC1ED8;
+    case 2u: goto L_08AC1F0C;
+    case 3u: goto L_08AC1F20;
+    default:
+        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, "invalid internal function entry");
+        else ctx.pc = local_pc;
+        return;
+    }
+    }
+L_08AC1ED8:
+    ctx.set_gpr(2, 2797u << 16u);
+    ctx.set_gpr(2, ctx.gpr[2] | 6668u);
+    ctx.set_gpr(5, ctx.gpr[5] ^ ctx.gpr[2]);
+    ctx.set_gpr(2, 43610u << 16u);
+    ctx.set_gpr(7, std::rotr(ctx.gpr[5], 8));
+    ctx.set_gpr(2, ctx.gpr[2] | 766u);
+    ctx.set_gpr(2, ctx.gpr[7] ^ ctx.gpr[2]);
+    ctx.set_gpr(3, 4542u << 16u);
+    ctx.set_gpr(6, std::rotr(ctx.gpr[2], 8));
+    ctx.set_gpr(3, ctx.gpr[3] | 33223u);
+    ctx.set_gpr(3, ctx.gpr[6] ^ ctx.gpr[3]);
+    { const bool branch_taken = ctx.gpr[4] == 0u;
+    ctx.set_gpr(3, std::rotr(ctx.gpr[3], 8));
+      if (branch_taken) {
+    rt.record_transfer(0x08AC1F04u, 0x10800006u, 0x08AC1F20u);
+          goto L_08AC1F20;
+      }
+    rt.record_transfer(0x08AC1F04u, 0x10800006u, 0x08AC1F0Cu);
+      goto L_08AC1F0C;
+    }
+L_08AC1F0C:
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F0Cu;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(12), ctx.gpr[3]);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F10u;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(0), ctx.gpr[5]);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F14u;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(4), ctx.gpr[7]);
+    jump_target = ctx.gpr[31];
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F1Cu;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(8), ctx.gpr[6]);
+    rt.record_transfer(0x08AC1F18u, 0x03E00008u, jump_target);
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    ctx.pc = jump_target;
+    return;
+L_08AC1F20:
+    ctx.set_gpr(2, 2284u << 16u);
+    ctx.set_gpr(4, ctx.gpr[2] + static_cast<std::uint32_t>(-8384));
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F28u;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(12), ctx.gpr[3]);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F2Cu;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(0), ctx.gpr[5]);
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F30u;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(4), ctx.gpr[7]);
+    jump_target = ctx.gpr[31];
+    if (rt.frontier_diagnostics) rt.diagnostic_pc = 0x08AC1F38u;
+    rt.memory().aot_store32(ctx.gpr[4] + static_cast<std::uint32_t>(8), ctx.gpr[6]);
+    rt.record_transfer(0x08AC1F34u, 0x03E00008u, jump_target);
+    local_pc = jump_target;
+    if (++local_transfers < 2048u) { entry_id = 0u; goto LOCAL_DISPATCH; }
+    ctx.pc = jump_target;
+    return;
+}
+
+void sub_08AC1ED8(Runtime &rt, AllegrexContext &ctx) {
+    auto aot_mem = rt.memory().aot_fast_view();
+    sub_08AC1ED8_entry(rt, ctx, 0u, aot_mem);
+}
+
 static void import_0(Runtime &rt, AllegrexContext &ctx) {
     const RuntimeExecutionContextToken caller_context = capture_runtime_execution_context();
     const std::uint32_t import_pc = ctx.pc;
@@ -24097,6 +24265,13 @@ void register_generated_functions(Runtime &runtime) {
     runtime.register_function(0x08A9B094u, &sub_08A9B198, "sub_08A9B198");
     runtime.register_function(0x08A9B198u, &sub_08A9B198, "sub_08A9B198");
     runtime.register_function(0x08AA0F8Cu, &sub_08AA0F8C, "sub_08AA0F8C");
+    runtime.register_function(0x08A9B934u, &sub_08A9B934, "sub_08A9B934");
+    runtime.register_function(0x08A9B958u, &sub_08A9B934, "sub_08A9B934");
+    runtime.register_function(0x08A9B96Cu, &sub_08A9B934, "sub_08A9B934");
+    runtime.register_function(0x08A9B974u, &sub_08A9B934, "sub_08A9B934");
+    runtime.register_function(0x08AC1ED8u, &sub_08AC1ED8, "sub_08AC1ED8");
+    runtime.register_function(0x08AC1F0Cu, &sub_08AC1ED8, "sub_08AC1ED8");
+    runtime.register_function(0x08AC1F20u, &sub_08AC1ED8, "sub_08AC1ED8");
     runtime.register_function(0x08B7FD9Cu, &import_0, "sceAudio::0x01562BA3");
     runtime.register_function(0x08B7FDA4u, &import_1, "sceAudio::0x2D53F36E");
     runtime.register_function(0x08B7FDACu, &import_2, "sceAudio::0x43196845");

@@ -36,6 +36,34 @@ int main() {
         m.store32(a+48,0x50000001);CHECK(!check().accepted); // BEQL may annul RA save.
     }
     {
+        // A completed jump separates an entry whose multiply precedes the
+        // ordinary RA-saving frame. A matching JAL alone is insufficient.
+        GuestMemory m;
+        const std::uint32_t c=0x08800000,a=0x08801000;
+        const std::uint32_t jal=0x0C000000u|((a>>2)&0x03FFFFFFu);
+        const std::uint32_t jump=0x08000000u|(((c+16)>>2)&0x03FFFFFFu);
+        m.store32(c,jal);m.store32(c+4,0);
+        m.store32(a-8,jump);m.store32(a-4,0x27BD0010);
+        m.store32(a,0x00A40018); // mult a1,a0 before stack allocation
+        m.store32(a+4,0x27BDFFF0);m.store32(a+8,0xAFBF000C);
+        m.store32(a+12,0x00001012);m.store32(a+16,0x8FBF000C);
+        m.store32(a+20,0x03E00008);m.store32(a+24,0x27BD0010);
+        std::vector<ExecutableRange> ranges={{c,a+28}};
+        std::map<std::uint32_t,std::string> seeds={{c,"caller"}};
+        std::set<std::uint32_t> owned={c,c+4};
+        auto check=[&](std::uint32_t target) {return p3p3ds::validate_frontier(m,ranges,seeds,owned,{},target,c,jal);};
+        CHECK(check(a).accepted);
+        m.store32(a-8,0);CHECK(!check(a).accepted); // straight-line interior label
+        m.store32(a-8,jump);
+        const std::uint32_t branch=(0x04u<<26)|(((a+12-(c+8+4))/4)&0xFFFFu);
+        m.store32(c+8,branch);CHECK(!check(a).accepted); // external interior entry
+        m.store32(c+8,(0x04u<<26)|(((a+24-(c+8+4))/4)&0xFFFFu));
+        CHECK(!check(a).accepted); // external entry into a delay slot
+        m.store32(c+8,0);
+        owned.insert(a+12);CHECK(!check(a).accepted);owned.erase(a+12);
+        CHECK(!check(a+12).accepted); // random interior direct-JAL claim
+    }
+    {
         Runtime r; p3p3ds::KernelState k;r.frontier_diagnostics=true;
         set_runtime_thread_identity(2,"test");
         r.cpu().pc=0x08801000;r.cpu().gpr[31]=0x08800008;

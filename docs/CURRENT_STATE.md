@@ -2,7 +2,21 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current micro-sprint: observed UMD drive wait
+## Current frontier: audio HLE after boundary recovery
+
+Source base: `d8b4253a85ef60352109496218153c3def66636b` (ULUS-10512 PC host).
+
+- [VERIFIED] The pre-change frontier was `missing_guest_function` at `0x08A9B934`, executed direct JAL at `0x08AB29BC`, thread UID 2. Its 18-instruction, four-block CFG begins with `mult a1,a0` before `addiu sp,sp,-16` and an RA save at `0x08A9B94C`. The preceding code ends with an unconditional jump at `0x08A9B92C` and delay slot at `0x08A9B930`, so there is no straight-line entry. The relocated ELF analyzer lists `0x08A9B934` as a direct-JAL seed (`.tmp/frontier-analysis_function_seeds.csv`); source of truth for acceptance is `core/src/frontier.cpp::validate_frontier` and the executable/caller disassembly, not the analyzer label alone. A static scan found 459 direct JAL words and six J words targeting the entry, no conditional branch word targeting it; the six inspected jumps have RA reload and positive stack restoration. No external direct edge into the candidate body was found. This is an independent function with an arithmetic prefix, not a shared interior entry. The incoming-word census is static and may include never-executed words.
+- [VERIFIED] The validator now accepts the narrow `mult/multu`-then-frame pattern only after a completed predecessor jump, immediate stack allocation, RA save, closed supported CFG, no existing coverage overlap and no external branch/call/jump into its body or delay slots. External jumps to the entry require a restored-RA/stack tail-call shape. Synthetic frontier tests reject straight-line predecessors, body/delay-slot entries, overlap and unsupported arbitrary interior claims. Existing boundary behavior remains covered by the full suite. No GPL reference implementation code was copied.
+- [VERIFIED] `py -3 -B tools/chase_frontier.py --fast --max-additions 128 --verify-every 10 --output .tmp/frontier-auto` accepted `0x08A9B934` (18 instructions, four blocks) and `0x08AC1ED8` (22 instructions, three blocks), then stopped at the first new semantic frontier: **missing HLE** `sceAudio::0x5EC81C55`, stub PC `0x08B7FDC4`, caller `0x08B64264`, thread UID 2, RA `0x08B6426C`. The second seed passed the pre-existing independent-boundary proof. The managed manifest now has 20 seeds; generation reports 128 manual functions and 221 import wrappers. No audio implementation was attempted.
+- [VERIFIED] Final `py -3 -B tools/chase_frontier.py --check-only --output .tmp/frontier-final` passes Release build, full CTest (**11/11**), stable bootstrap, two byte-identical `--run-until-blocker` event files and independent AOT regeneration. Event SHA-256: `C60AD25644552B024816EB1B92231C778911E76DEACF1F6C70FCD9AD58C2DD35`; generated C++ SHA-256: `DB32AF9348EF9E60830128E16A505C3C23CE71F19105FB34822A04F160D25182`. See `.tmp/frontier-auto/report.json` and `.tmp/frontier-final/report.json`; `git diff --check` is clean.
+- [VERIFIED] Graphics milestone: **NO**. The final report still records no GE writer and no color/depth-target writes. Four unclassified VRAM operations touched 16 bytes (10 changed); framebuffer configuration and the two setup GE lists do not establish rendered pixels.
+
+Immediate blocker: missing `sceAudio::0x5EC81C55` HLE at `0x08B7FDC4`.
+
+Next smallest step: in a separate sprint, prove the observed audio call arguments and return use, then research the minimal service contract in the required PSP source order.
+
+## UMD drive wait (historical)
 
 Source base: `92e67180fc84c7df04c8e61d8c22ea47bca7dcbf`.
 
