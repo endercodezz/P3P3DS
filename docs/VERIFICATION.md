@@ -6,6 +6,13 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## Audio reservation micro-sprint
+
+- [VERIFIED] ULUS-10512 first calls `sceAudioChReserve(-1,448,0)` at `0x08B64264`; after return it tests the sign of `V0` and stores the channel number. Evidence: `build/generated/p3p_generated.cpp:L_08B64254/L_08B6426C`, `.tmp/audio-before.json`, `.tmp/audio-reserve-1.json`. A temporary register probe established `A3=0x08E10000` and `V0_before=0x08E10CA0` and was removed.
+- [VERIFIED] uOFW `references/uofw/src/kd/audio/audio.c:440-500`, PSPSDK `psp/pspsdk/src/audio/pspaudio.h:31-56,69-97` and inspected pspautotests `references/pspautotests/tests/audio/sceaudio/reserve.expected:1-70` support descending free-channel selection and the implemented channel, size and format errors. The PC runtime reserves channels 7, 6, 5, 4 and resumes guest execution; focused test `tests/test_hle_audio.cpp` and two deterministic replays establish the limited host behavior. No hardware autotest was run, and no audio samples were played.
+
+---
+
 ## Observed UMD wait micro-sprint
 
 - [VERIFIED] The executed P3P call at `0x08AA1608` passes `A0=0x20` to `sceUmdWaitDriveStat` and resumes at `0x08AA1610` without testing `V0`; evidence: `build/generated/p3p_generated.cpp:L_08AA1608/L_08AA1610`, `.tmp/umd-wait-before.json`, `.tmp/umd-wait-final-1.json`. uOFW calls this bit `SCE_UMD_READABLE` (`references/uofw/include/mediaman.h:55-67`); PSPSDK labels the same numeric bit `PSP_UMD_READY` (`psp/pspsdk/src/umd/pspumd.h:46-53`).

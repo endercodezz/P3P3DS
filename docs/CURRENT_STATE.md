@@ -2,7 +2,21 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
-## Current frontier: audio HLE after boundary recovery
+## Current frontier: SceWaveMain thread entry after audio reservation
+
+Source base: `d3d84511dca98c6e694f68900d7a6a16ff9cf72b` (ULUS-10512 PC host).
+
+- [VERIFIED] The pre-change replay `.tmp/audio-before.json` stopped at `sceAudio::sceAudioChReserve` (NID `0x5EC81C55`), stub `0x08B7FDC4`, executed caller `0x08B64264`, RA/return PC `0x08B6426C`, `user_main` UID 2. `build/generated/p3p_generated.cpp:L_08B64254` sets `A0=-1`, `A1=448`, `A2=0` and the return address. A temporary PC-runner register probe at the stop confirmed `A3=0x08E10000` and `V0_before=0x08E10CA0`; the probe was removed before the final build. `L_08B6426C` branches on negative `V0` and stores the returned channel number at offset 4 even in the branch delay slot. The next call at `0x08B64294` requests `(-1,256,0)` and likewise stores the returned number at `0x08B6429C`.
+- [VERIFIED] uOFW `references/uofw/src/kd/audio/audio.c:440-500` selects a free channel from 7 down to 0 for any negative request, rejects explicit channel 8+ or a reserved channel, checks positive 64-aligned sample counts up to `0xFFC0` and formats 0/stereo or `0x10`/mono, then returns the selected channel. `references/uofw/include/audio.h:20-27,96-106` names the error codes. PSPSDK `psp/pspsdk/src/audio/pspaudio.h:31-56,69-97` documents the range, format, alignment and return contract; its wording calls `-1` the next channel without specifying search order. Hardware fixture `references/pspautotests/tests/audio/sceaudio/reserve.c:8-47` and `reserve.expected:1-70` confirms descending automatic selection (including `-9`), repeated-channel error `0x80260003`, no-free-channel error `0x80260005`, size error `0x80260006` and format error `0x80260007`. The fixture was inspected, not run on hardware. PPSSPP `references/ppsspp/Core/HLE/sceAudio.cpp::GetFreeChannel/sceAudioChReserve` agrees as a secondary behavioral reference; its playback-related unavailable state is outside this reservation-only implementation. No conflict affecting the observed call was found.
+- [VERIFIED] `core/include/p3p3ds/hle/audio.hpp` and `core/src/hle/audio.cpp` implement only per-kernel channel reservation: eight slots, descending automatic selection, explicit allocation, valid size/format, distinct errors and return of the actual channel. Only `sceAudio::0x5EC81C55` is registered. Events record requested channel, sample count, format, result, caller and return PC, capped at 16 per kernel. No PCM output, host audio device, mixing or timing is implemented. Focused `tests/test_hle_audio.cpp` covers P3P's first and second calls, state, repeated/invalid/exhausted allocation, negative auto request, size/format errors, telemetry and independent runtimes.
+- [VERIFIED] Release build, full CTest (**12/12**), stable `--verify-bootstrap`, `git diff --check` and two byte-identical `--run-until-blocker --dump-events .tmp/audio-reserve-{1,2}.json` replays pass; event SHA-256 is `DE552F2204D1A7547CF542456670B3DADFF420ABAACAF3E3CB4E32724880ABF6`. The events show `audio_ch_reserve` results 7, 6, 5, 4 with guest entries at `0x08B6426C` and `0x08B6429C`, proving continuation. The next genuine blocker is **`unproven_transfer`** for new thread `SceWaveMain` UID 5, entry **`0x08B64FE0`**. The stop occurs at the thread-start stub `0x08B7FC74`; the last transfer is `0x08B643E8 -> 0x08B7FC74`, not a matching direct JAL to the missing thread entry. Managed seeds remain 20. The chaser was not run because this frontier is outside its automatic direct-JAL proof rule.
+- [VERIFIED] Graphics milestone: **NO**. No GE writer or color/depth-target write was observed; four unclassified-resource VRAM operations touched 16 bytes (10 changed). Actual audio output: **NO**.
+
+Immediate blocker: unproven `SceWaveMain` thread entry `0x08B64FE0` (UID 5).
+
+Next smallest step: separately prove the thread-entry target, scheduling transfer and function boundary before adding any AOT seed; keep audio playback out of this sprint.
+
+## Audio HLE after boundary recovery (historical)
 
 Source base: `d8b4253a85ef60352109496218153c3def66636b` (ULUS-10512 PC host).
 

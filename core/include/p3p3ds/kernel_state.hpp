@@ -1,6 +1,7 @@
 #pragma once
 
 #include "p3p3ds/hle/display.hpp"
+#include "p3p3ds/hle/audio.hpp"
 #include "p3p3ds/hle/ge.hpp"
 #include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
@@ -80,9 +81,12 @@ public:
 
     hle::UmdState &umd() noexcept { return umd_; }
     const hle::UmdState &umd() const noexcept { return umd_; }
+    hle::AudioState &audio() noexcept { return audio_; }
+    const hle::AudioState &audio() const noexcept { return audio_; }
 private:
     // Per-kernel state, never process-global registration.
     hle::UmdState umd_;
+    hle::AudioState audio_;
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;
     static constexpr std::uint32_t kSystemFlagCompilerVersionSet = 0x2000u;
 
