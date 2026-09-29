@@ -20,19 +20,25 @@ FrontierProof validate_frontier(const psprecomp::GuestMemory &m,
     const std::vector<psprecomp::ExecutableRange> &ranges,
     const std::map<std::uint32_t, std::string> &seeds,
     const std::set<std::uint32_t> &owned, const std::set<std::uint32_t> &imports,
-    std::uint32_t target, std::uint32_t caller, std::uint32_t word) {
+    std::uint32_t target, FrontierOrigin origin) {
     using namespace psprecomp;
     auto fail=[](const char *why) { return FrontierProof{false,why,0,0}; };
     auto executable=[&](std::uint32_t pc) { return is_executable_address(ranges,pc) && m.contains(pc,4); };
-    if (!executable(target) || !executable(caller)) return fail("unaligned or outside executable file-backed range");
-    if (!owned.contains(caller)) return fail("caller is not owned by existing AOT coverage");
-    if (m.load32(caller)!=word || (word>>26)!=3 ||
-        (((caller+4)&0xF0000000u)|((word&0x03FFFFFFu)<<2))!=target)
-        return fail("executed edge is not matching direct jal");
+    if (!executable(target)) return fail("unaligned or outside executable file-backed range");
+    if (origin.kind==FrontierOriginKind::DirectJal) {
+        if (!executable(origin.caller)) return fail("unaligned or outside executable file-backed range");
+        if (!owned.contains(origin.caller)) return fail("caller is not owned by existing AOT coverage");
+        if (m.load32(origin.caller)!=origin.word || (origin.word>>26)!=3 ||
+            (((origin.caller+4)&0xF0000000u)|((origin.word&0x03FFFFFFu)<<2))!=target)
+            return fail("executed edge is not matching direct jal");
+        if (!executable(origin.caller+4) || decode_allegrex(m.load32(origin.caller+4)).is_control_flow())
+            return fail("invalid call delay slot");
+    } else if (origin.kind==FrontierOriginKind::ThreadEntry) {
+        if (origin.thread_uid<=0 || origin.entry_pc!=target)
+            return fail("invalid thread-entry provenance");
+    } else return fail("unknown frontier origin");
     if (imports.contains(target) || imports.contains(target&~7u)) return fail("import stub");
     if (seeds.contains(target) || owned.contains(target)) return fail("target already owned: possible interior entry or stale build");
-    if (!executable(caller+4) || decode_allegrex(m.load32(caller+4)).is_control_flow())
-        return fail("invalid call delay slot");
     // Conservative boundary evidence: independent stack prologue saving RA,
     // or a leaf immediately following a completed JR-RA plus its delay slot.
     const auto first=decode_allegrex(m.load32(target));
@@ -139,7 +145,8 @@ FrontierProof validate_frontier(const psprecomp::GuestMemory &m,
         }
     }
     if (!terminal) return fail("no proven return or tail-call");
-    return {true,prefixed_frame ? "executed direct jal; prefixed RA-saving frame; isolated closed CFG; no overlap" :
-        "executed direct jal; independent boundary; closed supported CFG; no overlap",cfg.labels.size(),cfg.basic_block_count};
+    const auto origin_name=origin.kind==FrontierOriginKind::ThreadEntry ? "thread-entry origin" : "executed direct jal";
+    return {true,std::string(origin_name)+(prefixed_frame ? "; prefixed RA-saving frame; isolated closed CFG; no overlap" :
+        "; independent boundary; closed supported CFG; no overlap"),cfg.labels.size(),cfg.basic_block_count};
 }
 }

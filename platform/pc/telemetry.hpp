@@ -4,6 +4,7 @@
 #include "../../profiles/p3p/config/bootstrap_expectations.hpp"
 #include <fstream>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 namespace p3p3ds {
 inline std::string json_string(const std::string &s) {
@@ -47,6 +48,8 @@ inline std::string blocker_type(const psprecomp::Runtime &r, const KernelState &
     if(s.starts_with("Unsupported Allegrex")) return "unsupported_instruction";
     if(s.starts_with("Memory fault")) return "memory_fault";
     if(s.starts_with("No recompiled function")) {
+        if(k.threads().verified_thread_entry(r.cpu(),psprecomp::runtime_thread_uid()))
+            return "missing_guest_function";
         const auto &t=r.last_transfer;
         if(t.target==r.cpu().pc && t.thread==psprecomp::runtime_thread_uid() && (t.word>>26)==3 && r.cpu().gpr[31]==t.pc+8)
             return "missing_guest_function";
@@ -60,10 +63,19 @@ inline void dump_events(const std::filesystem::path &path, const psprecomp::Runt
                         const KernelState &k, const BootstrapCheckpoint &check) {
     std::ofstream o(path); if(!o) throw std::runtime_error("cannot open event output");
     const auto &t=r.last_transfer; const auto &w=r.memory().vram_writes(); const auto &g=k.ge().state();
+    const auto type=blocker_type(r,k);
+    const auto thread_entry=type=="missing_guest_function" ?
+        k.threads().verified_thread_entry(r.cpu(),psprecomp::runtime_thread_uid()) : std::nullopt;
+    const auto proof_kind=type=="missing_guest_function" ?
+        (thread_entry ? "thread_entry" : "direct_jal") : "none";
     std::uint64_t cpu_color=0,cpu_depth=0;
     for(const auto &e:r.events) if(e.type=="vram_activity_summary") {cpu_color=e.fields.at("color");cpu_depth=e.fields.at("depth");}
     o << "{\n\"schema\":1,\n\"bootstrap_passed\":" << (check.passed?"true":"false")
-      << ",\n\"blocker\":{\"type\":" << json_string(blocker_type(r,k)) << ",\"pc\":" << r.cpu().pc
+      << ",\n\"blocker\":{\"type\":" << json_string(type) << ",\"pc\":" << r.cpu().pc
+      << ",\"proof_kind\":" << json_string(proof_kind)
+      << (thread_entry ? ",\"provenance\":{\"kind\":\"thread_entry\",\"uid\":"+
+          std::to_string(thread_entry->uid)+",\"entry\":"+std::to_string(thread_entry->entry_pc)+
+          ",\"from_uid\":"+std::to_string(thread_entry->from_uid)+"}" : "")
       << ",\"caller\":" << t.pc << ",\"word\":" << t.word << ",\"target\":" << t.target
       << ",\"thread\":" << psprecomp::runtime_thread_uid() << ",\"ra\":" << r.cpu().gpr[31]
       << ",\"instruction_pc\":" << r.diagnostic_pc

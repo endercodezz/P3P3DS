@@ -14,9 +14,23 @@ spec.loader.exec_module(chase)
 class ChaserTests(unittest.TestCase):
     def event(self):
         return {"schema": 1, "bootstrap_passed": True,
-                "blocker": {"type": "missing_guest_function", "pc": 4096, "caller": 512, "word": 0x0C000400, "target": 4096, "ra": 520, "thread": 2},
+                "blocker": {"type": "missing_guest_function", "proof_kind": "direct_jal", "pc": 4096, "caller": 512, "word": 0x0C000400, "target": 4096, "ra": 520, "thread": 2},
                 "graphics": {"writer": False, "vram_operations": 0},
                 "events": [{"type": "guest_transfer", "pc": 512, "thread": 2, "fields": {"word": 0x0C000400, "target": 4096}}]}
+
+    def thread_event(self):
+        e = self.event()
+        e["blocker"].update(pc=0x1000, thread=5, proof_kind="thread_entry",
+                            provenance={"kind": "thread_entry", "uid": 5, "entry": 0x1000, "from_uid": 2})
+        e["events"] = [
+            {"type": "thread_create", "thread": 2, "detail": "worker", "fields": {"uid": 5, "entry": 0x1000}},
+            {"type": "thread_start", "thread": 5, "fields": {"uid": 5, "result": 0}},
+            {"type": "thread_switch", "thread": 5, "fields": {"uid": 5, "entry": 0x1000}},
+            {"type": "thread_entry_transfer", "thread": 5, "detail": "worker",
+             "fields": {"uid": 5, "entry": 0x1000, "from_uid": 2, "started": 1}},
+            {"type": "stop", "thread": 5, "fields": {"target": 0x1000}},
+        ]
+        return e
 
     def test_stop_classes(self):
         e = self.event()
@@ -34,6 +48,26 @@ class ChaserTests(unittest.TestCase):
         self.assertIsNone(chase.candidate(e))  # metadata is not rendering
         e["graphics"]["color_writes"] = 1
         self.assertEqual(chase.candidate(e), "graphics writer")
+
+    def test_thread_entry_provenance(self):
+        e = self.thread_event()
+        self.assertIsNone(chase.candidate(e))
+        e["blocker"]["thread"] = 6
+        self.assertEqual(chase.candidate(e), "mismatched thread-entry provenance")
+        e = self.thread_event(); e["blocker"]["pc"] = 0x1004
+        self.assertEqual(chase.candidate(e), "mismatched thread-entry provenance")
+        e = self.thread_event(); e["events"].pop(1)
+        self.assertEqual(chase.candidate(e), "missing successful thread start")
+        e = self.thread_event(); e["events"].insert(-1,{"type": "guest_enter", "thread": 5, "fields": {"target": 0x1000}})
+        self.assertEqual(chase.candidate(e), "stale thread-entry transfer")
+        e = self.thread_event(); e["events"].pop(2)
+        self.assertEqual(chase.candidate(e), "missing matching thread switch")
+        e = self.thread_event(); e["events"].pop(3)
+        self.assertEqual(chase.candidate(e), "missing fresh thread-entry transfer")
+        e = self.thread_event(); e["blocker"].pop("provenance")
+        with self.assertRaises(ValueError): chase.candidate(e)
+        e = self.thread_event(); e["blocker"].pop("proof_kind")
+        with self.assertRaises(ValueError): chase.candidate(e)
 
     def test_manifest_duplicate_and_containment(self):
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as d:
@@ -88,7 +122,7 @@ class FakeOps:
                     "events": [{"type": "missing_hle", "detail": "sceUmdUser",
                                 "fields": {"nid": 0x8EF08FCE}}]}
         return {"schema": 1, "bootstrap_passed": True,
-                "blocker": {"type": "missing_guest_function", "pc": pc,
+                "blocker": {"type": "missing_guest_function", "proof_kind": "direct_jal", "pc": pc,
                             "caller": caller, "word": word, "target": pc,
                             "ra": caller + 8, "thread": 2},
                 "graphics": {"writer": False},
@@ -111,7 +145,23 @@ class FakeOps:
         self.proof_calls.append(self.index)
         if self.ambiguous_at == self.index:
             return {"accepted": False, "reason": "ambiguous target"}
-        return {"accepted": True, "reason": "closed CFG"}
+        return {"accepted": True, "proof_kind": blocker["proof_kind"], "reason": "closed CFG"}
+
+
+class ThreadOps(FakeOps):
+    def event(self):
+        if self.index == 0:
+            e = ChaserTests().thread_event()
+            return e
+        return super().event()
+
+
+class MalformedThreadOps(ThreadOps):
+    def event(self):
+        e = super().event()
+        if self.index == 0:
+            e["blocker"].pop("provenance")
+        return e
 
 
 class WorkflowTests(unittest.TestCase):
@@ -126,6 +176,23 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(report["verified_additions"], 4)
         self.assertEqual(report["final_verification"], "PASS")
         self.assertEqual(report["stop"], "missing_hle")
+
+    def test_thread_entry_seed_workflow(self):
+        ops = ThreadOps(1)
+        report = self.run_chase(ops, fast=True)
+        self.assertEqual(ops.index, 1)
+        self.assertEqual(ops.proof_calls, [0])
+        self.assertEqual(report["accepted_candidates"][0]["proof_kind"], "thread_entry")
+        self.assertEqual(report["final_verification"], "PASS")
+        self.assertEqual(report["stop"], "missing_hle")
+
+    def test_missing_thread_provenance_never_adds_seed(self):
+        ops = MalformedThreadOps(1)
+        report = self.run_chase(ops, fast=True)
+        self.assertEqual(ops.index, 0)
+        self.assertTrue(report["error"])
+        self.assertEqual(report["verified_additions"], 0)
+        self.assertEqual(ops.proof_calls, [])
 
     def test_fast_cadence_and_final_checkpoint(self):
         ops = FakeOps(5)

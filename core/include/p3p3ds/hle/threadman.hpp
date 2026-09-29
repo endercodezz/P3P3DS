@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -53,6 +54,9 @@ struct ThreadControlBlock {
     std::uint32_t attributes{0};
     std::uint32_t option_address{0};
     InternalThreadState status{InternalThreadState::Dormant};
+    bool started{false};
+    bool entry_dispatch_pending{false};
+    bool entry_executed{false};
     std::int32_t exit_status{0};
     psprecomp::AllegrexContext context{};
 };
@@ -62,6 +66,11 @@ struct CallbackObject {
     std::int32_t uid{}, owner_thread_uid{};
     std::string name;
     std::uint32_t function{}, common_argument{};
+};
+
+struct ThreadEntryProvenance {
+    std::int32_t uid{}, from_uid{};
+    std::uint32_t entry_pc{};
 };
 
 class ThreadManager {
@@ -101,11 +110,17 @@ public:
     [[nodiscard]] const ThreadControlBlock *current_thread() const noexcept;
     [[nodiscard]] std::int32_t current_thread_id() const noexcept { return current_thread_id_; }
     [[nodiscard]] std::size_t thread_count() const noexcept { return threads_.size(); }
+    [[nodiscard]] std::optional<ThreadEntryProvenance> verified_thread_entry(
+        const psprecomp::AllegrexContext &ctx, std::int32_t runtime_uid) const noexcept;
+    void note_guest_execution(std::int32_t uid, std::uint32_t pc) noexcept;
+    void invalidate_thread_entry() noexcept { active_entry_.reset(); }
 
     bool switch_to(std::int32_t target_thid, psprecomp::AllegrexContext &ctx);
     std::int32_t change_current_thread_attr(std::uint32_t clear_attr, std::uint32_t set_attr) noexcept;
 
 private:
+    void select_initial_entry(ThreadControlBlock &target, std::int32_t from_uid,
+                              const psprecomp::AllegrexContext &ctx) noexcept;
     std::int32_t next_uid_{1};
     std::int32_t current_thread_id_{0};
     std::uint32_t next_stack_top_{0x09FF0000u};
@@ -113,6 +128,7 @@ private:
     // Shares next_uid_ with threads; type-specific lookup prevents UID confusion.
     std::map<std::int32_t, CallbackObject> callbacks_;
     std::vector<std::int32_t> ready_queue_;
+    std::optional<ThreadEntryProvenance> active_entry_;
 };
 
 void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kernel);

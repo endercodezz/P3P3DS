@@ -49,6 +49,7 @@ void ThreadManager::reset() {
     threads_.clear();
     callbacks_.clear();
     ready_queue_.clear();
+    active_entry_.reset();
 }
 
 std::int32_t ThreadManager::create_callback(std::string_view name, std::uint32_t function, std::uint32_t common_argument) {
@@ -208,6 +209,8 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
 
     // Transition target to Ready
     target->status = InternalThreadState::Ready;
+    target->started = true;
+    target->entry_dispatch_pending = true;
     ready_queue_.push_back(thid);
     std::cout << "[THREAD START] uid=" << thid << " name=" << target->name
               << " args=" << arg_size << "\n";
@@ -227,6 +230,7 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid,
         target->status = InternalThreadState::Running;
         caller_ctx = target->context;
         psprecomp::set_runtime_thread_identity(target->uid, target->name);
+        select_initial_entry(*target,current->uid,caller_ctx);
         return 0;
     }
 
@@ -259,11 +263,42 @@ bool ThreadManager::schedule(psprecomp::AllegrexContext &ctx) {
     auto *target = get_thread(next_thid);
     if (!target) return false;
 
+    const auto from_uid=current_thread_id_;
+    active_entry_.reset();
     current_thread_id_ = next_thid;
     target->status = InternalThreadState::Running;
     ctx = target->context;
     psprecomp::set_runtime_thread_identity(target->uid, target->name);
+    select_initial_entry(*target,from_uid,ctx);
     return true;
+}
+
+void ThreadManager::select_initial_entry(ThreadControlBlock &target, std::int32_t from_uid,
+                                         const psprecomp::AllegrexContext &ctx) noexcept {
+    if (target.started && target.entry_dispatch_pending && !target.entry_executed &&
+        target.status==InternalThreadState::Running && ctx.pc==target.entry_pc &&
+        target.context.pc==target.entry_pc) {
+        active_entry_=ThreadEntryProvenance{target.uid,from_uid,target.entry_pc};
+        target.entry_dispatch_pending=false;
+    }
+}
+
+std::optional<ThreadEntryProvenance> ThreadManager::verified_thread_entry(
+    const psprecomp::AllegrexContext &ctx, std::int32_t runtime_uid) const noexcept {
+    if (!active_entry_ || current_thread_id_!=runtime_uid || active_entry_->uid!=runtime_uid ||
+        ctx.pc!=active_entry_->entry_pc) return std::nullopt;
+    const auto *target=get_thread(runtime_uid);
+    if (!target || !target->started || target->entry_executed ||
+        target->status!=InternalThreadState::Running || target->entry_pc!=ctx.pc ||
+        target->context.pc!=ctx.pc) return std::nullopt;
+    return active_entry_;
+}
+
+void ThreadManager::note_guest_execution(std::int32_t uid, std::uint32_t pc) noexcept {
+    if (!active_entry_) return;
+    if (uid==active_entry_->uid && pc==active_entry_->entry_pc)
+        if (auto *target=get_thread(uid)) target->entry_executed=true;
+    active_entry_.reset();
 }
 
 bool ThreadManager::exit_current_thread(std::int32_t exit_status, psprecomp::AllegrexContext &ctx, psprecomp::Runtime &runtime) {
@@ -276,6 +311,12 @@ bool ThreadManager::exit_current_thread(std::int32_t exit_status, psprecomp::All
     }
 
     if (schedule(ctx)) {
+        runtime.event("thread_switch",{{"uid",static_cast<std::uint32_t>(current_thread_id_)},
+            {"entry",ctx.pc}});
+        if (auto proof=verified_thread_entry(ctx,psprecomp::runtime_thread_uid()))
+            runtime.event("thread_entry_transfer",{{"uid",static_cast<std::uint32_t>(proof->uid)},
+                {"entry",proof->entry_pc},{"from_uid",static_cast<std::uint32_t>(proof->from_uid)},
+                {"started",1u}},get_thread(proof->uid)->name);
         return true;
     }
 
@@ -315,6 +356,8 @@ bool ThreadManager::switch_to(std::int32_t target_thid, psprecomp::AllegrexConte
     }
 
     ready_queue_.erase(std::remove(ready_queue_.begin(), ready_queue_.end(), target_thid), ready_queue_.end());
+    active_entry_.reset();
+    target->entry_dispatch_pending=false; // Arbitrary switch is not a proven initial start.
     current_thread_id_ = target_thid;
     target->status = InternalThreadState::Running;
     ctx = target->context;
@@ -389,6 +432,10 @@ void register_threadman_for_user(psprecomp::Runtime &runtime, KernelState &kerne
                 thid, arg_size, arg_ptr, rt.memory(), ctx);
             rt.event("thread_start", {{"uid",static_cast<std::uint32_t>(thid)}, {"result",static_cast<std::uint32_t>(result)}});
             rt.event("thread_switch", {{"uid",static_cast<std::uint32_t>(kernel.threads().current_thread_id())}, {"entry",ctx.pc}});
+            if (auto proof=kernel.threads().verified_thread_entry(ctx,psprecomp::runtime_thread_uid()))
+                rt.event("thread_entry_transfer",{{"uid",static_cast<std::uint32_t>(proof->uid)},
+                    {"entry",proof->entry_pc},{"from_uid",static_cast<std::uint32_t>(proof->from_uid)},
+                    {"started",1u}},kernel.threads().get_thread(proof->uid)->name);
             if (result < 0) {
                 ctx.set_gpr(2, static_cast<std::uint32_t>(result));
             }

@@ -79,14 +79,49 @@ def candidate(event):
     try:
         if graphics["writer"] or graphics.get("color_writes", 0) or graphics.get("depth_writes", 0):
             return "graphics writer"
-        if b["target"] != b["pc"] or b["word"] >> 26 != 3 or b["ra"] != b["caller"] + 8:
-            return "unproven executed edge"
-        edges = [e for e in events if e["type"] == "guest_transfer"]
-        if not edges:
-            return "missing executed edge"
-        e = edges[-1]
-        if (e["pc"], e["fields"]["word"], e["fields"]["target"], e["thread"]) != (b["caller"], b["word"], b["pc"], b["thread"]):
-            return "stale executed edge"
+        kind = b["proof_kind"]
+        if kind == "direct_jal":
+            if b["target"] != b["pc"] or b["word"] >> 26 != 3 or b["ra"] != b["caller"] + 8:
+                return "unproven executed edge"
+            edges = [e for e in events if e["type"] == "guest_transfer"]
+            if not edges:
+                return "missing executed edge"
+            e = edges[-1]
+            if (e["pc"], e["fields"]["word"], e["fields"]["target"], e["thread"]) != (b["caller"], b["word"], b["pc"], b["thread"]):
+                return "stale executed edge"
+        elif kind == "thread_entry":
+            p = b["provenance"]
+            if not isinstance(p, dict) or p["kind"] != "thread_entry" or not isinstance(p["uid"], int) or not isinstance(p["entry"], int) or not isinstance(p["from_uid"], int):
+                return "malformed thread-entry provenance"
+            if p["uid"] <= 0 or p["from_uid"] <= 0 or b["thread"] != p["uid"] or b["pc"] != p["entry"]:
+                return "mismatched thread-entry provenance"
+            def first_after(start, predicate):
+                return next((i for i in range(start + 1, len(events)) if predicate(events[i])), None)
+            created = first_after(-1, lambda e: e.get("type") == "thread_create" and
+                e.get("fields", {}).get("uid") == p["uid"] and e.get("fields", {}).get("entry") == p["entry"] and
+                isinstance(e.get("detail"), str) and bool(e["detail"]))
+            if created is None:
+                return "missing thread creation proof"
+            started = first_after(created, lambda e: e.get("type") == "thread_start" and
+                e.get("fields", {}).get("uid") == p["uid"] and e.get("fields", {}).get("result") == 0)
+            if started is None:
+                return "missing successful thread start"
+            switched = first_after(started, lambda e: e.get("type") == "thread_switch" and
+                e.get("fields", {}).get("uid") == p["uid"] and e.get("fields", {}).get("entry") == p["entry"] and
+                e.get("thread") == p["uid"])
+            if switched is None:
+                return "missing matching thread switch"
+            transfer = first_after(switched, lambda e: e.get("type") == "thread_entry_transfer" and
+                e.get("fields", {}).get("uid") == p["uid"] and e.get("fields", {}).get("entry") == p["entry"] and
+                e.get("fields", {}).get("from_uid") == p["from_uid"] and e.get("fields", {}).get("started") == 1 and
+                e.get("thread") == p["uid"] and e.get("detail") == events[created]["detail"])
+            if transfer is None:
+                return "missing fresh thread-entry transfer"
+            if any(e.get("type") not in ("stop", "vram_activity_summary", "blocker", "final_blocker")
+                   for e in events[transfer + 1:]):
+                return "stale thread-entry transfer"
+        else:
+            return "missing or unknown proof kind"
     except (KeyError, TypeError, IndexError) as e:
         raise ValueError(f"malformed event data: {e}") from e
     return None
@@ -174,7 +209,7 @@ def chase_loop(ops, report, *, fast, max_additions, verify_every, check_only=Fal
             if reason:
                 finish(reason, observation)
                 break
-            failing_candidate = {"pc": b["pc"], "caller": b["caller"]}
+            failing_candidate = {"pc": b["pc"], "caller": b["caller"], "proof_kind": b["proof_kind"]}
             proof = ops.prove(b)
             step["proof"] = proof
             step["proof_result"] = "accepted" if proof["accepted"] else proof["reason"]
@@ -295,11 +330,15 @@ class WorkspaceOps:
         return observation
 
     def prove(self, blocker):
-        log = self.run([self.checker, ELF, self.build_dir / "generated/frontier_functions.csv",
-                        hex(blocker["pc"]), hex(blocker["caller"]), hex(blocker["word"])],
+        if blocker["proof_kind"] == "thread_entry":
+            args = ["--thread-entry", hex(blocker["pc"]), str(blocker["provenance"]["uid"]),
+                    hex(blocker["provenance"]["entry"])]
+        else:
+            args = ["--direct-jal", hex(blocker["pc"]), hex(blocker["caller"]), hex(blocker["word"])]
+        log = self.run([self.checker, ELF, self.build_dir / "generated/frontier_functions.csv", *args],
                        "proof", allowed=(0, 2))
         proof = json.loads(log.read_text(encoding="utf-8").splitlines()[-1])
-        if not isinstance(proof, dict) or not isinstance(proof.get("accepted"), bool) or not isinstance(proof.get("reason"), str):
+        if not isinstance(proof, dict) or not isinstance(proof.get("accepted"), bool) or not isinstance(proof.get("reason"), str) or proof.get("proof_kind") != blocker["proof_kind"]:
             raise ValueError("malformed validator proof")
         return proof
 
@@ -330,7 +369,10 @@ def main(argv=None):
     blocker = report.get("final_blocker") or {}
     if blocker:
         print(f"PC:                  0x{blocker['pc']:08X}")
-        print(f"Caller:              0x{blocker['caller']:08X}")
+        if blocker.get("proof_kind") == "thread_entry":
+            print(f"Thread entry UID:    {blocker['provenance']['uid']}")
+        else:
+            print(f"Caller:              0x{blocker['caller']:08X}")
         print(f"Module:              {blocker.get('module', 'unavailable')}")
         if "nid" in blocker:
             print(f"NID:                 0x{blocker['nid']:08X}")

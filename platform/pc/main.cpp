@@ -49,6 +49,12 @@ int main(int argc,char **argv) {
         rt.frontier_diagnostics=true;
         p3p3ds::BootstrapCheckpoint checkpoint;
         rt.event_observer=[&] {
+            if(!rt.events.empty() && rt.events.back().type=="guest_transfer")
+                kernel.threads().invalidate_thread_entry();
+            if(!rt.events.empty() && rt.events.back().type=="guest_enter") {
+                const auto &e=rt.events.back();
+                kernel.threads().note_guest_execution(e.thread,static_cast<std::uint32_t>(e.fields.at("target")));
+            }
             const bool previous=checkpoint.passed;
             checkpoint.observe(rt,kernel);
             if(!previous && checkpoint.passed && verify && !chase && !expected) {

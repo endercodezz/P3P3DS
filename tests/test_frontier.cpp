@@ -64,6 +64,66 @@ int main() {
         CHECK(!check(a+12).accepted); // random interior direct-JAL claim
     }
     {
+        GuestMemory m;
+        const std::uint32_t a=0x08801000;
+        m.store32(a-8,0x03E00008);m.store32(a-4,0);
+        m.store32(a,0x27BDFFF0);m.store32(a+4,0xAFBF000C);
+        m.store32(a+8,0x8FBF000C);m.store32(a+12,0x03E00008);
+        m.store32(a+16,0x27BD0010);
+        std::vector<ExecutableRange> ranges={{a-8,a+20}};
+        std::map<std::uint32_t,std::string> seeds;
+        std::set<std::uint32_t> owned;
+        auto proof=[&](std::uint32_t target) {return p3p3ds::validate_frontier(
+            m,ranges,seeds,owned,{},target,p3p3ds::FrontierOrigin::thread_entry(5,a));};
+        CHECK(proof(a).accepted);
+        CHECK(!p3p3ds::validate_frontier(m,ranges,seeds,owned,{},a,
+            p3p3ds::FrontierOrigin::thread_entry(0,a)).accepted);
+        CHECK(!proof(a+4).accepted);
+        CHECK(!p3p3ds::validate_frontier(m,ranges,seeds,owned,{a},a,
+            p3p3ds::FrontierOrigin::thread_entry(5,a)).accepted);
+        owned.insert(a+8);CHECK(!proof(a).accepted);owned.clear();
+        m.store32(a-8,0);m.store32(a,0);CHECK(!proof(a).accepted);
+        m.store32(a-8,0x03E00008);m.store32(a,0x27BDFFF0);
+        m.store32(a+8,0x0000000D);CHECK(!proof(a).accepted);
+    }
+    {
+        Runtime r; p3p3ds::KernelState k; r.frontier_diagnostics=true;
+        const std::uint32_t entry=0x08801000;
+        k.threads().init_root_thread("root",0x08800000,0x09FFFF00,0);
+        r.cpu()=k.threads().current_thread()->context;
+        auto uid=k.threads().create_thread("worker",entry,16,512,0,0,r.memory());
+        CHECK(uid>0);
+        r.cpu().pc=entry;
+        CHECK(!k.threads().verified_thread_entry(r.cpu(),uid)); // Dormant thread.
+        r.cpu()=k.threads().current_thread()->context;
+        CHECK(k.threads().start_thread(uid,0,0,r.memory(),r.cpu())==0);
+        CHECK(k.threads().current_thread_id()==uid && r.cpu().pc==entry);
+        CHECK(k.threads().verified_thread_entry(r.cpu(),uid));
+        r.stop("No recompiled function registered at 0x08801000");
+        CHECK(p3p3ds::blocker_type(r,k)=="missing_guest_function");
+        set_runtime_thread_identity(uid+1,"wrong");
+        CHECK(p3p3ds::blocker_type(r,k)=="unproven_transfer");
+        set_runtime_thread_identity(uid,"worker");
+        r.cpu().pc=entry+4;CHECK(p3p3ds::blocker_type(r,k)=="unproven_transfer");
+        r.cpu().pc=entry;
+        k.threads().note_guest_execution(uid,entry+4);
+        CHECK(p3p3ds::blocker_type(r,k)=="unproven_transfer");
+        auto other=k.threads().create_thread("other",entry+32,16,512,0,0,r.memory());
+        CHECK(k.threads().switch_to(other,r.cpu()));
+        CHECK(!k.threads().verified_thread_entry(r.cpu(),other)); // Arbitrary switch.
+        Runtime delayed; p3p3ds::KernelState later;delayed.frontier_diagnostics=true;
+        later.threads().init_root_thread("root",0x08800000,0x09FFFF00,0);
+        delayed.cpu()=later.threads().current_thread()->context;
+        auto deferred=later.threads().create_thread("deferred",entry,40,512,0,0,delayed.memory());
+        CHECK(later.threads().start_thread(deferred,0,0,delayed.memory(),delayed.cpu())==0);
+        CHECK(!later.threads().verified_thread_entry(delayed.cpu(),deferred)); // Still ready.
+        CHECK(later.threads().exit_current_thread(0,delayed.cpu(),delayed));
+        CHECK(later.threads().verified_thread_entry(delayed.cpu(),deferred));
+        CHECK(!delayed.events.empty() && delayed.events.back().type=="thread_entry_transfer");
+        later.threads().invalidate_thread_entry(); // Any subsequent guest transfer is stale.
+        CHECK(!later.threads().verified_thread_entry(delayed.cpu(),deferred));
+    }
+    {
         Runtime r; p3p3ds::KernelState k;r.frontier_diagnostics=true;
         set_runtime_thread_identity(2,"test");
         r.cpu().pc=0x08801000;r.cpu().gpr[31]=0x08800008;

@@ -6,6 +6,13 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## Thread-entry frontier provenance micro-sprint
+
+- [VERIFIED] The `SceWaveMain` UID 5 initial context switch installs its stored entry `0x08B64FE0` without a guest JAL to that address. Evidence: `core/src/hle/threadman.cpp::start_thread`, `platform/pc/telemetry.hpp::blocker_type`, `.tmp/thread-entry-before.json` and `.tmp/thread-entry-check/report.json`. The new `thread_entry_transfer` record is one-shot and is invalidated by guest execution/transfer or another switch.
+- [VERIFIED] The relocated ELF analyzer (`.tmp/thread-entry-analysis_functions_auto.csv`, `sub_08B64FE0`) and `p3p_frontier_check --thread-entry` report a closed supported CFG of 454 instructions and 107 blocks with an independent predecessor return/delay slot. The 21-seed AOT executes that entry and reaches missing `sceAudioOutputBlocking`, NID `0x136CAF51` (`references/uofw/src/kd/audio/exports.exp:51`). Full CTest 12/12 and two identical final replays (SHA-256 `9999960D59DC3166FE03051390EAD0DA4139321DD3A79081AF1EDBC6034A629B`) confirm this PC-host result; no hardware execution or audio output is claimed.
+
+---
+
 ## Audio reservation micro-sprint
 
 - [VERIFIED] ULUS-10512 first calls `sceAudioChReserve(-1,448,0)` at `0x08B64264`; after return it tests the sign of `V0` and stores the channel number. Evidence: `build/generated/p3p_generated.cpp:L_08B64254/L_08B6426C`, `.tmp/audio-before.json`, `.tmp/audio-reserve-1.json`. A temporary register probe established `A3=0x08E10000` and `V0_before=0x08E10CA0` and was removed.
