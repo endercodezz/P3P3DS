@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace p3p3ds::hle;
 
@@ -294,6 +295,7 @@ void audio_blocking() {
 }
 } // namespace
 
+namespace { void audio_contracts(); }
 int main() {
     semaphores();
     event_flags();
@@ -303,6 +305,47 @@ int main() {
     thread_end_status();
     callbacks();
     audio_blocking();
+    audio_contracts();
     std::cout << "threadman sync failures=" << failures << "\n";
     return failures == 0 ? 0 : 1;
 }
+
+// sceAudio channel contracts (references/uofw/src/kd/audio/audio.c).
+namespace {
+void audio_contracts() {
+    Env env;
+    std::vector<std::vector<std::int16_t>> pcm;
+    env.k.audio().set_sink([&](unsigned, std::uint64_t, const std::vector<std::int16_t> &s) { pcm.push_back(s); });
+    const auto a = [&](std::uint32_t nid, std::initializer_list<std::uint32_t> args) { return env.call("sceAudio", nid, args); };
+    const auto ch = a(0x5EC81C55u, {0xFFFFFFFFu, 64u, 0u});
+    CHECK(ch == 7u);
+    CHECK(a(0x95FD0C2Du, {8u, 0u}) == 0x80260003u);          // ChangeChannelConfig: bad channel
+    CHECK(a(0x95FD0C2Du, {ch, 0x20u}) == 0x80260007u);       // invalid format
+    CHECK(a(0x95FD0C2Du, {ch, 0x10u}) == 0u);                // mono
+    CHECK(a(0x95FD0C2Du, {6u, 0u}) == 0x80260008u);          // not reserved
+    CHECK(a(0xB7E1D8E7u, {ch, 0x10000u, 0u}) == 0x8026000Bu); // volume range
+    CHECK(a(0xB7E1D8E7u, {ch, 0x8000u, 0x4000u}) == 0u);
+    CHECK(a(0xCB2E439Eu, {ch, 65u}) == 0x80260006u);         // SetChannelDataLen alignment
+    CHECK(a(0xCB2E439Eu, {6u, 64u}) == 0x80260001u);
+    // Mono panned output: sink receives volume-scaled stereo.
+    env.rt.memory().store16(kScratch, 0x1000u);
+    for (std::uint32_t i = 1; i < 64u; ++i) env.rt.memory().store16(kScratch + i * 2u, 0u);
+    CHECK(a(0xE2D56B2Du, {ch, 0x8000u, 0x4000u, kScratch}) == 64u);
+    CHECK(pcm.size() == 1u && pcm[0].size() == 128u && pcm[0][0] == 0x1000 && pcm[0][1] == 0x0800);
+    CHECK(a(0xB011922Fu, {ch}) > 0u);                        // rest length while playing
+    CHECK(a(0xE2D56B2Du, {ch, 0x8000u, 0x8000u, kScratch}) == 64u); // queued behind
+    CHECK(a(0xE2D56B2Du, {ch, 0x8000u, 0x8000u, kScratch}) == 0x80260002u); // non-blocking busy
+    CHECK(a(0x95FD0C2Du, {ch, 0u}) == 0x80260002u);          // config while queued
+    CHECK(a(0x6FC46853u, {ch}) == 0u);                        // release
+    CHECK(a(0x6FC46853u, {ch}) == 0x80260008u);
+    // Output2 (SRC channel)
+    CHECK(a(0x01562BA3u, {16u}) == 0x80000104u);
+    CHECK(a(0x01562BA3u, {1024u}) == 0u);
+    CHECK(a(0x01562BA3u, {1024u}) == 0x80268002u);
+    CHECK(a(0x2D53F36Eu, {0x100000u, kScratch}) == 0x8026000Bu);
+    CHECK(a(0x2D53F36Eu, {0x8000u, kScratch}) == 1024u);
+    CHECK(a(0x43196845u, {}) == 0x80268002u);                 // still playing
+    env.tm(0xCEADEB47u, {100000u});
+    CHECK(a(0x43196845u, {}) == 0u);
+}
+} // namespace

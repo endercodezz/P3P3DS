@@ -2,6 +2,11 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## sceAudio channel contracts (2026-10-01)
+
+- [VERIFIED] All 12 imported `sceAudio` services follow `references/uofw/src/kd/audio/audio.c` / `include/audio.h`: reserve/release/data length/volume/config/rest length, `Output`/`OutputPanned` (non-blocking, `OUTPUT_BUSY`) and their blocking forms (retry at the stub), plus `Output2*` as the SRC channel. Accepted buffers go to an `AudioState::PcmSink` as volume-scaled stereo S16 at 44.1 kHz; no host device is attached yet. `rest_length` and SRC blocking are [INFERRED] timing approximations.
+- [VERIFIED] 14/14 CTest (audio contract cases in `p3p_threadman_sync`). Two replays byte-identical, SHA-256 `14DCF9E7234900BA85349CB11F3FDC38324F85C9F26BDDC24148A65C5552EDA9`. Next blocker: missing `IoFileMgrForUser::sceIoOpen`, caller `0x08B40CE8`.
+
 ## ThreadMan with waits and virtual time (2026-10-01)
 
 - [VERIFIED] `core/src/hle/threadman.cpp` + `threadman_hle.cpp` replace the DIRTY_FIRST_FRAME stubs (LwMutex lock/unlock/try, DelayThread, GetSystemTimeLow, event flags, CpuSuspend/ResumeIntr) with kernel objects and wait queues: threads (create/start/exit/delete/wait-end/sleep/wakeup/suspend/resume/priority/refer), semaphores, event flags, mutexes, lwmutexes (user workarea per `references/uofw/src/kd/usersystemlib/lwmutex.c`), callbacks with real guest delivery (`sceKernelCheckCallback`, *CB waits, return sentinel `0x24`). uOFW threadman is unreversed, so error codes/edge cases follow `references/pspautotests/tests/threads/**/*.expected`; PPSSPP only cross-checked.
