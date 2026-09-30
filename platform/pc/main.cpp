@@ -6,6 +6,7 @@
 #include "p3p3ds/vram_activity.hpp"
 #include <iostream>
 #include <optional>
+#include <set>
 namespace psprecomp {void register_generated_functions(Runtime &);}
 int main(int argc,char **argv) {
     try {
@@ -47,6 +48,11 @@ int main(int argc,char **argv) {
         // imply implemented UMD activation, drive readiness or filesystem mounting.
         kernel.umd().set_medium_present(true);
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
+        {
+            std::set<std::uint32_t> stubs;
+            for(const auto &import:elf.scan_imports(rt.memory(),*module)) stubs.insert(import.stub_address);
+            kernel.threads().set_import_stubs(std::move(stubs));
+        }
         p3p3ds::hle::register_all_hle_modules(rt,kernel);
         // Unregistered PCs (indirect targets, interior labels) are interpreted;
         // the first entry at each PC is logged as an interpreter_enter event.

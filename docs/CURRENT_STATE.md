@@ -2,6 +2,16 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## ThreadMan with waits and virtual time (2026-10-01)
+
+- [VERIFIED] `core/src/hle/threadman.cpp` + `threadman_hle.cpp` replace the DIRTY_FIRST_FRAME stubs (LwMutex lock/unlock/try, DelayThread, GetSystemTimeLow, event flags, CpuSuspend/ResumeIntr) with kernel objects and wait queues: threads (create/start/exit/delete/wait-end/sleep/wakeup/suspend/resume/priority/refer), semaphores, event flags, mutexes, lwmutexes (user workarea per `references/uofw/src/kd/usersystemlib/lwmutex.c`), callbacks with real guest delivery (`sceKernelCheckCallback`, *CB waits, return sentinel `0x24`). uOFW threadman is unreversed, so error codes/edge cases follow `references/pspautotests/tests/threads/**/*.expected`; PPSSPP only cross-checked.
+- [VERIFIED] Scheduling: strict priority, FIFO within a level, immediate preemption when a waker readies a higher-priority thread. Virtual clock: +1 us per HLE call (`kSyscallCostUs`, [INFERRED] policy), idle jumps to the earliest deadline, deadlock (all threads waiting without a deadline) stops with a named list. VBlank waits use a 16,683 us period on that clock; `sceAudioOutputBlocking` follows uOFW's one-queued-buffer model and retries at the stub when the slot frees; `sceUmdActivate` notifies the registered UMD callback (hardware: `pspautotests/tests/umd/callbacks/umd.expected`; argument `0x32` is [INFERRED]).
+- [VERIFIED] `test_threadman_sync` (CTest `p3p_threadman_sync`) covers each primitive's errors, blocking/wake/preemption, timeouts (zero and elapsed, remaining written back), delete-wakes, lwmutex handover and `numWaitThreads`, recursion/overflow, sleep/wakeup counting, wait-end status, callback frames (check + CB wait, non-zero return deletes), deadlock detection and blocking audio retry.
+- [VERIFIED] 14/14 CTest, `--verify-bootstrap` PASS. Two `--run-until-blocker --max-dispatches 5000000` replays are byte-identical, SHA-256 `BA99ED613474E6633FA5DB90D04C1C17BDF34A1FDF3D5C56EF816FF84D2D97DD`. The game now passes the old audio blocker, delivers the UMD callback, and initializes CRI middleware: threads `SceWaveMain` (7), `CriThread` x3 (10/14/17), `CRI ADX Audio` (28), `CRI ADX File` (29), `CRI Wave out` (30). UIDs moved because semaphores/flags now take real UIDs.
+- [INFERRED] Thread stacks still bump down from `0x09FF0000` outside SysMem (which grows up from `0x08ED0000`); they can only collide if both regions meet.
+
+Immediate blocker: missing `sceAudio::0x95FD0C2D` (`sceAudioChangeChannelConfig`), caller `0x08B64F90`, `user_main` UID 2.
+
 ## Interpreter fallback (2026-10-01)
 
 - [VERIFIED] `core/src/interpreter.cpp` executes any guest PC without a registered AOT entry. Instruction semantics mirror `recomp/PSPRecomp/tools/codegen_main.cpp` (same helpers, same link/delay-slot/condition order). `Runtime` gained a fallback hook (`set_runtime_fallback_hook`): with it installed the outer loop uses exact per-PC lookup, and a unit entered at a non-entry PC returns to the dispatcher (`Runtime::unregistered_entry`) instead of stopping. The first entry at each PC is logged as `interpreter_enter`; `--no-interpreter` restores the old stop.

@@ -47,6 +47,10 @@ public:
         return system_flags_;
     }
 
+    // Kernel_Library sceKernelCpuSuspendIntr/ResumeIntr state (enabled bit only).
+    [[nodiscard]] bool interrupts_enabled() const noexcept { return interrupts_enabled_; }
+    void set_interrupts_enabled(bool enabled) noexcept { interrupts_enabled_ = enabled; }
+
     [[nodiscard]] hle::ThreadManager &threads() noexcept {
         return thread_manager_;
     }
@@ -86,6 +90,7 @@ public:
 private:
     // Per-kernel state, never process-global registration.
     hle::UmdState umd_;
+    bool interrupts_enabled_{true};
     hle::AudioState audio_;
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;
     static constexpr std::uint32_t kSystemFlagCompilerVersionSet = 0x2000u;

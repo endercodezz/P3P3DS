@@ -20,6 +20,10 @@ int main() {
         r.invoke_import("sceDisplay",0xEEDA2E54,c);
         CHECK(m.load32(0x08800020)==0x04088000); CHECK(m.load32(0x08800024)==512); CHECK(m.load32(0x08800028)==3);
         // Wait APIs take no pointers; poisoned argument registers must not be dereferenced.
+        // They block the current thread until the next virtual vblank; with a
+        // single thread the clock advances to that deadline immediately.
+        k.threads().init_root_thread("root",0x08804000u,0x09FFFF00u,0u);
+        c.gpr[31]=0x08804100u;
         c.gpr[4]=c.gpr[5]=c.gpr[6]=0xDEADBEEF;
         for(auto nid:{0x36CDFADEu,0x8EB9EC49u,0x984C27E7u,0x46F186C3u}) r.invoke_import("sceDisplay",nid,c);
         CHECK(!r.stopped()); CHECK(m.load32(0x08800020)==0x04088000);
@@ -27,6 +31,7 @@ int main() {
         r.invoke_import("sceDisplay",0x9C6EAAD7,c); CHECK(c.gpr[2]==4);
         c.gpr[4]=3;r.invoke_import("sceDisplay",0x77ED8B3A,c);CHECK(c.gpr[2]==0);
         r.invoke_import("sceDisplay",0x9C6EAAD7,c);CHECK(c.gpr[2]==7);
+        CHECK(k.threads().vblank_count()==7u); CHECK(c.pc==0x08804100u); // plus 1us per syscall
         r.invoke_import("sceDisplay",0xDBA6C4C4,c); CHECK(std::abs(c.fpr[0]-59.94006f)<0.001f);
         r.invoke_import("sceDisplay",0x7ED59BC4,c); CHECK(c.gpr[2]==0);
     }

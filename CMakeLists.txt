@@ -84,6 +84,7 @@ add_library(p3p3ds_core
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
+    core/src/hle/threadman_hle.cpp
     core/src/hle/display.cpp
     core/src/hle/ge.cpp
     core/src/hle/umd.cpp
@@ -260,3 +261,7 @@ if(P3P_AOT_MODE STREQUAL "AUTO")
     set_tests_properties(p3p_interpreter_differential PROPERTIES
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" SKIP_RETURN_CODE 77)
 endif()
+
+add_executable(test_threadman_sync tests/test_threadman_sync.cpp)
+target_link_libraries(test_threadman_sync PRIVATE p3p3ds_core)
+add_test(NAME p3p_threadman_sync COMMAND test_threadman_sync)

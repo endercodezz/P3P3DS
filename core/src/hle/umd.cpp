@@ -47,6 +47,12 @@ void register_umd_module(psprecomp::Runtime &runtime, KernelState &kernel) {
                 {"v0_before",v0_before}, {"a2",ctx.gpr[6]}, {"a3",ctx.gpr[7]},
                 {"gp",ctx.gpr[28]}, {"sp",ctx.gpr[29]},
                 {"caller",ctx.gpr[31]-8u}, {"return_pc",ctx.gpr[31]}});
+            // pspautotests umd/callbacks/umd.expected: activation notifies the
+            // registered UMD callback, which runs at the owner's next CB point.
+            // [INFERRED] argument MEDIA_IN|READY|READABLE (uOFW mediaman.h bits);
+            // the hardware test only shows it is non-zero.
+            if (result == 0u && kernel.umd().registered_callback() != 0)
+                (void)kernel.threads().notify_callback(rt, kernel.umd().registered_callback(), 0x32u);
         });
     // uOFW mediaman_user.h / PSPSDK pspumd.h: zero absent, nonzero present.
     runtime.register_hle("sceUmdUser", 0x46EBB729u,

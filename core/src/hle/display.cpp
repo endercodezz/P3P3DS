@@ -1,4 +1,5 @@
 #include "p3p3ds/hle/display.hpp"
+#include "p3p3ds/hle/threadman.hpp"
 #include "p3p3ds/kernel_state.hpp"
 #include "psprecomp/allegrex_context.hpp"
 #include "psprecomp/runtime.hpp"
@@ -67,25 +68,36 @@ void register_display_module(psprecomp::Runtime &runtime, KernelState &kernel) {
             ctx.set_gpr(2, 0u);
         });
 
-    // DIRTY_FIRST_FRAME: deterministic vblank boundary, no wall-clock simulation.
-    for (auto nid : {0x36CDFADEu, 0x8EB9EC49u, 0x984C27E7u, 0x46F186C3u}) {
-        runtime.register_hle("sceDisplay", nid,
-            [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+    // VBlank waits block on ThreadManager's virtual clock (59.94 Hz period,
+    // matching sceDisplayGetFramePerSec). WaitVblankStart waits for the next
+    // vblank boundary; Multi waits for `count` boundaries.
+    const struct { std::uint32_t nid; bool callbacks; } vblank_waits[] = {
+        {0x984C27E7u, false}, // sceDisplayWaitVblankStart
+        {0x46F186C3u, true},  // sceDisplayWaitVblankStartCB
+        {0x36CDFADEu, false}, // sceDisplayWaitVblank
+        {0x8EB9EC49u, true},  // sceDisplayWaitVblankCB
+    };
+    for (const auto wait : vblank_waits) {
+        runtime.register_hle("sceDisplay", wait.nid,
+            [&kernel, callbacks = wait.callbacks](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+                auto &tm = kernel.threads();
                 kernel.display().advance_vblank();
-                ctx.set_gpr(2, 0u);
+                tm.block_current(rt, ctx, WaitInfo{WaitType::Vblank, 0, tm.next_vblank_time(), 0u, callbacks});
             });
     }
     // sceDisplayWaitVblankStartMultiCB(int vblanks)
     runtime.register_hle("sceDisplay", 0x77ED8B3Au,
-        [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
             const auto count=static_cast<std::int32_t>(ctx.gpr[4]);
             if (count<=0) { ctx.set_gpr(2,0x800001FEu); return; }
+            auto &tm = kernel.threads();
             for (std::int32_t i=0;i<count;++i) kernel.display().advance_vblank();
-            ctx.set_gpr(2,0u);
+            const auto deadline = (tm.vblank_count() + static_cast<std::uint64_t>(count)) * ThreadManager::kVblankPeriodUs;
+            tm.block_current(rt, ctx, WaitInfo{WaitType::Vblank, 0, deadline, 0u, true});
         });
-    runtime.register_hle("sceDisplay", 0x9C6EAAD7u,
+    runtime.register_hle("sceDisplay", 0x9C6EAAD7u, // sceDisplayGetVcount
         [&kernel](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
-            ctx.set_gpr(2, static_cast<std::uint32_t>(kernel.display().vcount()));
+            ctx.set_gpr(2, static_cast<std::uint32_t>(kernel.threads().vblank_count()));
         });
     runtime.register_hle("sceDisplay", 0xDBA6C4C4u,
         [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
