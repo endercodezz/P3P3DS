@@ -893,17 +893,20 @@ void emit_target(std::ostringstream &body, std::uint32_t target,
                  std::uint32_t unit_span_bytes = 0u,
                  const std::map<std::uint32_t, std::uint16_t> *direct_entry_ids = nullptr,
                  const std::set<std::uint32_t> *import_stubs = nullptr) {
-    if (labels.contains(target)) {
-        body << indent << "goto L_" << psprecomp::hex32(target).substr(2) << ";\n";
-        return;
-    }
-
     // A fixed J/JAL to a PSP import must return to the outer dispatcher.
     // Trying the generated-unit chain first is guaranteed to fail because import
     // registration deliberately poisons/replaces that exact PC, and these stubs
     // are frequently hot in real titles. Emit the minimal correct handoff directly.
+    // P3P3DS: this must precede the local-label check. A stub inside the same
+    // CFG/unit (e.g. P3P's tail call `j sceKernelCpuResumeIntr` at 0x08B73E24)
+    // was otherwise a `goto` into the stub's `jr ra`, silently skipping the HLE.
     if (import_stubs != nullptr && import_stubs->contains(target)) {
         body << indent << "ctx.pc = " << psprecomp::hex32(target) << "u; return;\n";
+        return;
+    }
+
+    if (labels.contains(target)) {
+        body << indent << "goto L_" << psprecomp::hex32(target).substr(2) << ";\n";
         return;
     }
 
@@ -992,7 +995,7 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                  << psprecomp::hex32(label).substr(2) << ";\n";
         }
         body << "    default:\n"
-             << "        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, \"invalid internal function entry\");\n"
+             << "        if (local_transfers == 0u) rt.unregistered_entry(ctx.pc); // P3P3DS: fallback-aware\n"
              // Local transfers advance local_pc without touching AllegrexContext.
              // Leaving the unit through this default arm hands control back to the
              // outer dispatcher, for which ctx.pc is the only statement of where to
@@ -1018,7 +1021,7 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                  << psprecomp::hex32(label).substr(2) << ";\n";
         }
         body << "    default:\n"
-             << "        if (local_transfers == 0u) rt.unsupported(ctx.pc, 0u, \"invalid internal function entry\");\n"
+             << "        if (local_transfers == 0u) rt.unregistered_entry(ctx.pc); // P3P3DS: fallback-aware\n"
              // Local transfers advance local_pc without touching AllegrexContext.
              // Leaving the unit through this default arm hands control back to the
              // outer dispatcher, for which ctx.pc is the only statement of where to
@@ -1091,7 +1094,9 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                          << psprecomp::hex32(decoded.word) << "u, " << psprecomp::hex32(target) << "u);\n";
                     if (decoded.kind == psprecomp::OpcodeKind::J) {
                         emit_target(body, target, function.entry_labels, "    ", function.executable_base, function.unit_span_bytes, function.direct_entry_ids, function.import_stubs);
-                    } else if (function.entry_labels.contains(target)) {
+                    } else if (function.entry_labels.contains(target) &&
+                               !(function.import_stubs != nullptr &&
+                                 function.import_stubs->contains(target))) { // P3P3DS: stubs first
                         // Fixed same-unit JAL: the destination is already a C++
                         // label. Going through ctx.pc + LOCAL_DISPATCH needlessly
                         // re-decodes a dense entry id and burns the local-transfer
@@ -1277,9 +1282,12 @@ int generate_manual(const std::filesystem::path &elf_path,
         }
     }
 
+    std::set<std::uint32_t> manual_import_stubs;
+    for (const auto &import : imports) manual_import_stubs.insert(import.stub_address);
     std::vector<GeneratedFunctionInput> generated;
     for (const auto &fn : merged_functions) {
         GeneratedFunctionInput input{fn.name, fn.primary_address, fn.instructions, fn.entry_labels};
+        input.import_stubs = &manual_import_stubs; // P3P3DS: see emit_target
         out << emit_function_source(input, memory, safe_name(input.name, input.address));
         generated.push_back(std::move(input));
     }
@@ -1550,7 +1558,16 @@ int generate_auto(const std::filesystem::path &elf_path,
     if (const auto module = elf.find_module_info(memory, load_base)) imports = elf.scan_imports(memory, *module);
     std::set<std::uint32_t> import_stubs;
     for (const auto &import : imports) import_stubs.insert(import.stub_address);
-    const auto program = psprecomp::analyze_program(elf, memory, load_base);
+    auto program = psprecomp::analyze_program(elf, memory, load_base);
+    // P3P3DS: never emit the 8-byte import stubs (`jr ra` + delay slot) as
+    // ordinary code. Their PCs belong to the import wrappers; a local JR or
+    // dispatch-table entry into the stub body would silently skip the HLE.
+    for (const auto stub : import_stubs) {
+        for (std::uint32_t pc = stub; pc < stub + 8u; pc += 4u) {
+            program.covered_labels.erase(pc);
+            program.covered_entry_labels.erase(pc);
+        }
+    }
     if (program.executable_ranges.empty()) throw psprecomp::Error("ELF has no executable ranges");
 
     std::filesystem::create_directories(output_dir);

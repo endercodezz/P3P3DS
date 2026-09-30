@@ -33,6 +33,7 @@ RuntimePreDispatchHook g_pre_dispatch_hook = nullptr;
 RuntimePostDispatchHook g_post_dispatch_hook = nullptr;
 RuntimePreChainedCallHook g_pre_chained_call_hook = nullptr;
 RuntimePostChainedCallHook g_post_chained_call_hook = nullptr;
+RuntimeFallbackHook g_fallback_hook = nullptr; // P3P3DS interpreter fallback
 }
 
 // Execution counter for a handful of guest addresses, armed by
@@ -107,6 +108,9 @@ void set_runtime_pre_chained_call_hook(RuntimePreChainedCallHook hook) noexcept 
 void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcept {
     g_post_chained_call_hook = hook;
     if (hook != nullptr) g_runtime_chain_observers_active = true;
+}
+void set_runtime_fallback_hook(RuntimeFallbackHook hook) noexcept {
+    g_fallback_hook = hook;
 }
 
 void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept { g_post_import_hook = hook; }
@@ -580,6 +584,8 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
             const std::int32_t dispatch_thread_uid = g_runtime_thread_uid;
             RecompiledFunction function = lookup_function(before);
             if (function == nullptr) {
+                // P3P3DS: interpreter fallback for unregistered PCs.
+                if (g_fallback_hook != nullptr && g_fallback_hook(*this, cpu_)) return;
                 stop("No recompiled function registered at " + hex32(before));
                 return;
             }
@@ -654,9 +660,16 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
             // cost a cache/TLB miss at every outer return.  Any unit containing
             // a host/import override is poisoned at registration and falls
             // back to exact per-PC dispatch automatically.
-            RecompiledFunction function = lookup_generated_unit(before);
+            // P3P3DS: with a fallback installed, require an exact entry; the
+            // unit table also answers for interior PCs that are not entries.
+            RecompiledFunction function = g_fallback_hook != nullptr ? nullptr : lookup_generated_unit(before);
             if (function == nullptr) function = lookup_function(before);
             if (function == nullptr) {
+                if (g_fallback_hook != nullptr && g_fallback_hook(*this, cpu_)) {
+                    if (!stopped_ && starvation_every != 0u && starvation != nullptr)
+                        (void)account_dispatch_work(cpu_, true);
+                    continue;
+                }
                 stop("No recompiled function registered at " + hex32(before));
                 break;
             }
@@ -716,6 +729,8 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
         RecompiledFunction function = lookup_function(before);
         const FunctionEntry *function_entry = lookup_entry(before);
         if (function == nullptr) {
+            // P3P3DS: interpreter fallback for unregistered PCs.
+            if (g_fallback_hook != nullptr && g_fallback_hook(*this, cpu_)) continue;
             stop("No recompiled function registered at " + hex32(before));
             break;
         }
@@ -1103,6 +1118,7 @@ void Runtime::event(std::string type, std::map<std::string, std::uint64_t> field
 void Runtime::record_transfer_impl(std::uint32_t pc, std::uint32_t word, std::uint32_t target) {
     diagnostic_pc = pc;
     last_transfer = {pc, word, target, runtime_thread_uid()};
+    if (transfer_budget != 0u && ++transfers_recorded >= transfer_budget) throw TransferBudgetHalt{};
     // Branches invalidate stale caller evidence but do not flood the event log
     // in guest memset/math loops. Calls, jumps and returns form the bounded trace.
     const auto op=word>>26;
@@ -1118,6 +1134,10 @@ void Runtime::stop(std::string reason) {
 }
 bool Runtime::stopped() const noexcept { return stopped_; }
 const std::string &Runtime::stop_reason() const noexcept { return stop_reason_; }
+
+void Runtime::unregistered_entry(std::uint32_t pc) {
+    if (g_fallback_hook == nullptr) unsupported(pc, 0u, "invalid internal function entry");
+}
 
 void Runtime::unsupported(std::uint32_t pc, std::uint32_t instruction, const std::string &reason) {
     diagnostic_pc = pc;

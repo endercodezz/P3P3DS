@@ -24,7 +24,8 @@ set(P3P_GENERATED_CPP "${P3P_GENERATED_DIR}/p3p_generated.cpp")
 set(P3P_ELF "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/game/eboot.elf")
 set(P3P_FUNCTIONS_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/p3p_functions.csv")
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
-set(P3P_FRONTIER_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/frontier_seeds.csv")
+set(P3P_FRONTIER_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/frontier_seeds.csv" CACHE FILEPATH
+    "Managed frontier seed manifest merged into MANUAL-mode generation")
 set(P3P_MERGED_CSV "${P3P_GENERATED_DIR}/frontier_functions.csv")
 
 # AUTO: whole-.text generation from psp_analyze's global CFG, split into
@@ -79,6 +80,7 @@ endif()
 # Core P3P3DS Target-Agnostic Runtime & HLE Library
 add_library(p3p3ds_core
     core/src/frontier.cpp
+    core/src/interpreter.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
@@ -249,3 +251,12 @@ add_executable(test_frontier tests/test_frontier.cpp)
 target_link_libraries(test_frontier PRIVATE p3p3ds_core)
 add_test(NAME p3p_frontier_safety COMMAND test_frontier)
 add_test(NAME p3p_frontier_workflow COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_chase_frontier.py")
+
+# Interpreter vs AOT differential test (needs the local ELF; skips otherwise).
+if(P3P_AOT_MODE STREQUAL "AUTO")
+    add_executable(test_interpreter_diff tests/test_interpreter_diff.cpp)
+    target_link_libraries(test_interpreter_diff PRIVATE p3p_aot p3p3ds_core)
+    add_test(NAME p3p_interpreter_differential COMMAND test_interpreter_diff "${P3P_ELF}")
+    set_tests_properties(p3p_interpreter_differential PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" SKIP_RETURN_CODE 77)
+endif()

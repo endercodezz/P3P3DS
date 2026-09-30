@@ -1,6 +1,7 @@
 #include "psprecomp/common.hpp"
 #include "psprecomp/elf32.hpp"
 #include "p3p3ds/hle/hle_modules.hpp"
+#include "p3p3ds/interpreter.hpp"
 #include "telemetry.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <iostream>
@@ -10,7 +11,7 @@ int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path;
         std::uint64_t budget=100000;
-        bool verify=false, chase=false, stop_any_vram=false;
+        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true;
         std::optional<std::uint32_t> expected;
         for(int i=1;i<argc;++i) {
             const std::string a=argv[i];
@@ -22,6 +23,7 @@ int main(int argc,char **argv) {
             else if(a=="--verify-bootstrap" || a=="--verify-milestone" || a=="--verify") verify=true;
             else if(a=="--run-until-blocker") chase=true;
             else if(a=="--stop-on-any-vram-write") stop_any_vram=true;
+            else if(a=="--no-interpreter") interpreter_enabled=false;
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
                 std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
@@ -46,6 +48,10 @@ int main(int argc,char **argv) {
         kernel.umd().set_medium_present(true);
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
         p3p3ds::hle::register_all_hle_modules(rt,kernel);
+        // Unregistered PCs (indirect targets, interior labels) are interpreted;
+        // the first entry at each PC is logged as an interpreter_enter event.
+        p3p3ds::Interpreter interpreter;
+        if(interpreter_enabled) p3p3ds::install_interpreter_fallback(&interpreter);
         rt.frontier_diagnostics=true;
         p3p3ds::BootstrapCheckpoint checkpoint;
         rt.event_observer=[&] {
@@ -76,6 +82,9 @@ int main(int argc,char **argv) {
             rt.stop((reason.find("memory")!=std::string::npos?"Memory fault: ":"Runtime exception: ")+reason);
         }
         rt.event_observer={};
+        p3p3ds::install_interpreter_fallback(nullptr);
+        rt.event("interpreter_summary",{{"entries",interpreter.entries()},{"distinct_pcs",interpreter.entry_pcs().size()},
+            {"instructions",interpreter.executed()}});
         rt.event("vram_activity_summary",{{"unclassified_resource",activity.resource},{"bound_texture_resource",activity.texture},
             {"color",activity.color},{"depth",activity.depth},{"suppressed",activity.suppressed}});
         if(!rt.stopped())rt.stop("Dispatch budget exhausted");
@@ -85,7 +94,9 @@ int main(int argc,char **argv) {
         std::cout<<"Stop Reason: "<<rt.stop_reason()<<"\nFinal Guest PC: "<<psprecomp::hex32(rt.cpu().pc)
                  <<"\nBlocker type: "<<type<<"\nLast executed transfer: "<<psprecomp::hex32(rt.last_transfer.pc)
                  <<" word="<<psprecomp::hex32(rt.last_transfer.word)<<" target="<<psprecomp::hex32(rt.last_transfer.target)
-                 <<"\nStable bootstrap: "<<(checkpoint.passed?"PASS":"FAIL")<<"\n";
+                 <<"\nStable bootstrap: "<<(checkpoint.passed?"PASS":"FAIL")
+                 <<"\n[INTERPRETER] entries="<<interpreter.entries()<<" distinct_pcs="<<interpreter.entry_pcs().size()
+                 <<" instructions="<<interpreter.executed()<<"\n";
         kernel.ge().report();
         const auto &w=rt.memory().vram_writes();std::size_t nonzero=0;
         for(auto b:rt.memory().vram_bytes()) nonzero+=b!=0;

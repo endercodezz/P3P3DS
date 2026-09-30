@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## Interpreter fallback (2026-10-01)
+
+- [VERIFIED] `core/src/interpreter.cpp` executes any guest PC without a registered AOT entry. Instruction semantics mirror `recomp/PSPRecomp/tools/codegen_main.cpp` (same helpers, same link/delay-slot/condition order). `Runtime` gained a fallback hook (`set_runtime_fallback_hook`): with it installed the outer loop uses exact per-PC lookup, and a unit entered at a non-entry PC returns to the dispatcher (`Runtime::unregistered_entry`) instead of stopping. The first entry at each PC is logged as `interpreter_enter`; `--no-interpreter` restores the old stop.
+- [VERIFIED] `test_interpreter_diff` (CTest `p3p_interpreter_differential`): from identical CPU/RAM/VRAM state, AOT(+fallback) and pure interpretation must agree on all GPR/HI/LO/FPR/FCR31/VFPU state, RAM, VRAM, last transfer and stop class after N recorded transfers (`Runtime::transfer_budget`). Default: 400 fully-lowerable analyzer functions x 3 register seeds (every odd seed starts at an interior unregistered PC) = 1,200 cases, 0 failures. Extended run: 500 functions x 4 seeds, budget 1,000: 2,000 cases, 69,093 transfers, 1,016 fallback entries, 0 failures.
+- [VERIFIED] Real-execution check: a MANUAL build with only the 114 original `p3p_functions.csv` groups and **no frontier seeds** stops at `0x08B1C594` with `--no-interpreter`, but with the interpreter reaches the same `sceAudio::0x136CAF51` blocker as AUTO (39 interpreter entries, 17 PCs, 2,534 instructions). Its 206 semantic events (all HLE calls, arguments, results) are identical to the AUTO run.
+- [VERIFIED] That comparison exposed a codegen bug, now fixed in `codegen_main.cpp`: a fixed transfer to an import stub inside the same CFG/unit became a `goto` into the stub's `jr ra` (P3P's tail call `j sceKernelCpuResumeIntr` at `0x08B73E24`), silently skipping the HLE. Import checks now precede local labels, MANUAL mode gets the stub set, and AUTO no longer emits the 221 stub bodies (751,453 PCs / 170,803 entries).
+- [VERIFIED] 13/13 CTest, `--verify-bootstrap` PASS, `chase_frontier.py --check-only --output .tmp/interp-check` PASS. AUTO replays are byte-identical, SHA-256 `65D6315C6BDC88B922B1388511AFB6B2441B9EB3F2DDB5488429FC5D3DB4A767`; blocker unchanged (missing `sceAudioOutputBlocking`, UID 5).
+- [UNVERIFIED] pspautotests CPU/FPU PRX were not run: their harness needs newlib stdio over `sceIo`/`host0:`, semaphores and thread creation. Planned once ThreadMan and IoFileMgr exist.
+
 ## Whole-.text AOT generation (2026-10-01)
 
 Default build is now `P3P_AOT_MODE=AUTO`: `psp_recomp --auto` lowers the whole analyzer CFG instead of the 21-seed manifest. `MANUAL` remains for the legacy frontier tooling.

@@ -89,6 +89,16 @@ public:
         if (frontier_diagnostics) record_transfer_impl(pc, word, target);
     }
     void record_transfer_impl(std::uint32_t pc, std::uint32_t word, std::uint32_t target);
+    // P3P3DS differential testing: when non-zero, the transfer_budget-th
+    // recorded transfer throws TransferBudgetHalt after last_transfer is set,
+    // so AOT and the interpreter stop at the same logical point.
+    std::uint64_t transfer_budget{};
+    std::uint64_t transfers_recorded{};
+    // P3P3DS: generated units call this for a PC inside the unit that is not a
+    // registered block entry. Without a fallback hook it keeps the original
+    // "invalid internal function entry" stop; with one, the unit returns and
+    // the outer dispatcher hands ctx.pc to the fallback.
+    void unregistered_entry(std::uint32_t pc);
 
     GuestMemory &memory() noexcept { return memory_; }
     const GuestMemory &memory() const noexcept { return memory_; }
@@ -411,6 +421,14 @@ using RuntimePostChainedCallHook = void (*)(Runtime &, AllegrexContext &, std::u
                                             std::uint32_t native_depth);
 void set_runtime_pre_chained_call_hook(RuntimePreChainedCallHook hook) noexcept;
 void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcept;
+
+// P3P3DS: optional execution fallback (the Allegrex interpreter) for PCs
+// without a registered AOT entry. Called only from the outer dispatch loop;
+// returning false keeps the original "No recompiled function" stop. While a
+// hook is installed the outer loop uses exact per-PC lookup, so a PC inside a
+// generated unit that is not one of its block entries also reaches the hook.
+using RuntimeFallbackHook = bool (*)(Runtime &, AllegrexContext &);
+void set_runtime_fallback_hook(RuntimeFallbackHook hook) noexcept;
 
 #undef PSPRECOMP_RUNTIME_FORCEINLINE
 

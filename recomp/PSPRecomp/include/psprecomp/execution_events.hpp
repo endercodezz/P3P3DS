@@ -18,4 +18,6 @@ struct ExecutedTransfer {
 };
 // A diagnostic halt after a completed memory write, caught by the PC runner.
 struct FrontierHalt {};
+// P3P3DS differential tests: Runtime::transfer_budget reached.
+struct TransferBudgetHalt {};
 }
