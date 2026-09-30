@@ -22,6 +22,21 @@ SEEDS = ROOT / "profiles/p3p/config/frontier_seeds.csv"
 ELF = ROOT / "profiles/p3p/game/eboot.elf"
 
 
+def aot_mode(build):
+    cache = Path(build) / "CMakeCache.txt"
+    if cache.exists():
+        for line in cache.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("P3P_AOT_MODE:"):
+                return line.split("=", 1)[1].strip()
+    return "MANUAL"
+
+
+def aot_layout():
+    import re
+    text = (ROOT / "profiles/p3p/config/aot_layout.cmake").read_text(encoding="utf-8")
+    return dict(re.findall(r'set\((P3P_AOT_[A-Z_]+) "?([^")]+)"?\)', text))
+
+
 def contained(path):
     path = Path(path).resolve()
     if not path.is_relative_to(ROOT):
@@ -323,6 +338,19 @@ class WorkspaceOps:
         self.run(["ctest", "--test-dir", self.build_dir, "--output-on-failure"], "ctest")
         self.run([self.bootstrap, "--verify-bootstrap"], "bootstrap")
         observation = self.capture(additions)
+        if aot_mode(self.build_dir) == "AUTO":
+            layout = aot_layout()
+            repeat = self.output / "regenerated_auto"
+            self.run([self.generator, ELF, "--auto", repeat, layout["P3P_AOT_LOAD_BASE"],
+                      layout["P3P_AOT_UNIT_SPAN"]], "regenerate")
+            built = self.build_dir / "generated/auto"
+            names = sorted(p.name for p in built.iterdir() if p.name.startswith("generated_"))
+            if names != sorted(p.name for p in repeat.iterdir() if p.name.startswith("generated_")):
+                raise RuntimeError("non-deterministic generated unit set")
+            for name in names:
+                if (built / name).read_bytes() != (repeat / name).read_bytes():
+                    raise RuntimeError(f"non-deterministic generated source {name}")
+            return observation
         repeat_cpp = self.output / "regenerated.cpp"
         self.run([self.generator, ELF, self.build_dir / "generated/frontier_functions.csv", repeat_cpp], "regenerate")
         if repeat_cpp.read_bytes() != (self.build_dir / "generated/p3p_generated.cpp").read_bytes():

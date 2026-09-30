@@ -27,15 +27,54 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(P3P_FRONTIER_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/frontier_seeds.csv")
 set(P3P_MERGED_CSV "${P3P_GENERATED_DIR}/frontier_functions.csv")
 
-add_custom_command(
-    OUTPUT "${P3P_GENERATED_CPP}"
-    BYPRODUCTS "${P3P_MERGED_CSV}"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py" --merge "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${P3P_MERGED_CSV}"
-    COMMAND psp_recomp "${P3P_ELF}" "${P3P_MERGED_CSV}" "${P3P_GENERATED_CPP}"
-    DEPENDS psp_recomp "${P3P_ELF}" "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py"
-    COMMENT "Generating P3P recompiled translation units..."
-    VERBATIM
-)
+# AUTO: whole-.text generation from psp_analyze's global CFG, split into
+# fixed-span translation units (profiles/p3p/config/aot_layout.cmake).
+# MANUAL: legacy seed-manifest generation used by tools/chase_frontier.py.
+set(P3P_AOT_MODE "AUTO" CACHE STRING "AOT generation mode: AUTO or MANUAL")
+set_property(CACHE P3P_AOT_MODE PROPERTY STRINGS AUTO MANUAL)
+set(P3P_AOT_OPT "-O2" CACHE STRING "Optimization flag for generated AOT units (GCC/Clang)")
+include("${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake")
+
+if(P3P_AOT_MODE STREQUAL "AUTO")
+    set(P3P_AUTO_DIR "${P3P_GENERATED_DIR}/auto")
+    set(P3P_AUTO_SOURCES "${P3P_AUTO_DIR}/generated_registry.cpp")
+    math(EXPR _p3p_last_unit "${P3P_AOT_UNIT_COUNT} - 1")
+    foreach(_unit RANGE 0 ${_p3p_last_unit})
+        string(LENGTH "${_unit}" _len)
+        math(EXPR _pad "4 - ${_len}")
+        string(REPEAT "0" ${_pad} _zeros)
+        list(APPEND P3P_AUTO_SOURCES "${P3P_AUTO_DIR}/generated_unit_${_zeros}${_unit}.cpp")
+    endforeach()
+    add_custom_command(
+        OUTPUT ${P3P_AUTO_SOURCES} "${P3P_AUTO_DIR}/generated_units.hpp"
+        COMMAND psp_recomp "${P3P_ELF}" --auto "${P3P_AUTO_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py" "${P3P_AUTO_DIR}" "${P3P_AOT_UNIT_COUNT}" "${P3P_AOT_UNIT_SPAN}"
+        DEPENDS psp_recomp "${P3P_ELF}" "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py"
+        COMMENT "Generating whole-.text P3P AOT units (${P3P_AOT_UNIT_COUNT} x ${P3P_AOT_UNIT_SPAN} bytes)..."
+        VERBATIM
+    )
+    add_library(p3p_aot STATIC ${P3P_AUTO_SOURCES})
+    target_include_directories(p3p_aot PRIVATE recomp/PSPRecomp/include "${P3P_AUTO_DIR}")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(p3p_aot PRIVATE ${P3P_AOT_OPT})
+    endif()
+    target_link_libraries(p3p_aot PUBLIC psprecomp_core)
+    set(P3P_AOT_LINK p3p_aot)
+    set(P3P_AOT_RUNNER_SOURCES)
+else()
+    add_custom_command(
+        OUTPUT "${P3P_GENERATED_CPP}"
+        BYPRODUCTS "${P3P_MERGED_CSV}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py" --merge "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${P3P_MERGED_CSV}"
+        COMMAND psp_recomp "${P3P_ELF}" "${P3P_MERGED_CSV}" "${P3P_GENERATED_CPP}"
+        DEPENDS psp_recomp "${P3P_ELF}" "${P3P_FUNCTIONS_CSV}" "${P3P_FRONTIER_CSV}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/chase_frontier.py"
+        COMMENT "Generating P3P recompiled translation units..."
+        VERBATIM
+    )
+    set(P3P_AOT_LINK)
+    set(P3P_AOT_RUNNER_SOURCES "${P3P_GENERATED_CPP}")
+endif()
 
 # Core P3P3DS Target-Agnostic Runtime & HLE Library
 add_library(p3p3ds_core
@@ -65,7 +104,7 @@ endif()
 # PC Bootstrap Runner
 add_executable(p3p_pc_bootstrap
     platform/pc/main.cpp
-    "${P3P_GENERATED_CPP}"
+    ${P3P_AOT_RUNNER_SOURCES}
 )
 
 target_include_directories(p3p_pc_bootstrap PRIVATE
@@ -74,6 +113,7 @@ target_include_directories(p3p_pc_bootstrap PRIVATE
 )
 
 target_link_libraries(p3p_pc_bootstrap PRIVATE
+    ${P3P_AOT_LINK}
     p3p3ds_core
     psprecomp_core
 )

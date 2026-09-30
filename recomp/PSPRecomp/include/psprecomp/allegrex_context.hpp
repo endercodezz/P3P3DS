@@ -154,23 +154,28 @@ struct alignas(16) AllegrexContext {
     // branch and the PSP VFPU lane shuffle disappear from the AOT hot path.
     template <std::uint32_t ScalarRegister>
     PSPRECOMP_CONTEXT_FORCEINLINE void set_vfpu_scalar_bits_ct(std::uint32_t value) noexcept {
-        static_assert(ScalarRegister < 144u);
+        // P3P3DS: mirror set_vfpu_scalar_bits(): indices >= 144 are ignored.
+        // P3P emits `mfvc $zero, 255` (0x486000FF) as a VFPU sync idiom.
         if constexpr (ScalarRegister < 128u) {
             constexpr std::size_t index = vfpu_scalar_index(ScalarRegister);
             vfpu[index] = std::bit_cast<float>(value);
-        } else {
+        } else if constexpr (ScalarRegister < 144u) {
             vfpu_ctrl[ScalarRegister - 128u] = value;
+        } else {
+            (void)value;
         }
     }
 
     template <std::uint32_t ScalarRegister>
     [[nodiscard]] PSPRECOMP_CONTEXT_FORCEINLINE std::uint32_t vfpu_scalar_bits_ct() const noexcept {
-        static_assert(ScalarRegister < 144u);
+        // P3P3DS: mirror vfpu_scalar_bits(): indices >= 144 read as zero.
         if constexpr (ScalarRegister < 128u) {
             constexpr std::size_t index = vfpu_scalar_index(ScalarRegister);
             return std::bit_cast<std::uint32_t>(vfpu[index]);
-        } else {
+        } else if constexpr (ScalarRegister < 144u) {
             return vfpu_ctrl[ScalarRegister - 128u];
+        } else {
+            return 0u;
         }
     }
 

@@ -2,6 +2,16 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## Whole-.text AOT generation (2026-10-01)
+
+Default build is now `P3P_AOT_MODE=AUTO`: `psp_recomp --auto` lowers the whole analyzer CFG instead of the 21-seed manifest. `MANUAL` remains for the legacy frontier tooling.
+
+- [VERIFIED] `psp_recomp profiles/p3p/game/eboot.elf --auto <dir> 0x08804000 16384`: 21,965 function seeds (same list as `p3p_report_functions_auto.csv`), 751,674 emitted instruction PCs, 171,024 block entries, **237 units x 16 KiB** + registry, 123 MB of C++, generated in ~40 s. Layout is pinned in `profiles/p3p/config/aot_layout.cmake` and checked by `tools/verify_aot_layout.py`.
+- [VERIFIED] Clean `p3p_aot` build, GCC 16.1 `-O2`, `-j10`, i5-12400F / 16 GB: **780 s wall, 4.8 GiB peak RSS** (all compilers). Largest unit (`generated_unit_0049`): 21.3 s / 570 MiB at `-O2`, 13.6 s at `-O1`. Objects: 238 files, 101.6 MiB; `p3p_pc_bootstrap.exe` 79.8 MiB (77.4 MiB text). Incremental regeneration only recompiles changed units (Ninja restat).
+- [VERIFIED] Minimal `recomp/PSPRecomp` fixes required for volume (each commented `P3P3DS`): `codegen_main.cpp` in-place `text.replace()` lowering was O(n^2); a `JAL` to an import stub re-emitted forever (`continue` without advancing `pc`); direct unit chaining named non-existent units for targets without a block entry (data decoded as code, e.g. `0x08B80BE0 -> 0x0C382C34`). `allegrex_context.hpp` `_ct` scalar helpers now mirror the runtime helpers for indices >= 144 (P3P uses `mfvc $zero,255` = `0x486000FF`).
+- [VERIFIED] 12/12 CTest, `--verify-bootstrap` PASS, `py -3 -B tools/chase_frontier.py --check-only --output .tmp/auto-check` PASS (independent regeneration byte-identical for all units). Two `--run-until-blocker` replays are byte-identical, SHA-256 `77F38CDCED51D38E1130CEDEC011B7647CDD17B694143716DC2686A41F5DDF05`; blocker unchanged: missing `sceAudio::0x136CAF51` from `0x08B650F8`, UID 5. 171,026 registered entries.
+- [INFERRED] Manual seed `0x08B13400` (`p3p_functions.csv`) is an interior loop PC, not a function entry: it is covered as an instruction but not a registered block entry in AUTO mode. Such PCs are the interpreter fallback's job.
+
 ## Repository hygiene (2026-09-30)
 
 - [VERIFIED] `build/generated/p3p_generated.cpp` (derived from the proprietary EBOOT) is no longer tracked; CMake regenerates it (`CMakeLists.txt` `P3P_GENERATED_CPP`). It remains in history since `62edefb`; purging requires a maintainer-run `git filter-repo`, not done here.

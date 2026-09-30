@@ -913,7 +913,11 @@ void emit_target(std::ostringstream &body, std::uint32_t target,
     // chain table and indexes the tiny unit table instead. A bucket containing
     // an import/HLE/host replacement is marked overridden at registration time
     // and invoke_chained_unit() falls back to the exact per-PC lookup there.
-    if (unit_span_bytes != 0u && target >= executable_base) {
+    // P3P3DS: only chain directly to a registered block entry. A target with no
+    // entry id (data decoded as code, or past the last unit) would otherwise
+    // name a non-existent unit and would not materialize ctx.pc.
+    if (unit_span_bytes != 0u && target >= executable_base &&
+        direct_entry_ids != nullptr && direct_entry_ids->contains(target)) {
         const std::uint32_t unit = (target - executable_base) / unit_span_bytes;
         body << indent << "(void)" << direct_unit_chain_expression(unit, target, direct_entry_ids)
              << "; return;\n";
@@ -1103,12 +1107,16 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                         if (target_is_import) {
                             body << "    ctx.pc = " << psprecomp::hex32(target) << "u;\n"
                                  << "    return;\n";
-                            continue;
+                            // P3P3DS: was `continue`, which re-emitted this
+                            // instruction forever (pc never advanced) in --auto.
+                            break;
                         }
                         // Otherwise run the callee inline and resume locally only
                         // if it came back to our return address.
                         const bool direct_unit = function.unit_span_bytes != 0u &&
-                            target >= function.executable_base;
+                            target >= function.executable_base &&
+                            function.direct_entry_ids != nullptr &&
+                            function.direct_entry_ids->contains(target); // P3P3DS: see emit_target
                         const std::uint32_t target_unit = direct_unit
                             ? (target - function.executable_base) / function.unit_span_bytes : 0u;
                         if (!direct_unit)
@@ -1309,7 +1317,12 @@ int generate_manual(const std::filesystem::path &elf_path,
 // This pass is deliberately limited to --auto output; manual fixtures retain the
 // readable helper form used by their source-level tests.
 std::string lower_constant_gpr_writes(std::string text) {
+    // P3P3DS: build the result in a separate buffer. The original in-place
+    // text.replace() was O(n^2) and did not finish for whole-.text units.
     constexpr std::string_view needle = "ctx.set_gpr(";
+    std::string lowered;
+    lowered.reserve(text.size());
+    std::size_t copied = 0u;
     std::size_t search = 0u;
     while ((search = text.find(needle, search)) != std::string::npos) {
         const std::size_t open = search + needle.size() - 1u;
@@ -1357,10 +1370,13 @@ std::string lower_constant_gpr_writes(std::string text) {
             search = close + 1u;
             continue;
         }
-        text.replace(search, close - search + 1u, replacement);
-        search += replacement.size();
+        lowered.append(text, copied, search - copied);
+        lowered += replacement;
+        search = close + 1u;
+        copied = search;
     }
-    return text;
+    lowered.append(text, copied, std::string::npos);
+    return lowered;
 }
 
 std::string lower_aot_memory_accesses(std::string text) {
@@ -1394,6 +1410,10 @@ std::string lower_constant_fpr_accesses(std::string text) {
     text = std::move(lowered);
 
     constexpr std::string_view needle = "ctx.set_fpr_bits(";
+    // P3P3DS: linear rebuild instead of O(n^2) in-place replace (see above).
+    lowered.clear();
+    lowered.reserve(text.size());
+    std::size_t copied = 0u;
     std::size_t search = 0u;
     while ((search = text.find(needle, search)) != std::string::npos) {
         std::size_t cursor = search + needle.size();
@@ -1428,10 +1448,13 @@ std::string lower_constant_fpr_accesses(std::string text) {
         const std::string expression = text.substr(first, last - first);
         const std::string replacement = "ctx.fpr[" + std::to_string(index) +
             "] = std::bit_cast<float>(" + expression + ")";
-        text.replace(search, close - search + 1u, replacement);
-        search += replacement.size();
+        lowered.append(text, copied, search - copied);
+        lowered += replacement;
+        search = close + 1u;
+        copied = search;
     }
-    return text;
+    lowered.append(text, copied, std::string::npos);
+    return lowered;
 }
 
 // VFPU operands in automatic AOT are encoded literals. Convert the
