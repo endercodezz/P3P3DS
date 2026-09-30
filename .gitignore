@@ -44,13 +44,8 @@ experiments/p3p-analysis/p3p_report_function_seeds.csv
 
 # Build artifacts & outputs
 build/
-# Keep only the current P3P generated snapshot addressable; all other build
-# output remains ignored.
-!build/
-build/*
-!build/generated/
-build/generated/*
-!build/generated/p3p_generated.cpp
+# Generated AOT C++ is derived from the proprietary EBOOT and is rebuilt by
+# CMake; it must never be tracked.
 out/
 bin/
 obj/

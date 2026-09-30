@@ -2,6 +2,12 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## Repository hygiene (2026-09-30)
+
+- [VERIFIED] `build/generated/p3p_generated.cpp` (derived from the proprietary EBOOT) is no longer tracked; CMake regenerates it (`CMakeLists.txt` `P3P_GENERATED_CPP`). It remains in history since `62edefb`; purging requires a maintainer-run `git filter-repo`, not done here.
+- [VERIFIED] `logs/p3p_bootstrap_latest.log` and `profiles/p3p/config/frontier_checkpoint.json` contain only addresses/counters/hashes, no game bytes.
+- [VERIFIED] No top-level LICENSE exists. Vendored third-party trees are tracked in-repo, including `recomp/PSP-recompilation-project/font/jpn0.pgf` (a PSP firmware font) and `recomp/PSP-recompilation-project/SDL3.dll`; they were not modified.
+
 ## Current frontier: sceAudioOutputBlocking after verified thread entry
 
 Source base: `1436566709a9ebf61c07cad09d17f59e702e0b4f` (ULUS-10512 PC host).
