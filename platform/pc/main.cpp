@@ -5,6 +5,7 @@
 #include "p3p3ds/vfs.hpp"
 #include "telemetry.hpp"
 #include "frame_dump.hpp"
+#include "pcm_mixer.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
@@ -18,7 +19,7 @@ namespace psprecomp {void register_generated_functions(Runtime &); void apply_ge
 int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
-            ms0_path="out/ms0", mods_path, frames_dir;
+            ms0_path="out/ms0", mods_path, frames_dir, wav_path;
         std::uint64_t frame_every=30;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true;
@@ -39,6 +40,7 @@ int main(int argc,char **argv) {
             else if(a=="--ms0") ms0_path=value();
             else if(a=="--mods") mods_path=value();
             else if(a=="--frames-dir") frames_dir=value();
+            else if(a=="--wav") wav_path=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
@@ -47,7 +49,8 @@ int main(int argc,char **argv) {
                          <<"--elf <path> --max-dispatches <count> --stop-on-any-vram-write\n"
                          <<"--no-interpreter (stop at unregistered PCs instead of interpreting)\n"
                          <<"--umd <iso> (disc0: image; default: the single *.iso in the working directory)\n"
-                         <<"--frames-dir <dir> [--frame-every N] (write every Nth displayed frame as BMP)\n";return 0;
+                         <<"--frames-dir <dir> [--frame-every N] (write every Nth displayed frame as BMP)\n"
+                         <<"--wav <file> (mix all sceAudio output on the virtual clock into a 44.1 kHz stereo WAV)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -116,6 +119,8 @@ int main(int argc,char **argv) {
                               "ge_finish","ge_stall_update","ge_signal","ge_callback","ge_callback_complete"}) rt.event_type_limits[type]=4000;
         p3p3ds::BootstrapCheckpoint checkpoint;
         std::uint64_t frames_shown=0;
+        p3p3ds::PcmMixer mixer(wav_path.string());
+        kernel.audio().set_sink([&mixer](unsigned,std::uint64_t start,const std::vector<std::int16_t> &stereo) {mixer.add(start,stereo);});
         rt.event_observer=[&] {
             if(!rt.events.empty() && rt.events.back().type=="guest_transfer")
                 kernel.threads().invalidate_thread_entry();
@@ -163,6 +168,11 @@ int main(int argc,char **argv) {
         p3p3ds::install_interpreter_fallback(nullptr);
         rt.event("interpreter_summary",{{"entries",interpreter.entries()},{"distinct_pcs",interpreter.entry_pcs().size()},
             {"instructions",interpreter.executed()}});
+        mixer.finish();
+        rt.event("audio_summary",{{"buffers",mixer.buffers()},{"frames",mixer.frames()},{"nonzero_frames",mixer.nonzero_frames()},
+            {"peak",mixer.peak()},{"late_frames",mixer.late_frames()},{"clipped",mixer.clipped()}});
+        std::cout<<"[AUDIO] buffers="<<mixer.buffers()<<" frames="<<mixer.frames()<<" nonzero="<<mixer.nonzero_frames()
+                 <<" peak="<<mixer.peak()<<" late="<<mixer.late_frames()<<" clipped="<<mixer.clipped()<<"\n";
         rt.event("vram_activity_summary",{{"unclassified_resource",activity.resource},{"bound_texture_resource",activity.texture},
             {"color",activity.color},{"depth",activity.depth},{"suppressed",activity.suppressed}});
         if(!rt.stopped())rt.stop("Dispatch budget exhausted");

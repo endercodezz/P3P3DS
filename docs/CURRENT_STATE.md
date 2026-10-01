@@ -2,6 +2,12 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## PCM output on PC (2026-10-01)
+
+- [VERIFIED] `platform/pc/pcm_mixer.hpp`: every accepted `sceAudio` buffer (AudioState PcmSink, volume-scaled) is mixed at its virtual start time into a 44.1 kHz stereo S16 timeline; `--wav <file>` streams it to a WAV. `tests/test_pcm_mixer.cpp` checks placement, overlap sum/clamp, late buffers and the WAV header.
+- [VERIFIED] 20M-dispatch run: 52,428 buffers, 146 s of audio, 0 late, 0 clipped, peak 7,523. Silent through the logos and the movie (ATRAC3plus has no decoder yet), then non-silent from ~115 s (title screen): RMS 260-1,180 per second, first-difference/signal energy 0.012 (low-frequency content, not noise). The PCM is produced by the game's own CRI code; that it sounds right is [UNVERIFIED] until someone listens to it. Two replays: event dump and WAV byte-identical (WAV SHA-256 `74A7CC1EBFA509472B8A2A4A4C6F896CB64E0C0946906B785E207D5BF8CA2E4F`, events `399C7DBC1288CDB560987DBAE8DEF9B2C55F177FC685055D2F3740B218C627D4`). 21/21 CTest.
+- [UNVERIFIED] No live audio device yet (offline WAV only).
+
 ## Opening movie, title screen and attract loop (2026-10-01)
 
 - [VERIFIED] `core/src/hle/mpeg.cpp`: all 25 imported `sceMpeg` services. PSMF program-stream demultiplexer: AVC AUs split at H.264 access-unit delimiters, ATRAC3plus AUs = one 752-byte frame (header `0F D0`), PES PTS/DTS attached only when a PES payload starts at the AU, AVC attribute = `nal_ref_idc` of the AU's slice, ringbuffer packets freed once every registered stream consumed them. `tests/test_mpeg.cpp` replays pspautotests `video/mpeg/basic.c` on `test.pmf`: **2,905/2,905 lines of `basic.expected` identical** (180 frames: available sizes, callback offsets/counts, put results, AU sizes/timestamps/attributes, decode results), plus the `ringbuffer/{memsize,construct,avail,destruct}.expected` tables. Decoding is behind `MpegDecoder`; the default outputs black pictures and silence [UNVERIFIED substitute] (plan: `docs/NEXT_STEPS.md`).
