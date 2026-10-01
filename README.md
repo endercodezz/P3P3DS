@@ -59,6 +59,46 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 
 ---
 
+## Running on a New 3DS
+
+There are **no downloads**: the `.3dsx` contains code generated from the game's executable (and the decrypted executable itself), so it must never be shared. Everyone builds it from their own copy of the game.
+
+You need:
+- a **New 3DS / New 3DS XL / New 2DS XL** with custom firmware and the Homebrew Launcher (Old 3DS models are not supported);
+- your own *Persona 3 Portable* `ULUS-10512` ISO;
+- a PC with the tools listed under [Prerequisites](#prerequisites), including devkitPro.
+
+Steps:
+1. Prepare the game files once: `python tools/prepare_game.py "/path/to/Persona 3 Portable.iso"` ([Game Setup](#game-setup-one-command-preparation)).
+2. Build the PC tools ([Build](#build)), then the 3DS runner ([Build for New 3DS](#build-for-new-3ds)). The result is `build/3ds/p3p3ds.3dsx`.
+3. Copy to the microSD card:
+   ```text
+   SD card
+   ├── 3ds/
+   │   └── p3p3ds.3dsx          <- build/3ds/p3p3ds.3dsx
+   └── p3p3ds/
+       └── <any name>.iso       <- your ULUS-10512 image (the first .iso found is used)
+   ```
+   The runner creates `p3p3ds/ms0/` (memory stick), `p3p3ds/mods/` (mod chain, see below) and `p3p3ds/report.txt` itself.
+4. Start **P3P3DS** from the Homebrew Launcher.
+
+The top screen shows the game, the bottom screen authorship and a live debug report (fps, speed, memory, time split), also written to `sdmc:/p3p3ds/report.txt` every few seconds and on exit — please attach it to bug reports.
+
+| 3DS | PSP |
+|---|---|
+| B / A / Y / X | Cross (confirm) / Circle (back) / Square / Triangle — by position |
+| D-Pad, Circle Pad | D-Pad, analog stick |
+| L / R, START, SELECT | L / R, START, SELECT |
+| START + SELECT | quit P3P3DS |
+
+What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at roughly 90 % of full speed in the Azahar emulator; **no sound**; the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); **loading or saving a game stops the runner** (savedata is not implemented yet); 3D scenes have no lighting yet.
+
+Memory [UNVERIFIED on hardware]: the runner needs about 112 MB of application memory (44 MB of code, 32 MB of PSP RAM, the runtime and GPU buffers). If the bottom screen reports that it ran out of memory, the Homebrew Launcher was started with a smaller memory mode than the game needs.
+
+Emulator: Azahar works too — enable New 3DS mode, put the ISO in its virtual SD card under `p3p3ds/`, and open the `.3dsx`.
+
+---
+
 ## Goal
 
 The long-term goal of this project is a smooth, high-fidelity experience of Persona 3 Portable running natively on New Nintendo 3DS hardware, with support for user-supplied community mods and fan translations.
@@ -179,6 +219,7 @@ To build the PC runner and development tools:
 - **Python 3.10+** (code generation helpers, analysis and verification scripts)
 - About **5 GB of RAM** and ~11 minutes on a 12-thread CPU for a clean build of the 237 generated units (`-j10`)
 - Optional: .NET SDK for `experiments/cpk-check` (CPK inspection)
+- For the New 3DS build: [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the `3ds-dev` packages (devkitARM, libctru, citro3d, picasso, 3dsxtool)
 
 ---
 
@@ -228,7 +269,9 @@ cmake -S platform/3ds -B build/3ds -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=/o
 make -C build/3ds -j10
 ```
 
-A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Copy `build/3ds/p3p3ds.3dsx` to the console or emulator, put your ULUS-10512 `.iso` in `sdmc:/p3p3ds/`, and start it (Azahar: enable New 3DS mode). The bottom screen shows the debug report, also saved to `sdmc:/p3p3ds/report.txt`; START+SELECT quits. The `.3dsx` embeds code generated from your game executable: it is for your own testing, never for distribution.
+A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Installing and running it: [Running on a New 3DS](#running-on-a-new-3ds). The `.3dsx` embeds code generated from your game executable: it is for your own use, never for distribution.
+
+Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`).
 
 ### Run the game on PC
 
