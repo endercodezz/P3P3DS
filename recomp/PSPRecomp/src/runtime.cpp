@@ -1,6 +1,7 @@
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/common.hpp"
 
+#include <chrono> // P3P3DS profiling
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -113,6 +114,21 @@ void set_runtime_fallback_hook(RuntimeFallbackHook hook) noexcept {
 }
 
 void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept { g_post_import_hook = hook; }
+// P3P3DS: see RuntimeProfile in runtime.hpp.
+RuntimeProfile &runtime_profile() noexcept { static RuntimeProfile profile; return profile; }
+namespace {
+struct HleTimer {
+    std::chrono::steady_clock::time_point start;
+    bool on;
+    HleTimer() : on(runtime_profile().enabled) { if (on) start = std::chrono::steady_clock::now(); }
+    ~HleTimer() {
+        if (!on) return;
+        auto &p = runtime_profile();
+        p.hle_ns += static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
+        ++p.hle_calls;
+    }
+};
+} // namespace
 void set_runtime_thread_identity(std::int32_t uid, const std::string &name) noexcept {
     if (uid != g_runtime_thread_uid) ++g_runtime_thread_switch_generation_fast;
     g_runtime_thread_uid = uid;
@@ -1218,6 +1234,7 @@ void Runtime::invoke_import_cached(std::uint32_t slot, std::string_view library,
         import_bindings_[slot] = bound;
     }
 
+    const HleTimer hle_timer; // P3P3DS profiling
     (*bound)(*this, ctx);
     if (!stopped_ && g_post_import_hook != nullptr) g_post_import_hook(*this, ctx);
 }
@@ -1237,6 +1254,7 @@ void Runtime::invoke_import(std::string_view library, std::uint32_t nid, Allegre
         stop("Missing HLE import " + library_name + "::" + name);
         return;
     }
+    const HleTimer hle_timer; // P3P3DS profiling
     function_it->second(*this, ctx);
     if (!stopped_ && g_post_import_hook != nullptr) g_post_import_hook(*this, ctx);
 }

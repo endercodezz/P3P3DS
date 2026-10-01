@@ -82,7 +82,7 @@ Phase 4: Nintendo 3DS Backend Integration
     - Connect guest framebuffer in VRAM (`0x04000000`) to an SDL3/OpenGL debug window on PC.
     - Confirm the initial Atlus boot screen / legal disclaimer renders.
 
-13. **Step 13: Implement Controller Input & Event Flags** — HLE done; host input mapping open (the title screen waits for a button)
+13. **Step 13: Implement Controller Input & Event Flags** `[COMPLETED]` for scripted and XInput input (`--input`, `--gamepad`); keyboard needs a window
     - Hook `sceCtrl` (`sceCtrlReadBufferPositive`, `sceCtrlPeekBufferPositive`).
     - Map PC gamepad/keyboard to PSP buttons.
     - Implement semaphores and event flags needed for game state transitions.
@@ -108,11 +108,30 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ---
 
+### Render reference captures needed from PPSSPP (maintainer)
+
+The local PPSSPP (`D:ds\PPSSPP`) is the GUI build only, without PPSSPPHeadless, so frames cannot be captured by script. Capture these screens by hand in PPSSPP (ULUS-10512, internal resolution 1x = 480x272, no texture filtering/upscaling, "Software rendering" if possible) as lossless PNG and put them in `.tmp/reference/` (not committed) with the file names below. P3P3DS frame numbers come from `--frame-every 30`/`60` runs with the listed input script; screens are identified by content, not by frame number.
+
+| File | Screen | P3P3DS frame / script |
+|---|---|---|
+| `ref_01_atlus.png` | ATLUS logo, fully faded in | 80, no input |
+| `ref_02_criware.png` | CRIWARE logo | 150, no input |
+| `ref_03_title.png` | Title "PRESS ANY BUTTON" (male protagonist art) | 3600, no input |
+| `ref_04_main_menu.png` | Main menu, cursor on LOAD GAME | 3690, `profiles/p3p/input/title_start.txt` |
+| `ref_05_mc_select.png` | Protagonist selection, "Welcome to the world of P3P." | 6930, `profiles/p3p/input/new_game.txt` |
+| `ref_06_dark_hour_lobby.png` | Dorm lobby in the Dark Hour, "Boy's Voice: Welcome." (3D, green tint) | 9600, `.tmp`-style exploration script (see CURRENT_STATE) |
+| `ref_07_name_entry.png` | "Enter your last name." keyboard | ~10500 |
+| `ref_08_mitsuru.png` | Dorm lounge, Mitsuru introduction | ~11400 |
+| `ref_09_room.png` | Protagonist's room, cursor on the bed | ~13420 |
+| `ref_10_school_lobby.png` | School "1st Floor, Main Lobby" with students | ~15900 |
+
+Comparison plan once they exist: per-pixel RGB difference with a tolerance of 2 per channel, report the share of differing pixels and a difference image per pair; screens with animation (cursor pulse, text typing) are compared outside the animated regions only.
+
 ### Movie and audio decoding plan (sceMpeg / ATRAC3plus)
 
 Interface in place: `core/include/p3p3ds/hle/mpeg.hpp` `MpegDecoder` receives each demultiplexed AU (`decode_video` writes a picture into guest memory, `decode_audio` writes 2048 stereo S16 samples). `BlankMpegDecoder` (black / silence) is the default. Container behaviour is verified against `pspautotests/tests/video/mpeg/basic.expected`. P3P's only movie is `USRDIR/sound/pmsf/P3OPMV_P3P.pmsf` (`_P3PB` variant): H.264 2,997 AUs at 29.97 fps, ATRAC3plus 2,156 frames of 752 bytes.
 
-1. PC: an H.264 Baseline/Main decoder + ATRAC3plus decoder behind `MpegDecoder`. Candidates must be license-compatible and vendored offline (none present in the workspace); PPSSPP uses FFmpeg — reference only, no code copy. Verify: decoded frame hashes against a reference decode of the same AUs; audio PCM against a reference decoder.
+1. PC: an H.264 Baseline/Main decoder + ATRAC3plus decoder behind `MpegDecoder`. Candidates must be license-compatible and vendored offline (none present in the workspace); PPSSPP uses FFmpeg â€” reference only, no code copy. Verify: decoded frame hashes against a reference decode of the same AUs; audio PCM against a reference decoder.
 2. 3DS: the New 3DS has an MVD hardware H.264 service (`mvd:STD` in libctru) [UNVERIFIED for this stream profile]; ATRAC3plus needs a software decoder on ARM11 [UNVERIFIED cost]. Measure before choosing; an alternative is offline transcoding of the user's movie to a 3DS-native format at install time.
 3. The game's own `sceAtrac3plus` use for BGM (not yet reached) shares the ATRAC3plus decoder.
 

@@ -1,4 +1,5 @@
 #include "p3p3ds/hle/ge.hpp"
+#include "p3p3ds/profile.hpp"
 #include "p3p3ds/kernel_state.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/common.hpp"
@@ -111,6 +112,41 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     if (!rt.stopped()) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
                                  << " token=" << l.finish_token << " end=" << psprecomp::hex32(end_pc) << "\n";
 }
+// Enable bits and modes: PSPSDK pspge.h / pspgu.h command list.
+void GeManager::count_features(std::uint32_t prim_type) {
+    const auto &r=regs_.reg;
+    auto on=[&](std::uint32_t i){ return (r[i]&1u)!=0u; };
+    const auto layout=ge::vertex_layout(r[0x12]);
+    static constexpr const char *kPrims[]={"prim_points","prim_lines","prim_line_strip","prim_triangles","prim_triangle_strip","prim_triangle_fan","prim_sprites","prim_7"};
+    ++features_["draws"]; ++features_[kPrims[prim_type&7u]];
+    ++features_[layout.through?"through_mode":"transform_mode"];
+    const bool clear=(r[0xD3]&1u)!=0u;
+    if(clear){ ++features_["clear_mode"]; return; }
+    if(!layout.through && on(0x17)) ++features_["lighting"];
+    if(!layout.through && on(0x1F)) ++features_["fog"];
+    if(on(0x20)) ++features_["dither"];
+    if(on(0x21)) ++features_["alpha_blend"];
+    if(on(0x22)) ++features_["alpha_test"];
+    if(on(0x23)) ++features_["depth_test"];
+    if(on(0x24)) ++features_["stencil_test"];
+    if(on(0x25)) ++features_["antialias"];
+    if(on(0x27)) ++features_["color_test"];
+    if(on(0x28)) ++features_["logic_op"];
+    if(on(0x1D)) ++features_["cull"];
+    if(layout.weights) ++features_["skinning"];
+    if(layout.morphs>1u) ++features_["morph"];
+    if(layout.index_format) ++features_["indexed"];
+    if(on(0x1E) && layout.uv_format) {
+        ++features_["textured"];
+        static constexpr const char *kFormats[]={"tex_565","tex_5551","tex_4444","tex_8888","tex_clut4","tex_clut8","tex_clut16","tex_clut32","tex_dxt1","tex_dxt3","tex_dxt5"};
+        const auto fmt=r[0xC3]&0xFu; ++features_[fmt<11u?kFormats[fmt]:"tex_other"];
+        if((r[0xC6]&0x0101u)!=0u) ++features_["tex_filter_linear"];
+        if((r[0xC6]&0x4u)!=0u) ++features_["tex_mipmap_filter"]; // min filter 4..7
+        if(!layout.through && (r[0xC0]&3u)!=0u) ++features_["texgen"];
+        if((r[0xC2]&0xFF0000u)!=0u) ++features_["tex_levels"];
+    }
+}
+
 // GE command execution. Opcodes: PSPSDK psp/pspsdk/src/ge/pspge.h and the
 // gu command list (pspgu.h); PPSSPP GPU/ge_constants.h cross-checked only.
 void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t word) {
@@ -125,6 +161,8 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
     case 0x04: { // PRIM
         const auto count=arg&0xFFFF, type=(arg>>16)&7;
         if(type==7) { rt.stop("GE PRIM type 7 unsupported"); return; }
+        count_features(type);
+        const ProfileScope timer(host_profile().render_ns, host_profile().render_calls);
         renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
         const auto layout=ge::vertex_layout(regs_.reg[0x12]);
         if(layout.index_format) state_.index+=count*(layout.index_format==1?1u:2u);
@@ -170,7 +208,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         for(std::uint32_t i=0;i<bytes;i+=4) if(mem.contains(address+i,4)) regs_.clut[i/4]=mem.load32(address+i);
         break;
     }
-    case 0xEA: renderer_->transfer(mem,regs_); break;
+    case 0xEA: { const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); renderer_->transfer(mem,regs_); break; }
     default: break;
     }
     l.pc+=4;

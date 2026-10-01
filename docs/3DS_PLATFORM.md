@@ -207,5 +207,8 @@ A full PSP executable like Persona 3 Portable contains ~12,000 to 18,000 functio
 
 Behaviour is unchanged: identical 3,863 frame hashes, byte-identical WAV, same stop PC. Without records the frontier tooling has no transfer trace (thread-entry provenance, blocker classification), so the default stays ON for PC development. [VERIFIED] on PC; the ARM11 effect is [UNVERIFIED].
 
+### 8.4. Measured: where PC time goes (2026-10-01)
+`p3p_pc_bootstrap --profile`, 20M dispatches (boot, logos, movie, title, main menu; 146 s virtual), i5-12400F, GCC 16.1 `-O2`: wall 46.4 s; HLE calls 32.7 s (70.4 %, 6,125,098 calls — includes GE list execution and software rasterization started from `sceGeListEnQueue`, and the post-call scheduler hook); software rendering 17.4 s (37.6 %, 15,411 draws/transfers, nested in the HLE figure); interpreter 0.000 s (13 entries, 12-16 distinct PCs over whole first-day runs, a few thousand instructions); AOT code plus dispatch ≈ 30 %. For the 3DS this points at GE work (PICA200 instead of software rasterization) and HLE/scheduler overhead before AOT code size. [VERIFIED] on PC only; not measured on ARM11.
+
 ### 8.3. Blocked: devkitARM size measurements and the minimal 3DS harness
 devkitPro/devkitARM is not installed on this host (no `DEVKITPRO`, no `C:\devkitPro`), and installing global toolchains needs the maintainer's permission (CLAUDE.md section 2). Not done: `platform/3ds` CMake/.3dsx harness (`osSetSpeedupEnable`, citro3d clear), `-Os` vs `-O2` ARM11 text size of the full `.text`. These need devkitARM and, for speed, New 3DS hardware or Citra.

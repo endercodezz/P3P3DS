@@ -4,9 +4,9 @@
 
 ---
 
-## Status: NOT PLAYABLE (reaches New Game on PC)
+## Status: NOT PLAYABLE (reaches the first school day on PC with scripted input)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, opens the main menu and starts a New Game up to the protagonist selection scene. There is no window yet (frames are written as images). Nothing runs on 3DS hardware yet.
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. Nothing runs on 3DS hardware yet.
 
 Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)):
 
@@ -18,6 +18,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 | Opening movie | 100 s PSMF movie demultiplexed by `sceMpeg` (on the pspautotests sample movie, container behaviour matches PSP hardware output line for line); picture and movie audio are placeholders (black / silence) |
 | Title screen | "PRESS ANY BUTTON" at frame 3600 (~133 s virtual time), title-screen audio recorded to WAV (not yet checked by ear) |
 | Main menu and New Game | START opens NEW GAME / LOAD GAME / CONFIG / DATA INSTALL; NEW GAME loads the protagonist selection scene ("Welcome to the world of P3P.") |
+| First game day | Dark Hour dorm lobby (3D), name entry, Mitsuru introduction, own room with the navigation cursor, next morning with Yukari, school main lobby; 38 virtual minutes without a blocker |
 | Stability | 38,314 frames (24 min virtual) of the attract loop without a blocker; runs with the same input script are bit-for-bit deterministic |
 | Tests | CTest suites for HLE contracts, renderer, input and AOT/interpreter differential, several replaying pspautotests hardware transcripts |
 
@@ -38,7 +39,8 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] Controller input: scripted (deterministic) and XInput gamepad
 - [ ] Live window and audio device on PC
 - [x] Main menu and New Game start
-- [ ] Gameplay (name entry, intro, first controllable section)
+- [x] Name entry, introduction and first controllable section (scripted input)
+- [ ] Complete renderer (filtering, lines, lighting/skinning as the game needs) and movie decoding
 - [ ] New Nintendo 3DS native homebrew build (`.3dsx` / `.cia`)
 - [ ] Playable game on New Nintendo 3DS hardware
 
@@ -220,6 +222,7 @@ The runner prints the stop reason and a summary; `--dump-events` writes a JSON t
 | `--ms0 <dir>` / `--mods <dir>` | memory stick root (default `out/ms0`) / directory mapped to `ms0:/PSP/P3P` for mods |
 | `--input <file>` | vblank-keyed controller script, e.g. `profiles/p3p/input/new_game.txt` (format in `core/include/p3p3ds/input.hpp`) |
 | `--gamepad` | read XInput controller 0 |
+| `--profile` | wall-time split between HLE, GE rendering and interpreter |
 | `--frames-dir <dir>` `--frame-every <n>` | write displayed frames as BMP |
 | `--wav <file>` | mix all game audio on the virtual clock into a 44.1 kHz stereo WAV |
 | `--dump-events <json>` / `--io-trace <csv>` | execution trace / file reads (for `experiments/cpk-check`) |

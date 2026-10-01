@@ -1,4 +1,5 @@
 #include "p3p3ds/interpreter.hpp"
+#include "p3p3ds/profile.hpp"
 
 #include "psprecomp/common.hpp"
 
@@ -126,6 +127,8 @@ bool fallback_hook(Runtime &rt, AllegrexContext &ctx) {
     if (!g_interpreter->entry_pcs().contains(pc))
         rt.event("interpreter_enter", {{"target", pc}});
     g_interpreter->note_entry(pc);
+    auto &profile = host_profile();
+    const ProfileScope timer(profile.interpreter_ns, profile.interpreter_entries);
     (void)g_interpreter->run(rt, ctx, g_max_per_entry);
     return true;
 }

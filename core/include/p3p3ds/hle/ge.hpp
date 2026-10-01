@@ -54,6 +54,9 @@ public:
     std::uint32_t writer_pc() const { return writer_pc_; }
     void report() const;
     void set_renderer(std::unique_ptr<ge::GeRenderer> renderer) { renderer_ = std::move(renderer); }
+    // Per-PRIM census of the GE state the game uses (feature -> draw count),
+    // to prioritise renderer work by observed workload.
+    const std::map<std::string, std::uint64_t> &feature_counts() const { return features_; }
     ge::GeRenderer &renderer() { return *renderer_; }
     const ge::GeRegisters &registers() const { return regs_; }
 private:
@@ -62,6 +65,8 @@ private:
     void execute(psprecomp::Runtime &, GeListInfo &, std::uint32_t word);
     GeState state_;
     std::map<int,GeListInfo> lists_;
+    std::map<std::string, std::uint64_t> features_;
+    void count_features(std::uint32_t prim_type);
     std::map<int,GeCallback> callbacks_;
     std::deque<int> queue_;
     int next_id_{1}, next_callback_{0};

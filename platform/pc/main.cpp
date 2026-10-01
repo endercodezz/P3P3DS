@@ -7,6 +7,9 @@
 #include "frame_dump.hpp"
 #include "pcm_mixer.hpp"
 #include "host_input.hpp"
+#include "p3p3ds/profile.hpp"
+
+#include <chrono>
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
@@ -23,7 +26,7 @@ int main(int argc,char **argv) {
             ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path;
         std::uint64_t frame_every=30;
         std::uint64_t budget=100000;
-        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false;
+        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
         std::optional<std::uint32_t> expected;
         for(int i=1;i<argc;++i) {
             const std::string a=argv[i];
@@ -44,6 +47,7 @@ int main(int argc,char **argv) {
             else if(a=="--wav") wav_path=value();
             else if(a=="--input") input_path=value();
             else if(a=="--gamepad") gamepad=true;
+            else if(a=="--profile") profile=true;
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
@@ -55,7 +59,8 @@ int main(int argc,char **argv) {
                          <<"--frames-dir <dir> [--frame-every N] (write every Nth displayed frame as BMP)\n"
                          <<"--wav <file> (mix all sceAudio output on the virtual clock into a 44.1 kHz stereo WAV)\n"
                          <<"--input <file> (vblank-keyed button script, see core/include/p3p3ds/input.hpp)\n"
-                         <<"--gamepad (poll XInput pad 0 live; not paced to wall time)\n";return 0;
+                         <<"--gamepad (poll XInput pad 0 live; not paced to wall time)\n"
+                         <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -182,6 +187,9 @@ int main(int argc,char **argv) {
         rt.memory().vram_write_observer=[&](std::uint32_t address,std::size_t bytes) {activity.observe(rt,kernel,address,bytes,stop_any_vram);};
         std::cout<<"P3P3DS bootstrap: entry="<<psprecomp::hex32(entry)<<" relocations="<<reloc.total
                  <<" registered_entries="<<rt.function_count()<<"\n";
+        psprecomp::runtime_profile().enabled=profile;
+        p3p3ds::host_profile().enabled=profile;
+        const auto run_start=std::chrono::steady_clock::now();
         try {rt.run(entry,budget);}
         catch(const psprecomp::FrontierHalt &) {}
         catch(const psprecomp::Error &e) {
@@ -189,6 +197,16 @@ int main(int argc,char **argv) {
             rt.stop((reason.find("memory")!=std::string::npos?"Memory fault: ":"Runtime exception: ")+reason);
         }
         rt.event_observer={};
+        if(profile) {
+            const auto wall=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-run_start).count());
+            const auto &h=psprecomp::runtime_profile(); const auto &p=p3p3ds::host_profile();
+            // HLE time includes GE rendering triggered inside list submission and the
+            // post-call scheduler hook; interpreter time includes HLE it calls.
+            auto pct=[&](std::uint64_t ns){return wall?100.0*static_cast<double>(ns)/static_cast<double>(wall):0.0;};
+            std::printf("[PROFILE] wall=%.2fs hle=%.2fs (%.1f%%, %llu calls) render=%.2fs (%.1f%%, %llu draws/transfers) interpreter=%.3fs (%.2f%%, %llu entries)\n",
+                wall/1e9,h.hle_ns/1e9,pct(h.hle_ns),static_cast<unsigned long long>(h.hle_calls),p.render_ns/1e9,pct(p.render_ns),
+                static_cast<unsigned long long>(p.render_calls),p.interpreter_ns/1e9,pct(p.interpreter_ns),static_cast<unsigned long long>(p.interpreter_entries));
+        }
         p3p3ds::install_interpreter_fallback(nullptr);
         rt.event("interpreter_summary",{{"entries",interpreter.entries()},{"distinct_pcs",interpreter.entry_pcs().size()},
             {"instructions",interpreter.executed()}});
@@ -197,6 +215,10 @@ int main(int argc,char **argv) {
             {"peak",mixer.peak()},{"late_frames",mixer.late_frames()},{"clipped",mixer.clipped()}});
         std::cout<<"[AUDIO] buffers="<<mixer.buffers()<<" frames="<<mixer.frames()<<" nonzero="<<mixer.nonzero_frames()
                  <<" peak="<<mixer.peak()<<" late="<<mixer.late_frames()<<" clipped="<<mixer.clipped()<<"\n";
+        {
+            std::map<std::string,std::uint64_t> ge_features(kernel.ge().feature_counts().begin(),kernel.ge().feature_counts().end());
+            rt.event("ge_feature_summary",std::move(ge_features));
+        }
         rt.event("vram_activity_summary",{{"unclassified_resource",activity.resource},{"bound_texture_resource",activity.texture},
             {"color",activity.color},{"depth",activity.depth},{"suppressed",activity.suppressed}});
         if(!rt.stopped())rt.stop("Dispatch budget exhausted");

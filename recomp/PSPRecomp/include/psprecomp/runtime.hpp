@@ -431,6 +431,9 @@ void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcep
 // P3P3DS: runs after every HLE import that did not stop the runtime.
 using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
 void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept;
+// P3P3DS: optional wall-time accounting of HLE calls (runner --profile).
+struct RuntimeProfile { bool enabled{}; std::uint64_t hle_ns{}, hle_calls{}; };
+RuntimeProfile &runtime_profile() noexcept;
 
 // P3P3DS: optional execution fallback (the Allegrex interpreter) for PCs
 // without a registered AOT entry. Called only from the outer dispatch loop;
