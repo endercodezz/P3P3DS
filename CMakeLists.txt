@@ -38,6 +38,13 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake")
 
 if(P3P_AOT_MODE STREQUAL "AUTO")
     set(P3P_AUTO_DIR "${P3P_GENERATED_DIR}/auto")
+    # OFF drops the per-transfer rt.record_transfer diagnostics from the
+    # generated code (frontier tooling then has no transfer trace).
+    option(P3P_AOT_TRANSFER_RECORDS "Emit rt.record_transfer in generated AOT units" ON)
+    set(P3P_RECOMP_FLAGS "")
+    if(NOT P3P_AOT_TRANSFER_RECORDS)
+        set(P3P_RECOMP_FLAGS "--no-transfer-records")
+    endif()
     # Community CWCheat codes applied to the EBOOT before generation and load.
     set(P3P_CWCHEAT_INI "${CMAKE_CURRENT_SOURCE_DIR}/p3p/p3p-patches/ULUS10512.ini")
     set(P3P_CWCHEAT_SELECTION "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/cwcheat_patches.txt")
@@ -53,7 +60,7 @@ if(P3P_AOT_MODE STREQUAL "AUTO")
     add_custom_command(
         OUTPUT ${P3P_AUTO_SOURCES} "${P3P_AUTO_DIR}/generated_units.hpp"
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/cwcheat_patches.py" "${P3P_CWCHEAT_INI}" "${P3P_CWCHEAT_SELECTION}" "${P3P_PATCH_LIST}"
-        COMMAND psp_recomp "${P3P_ELF}" --auto "${P3P_AUTO_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}" "${P3P_PATCH_LIST}"
+        COMMAND psp_recomp "${P3P_ELF}" --auto "${P3P_AUTO_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}" "${P3P_PATCH_LIST}" ${P3P_RECOMP_FLAGS}
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py" "${P3P_AUTO_DIR}" "${P3P_AOT_UNIT_COUNT}" "${P3P_AOT_UNIT_SPAN}"
         DEPENDS psp_recomp "${P3P_ELF}" "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py" "${CMAKE_CURRENT_SOURCE_DIR}/tools/cwcheat_patches.py"

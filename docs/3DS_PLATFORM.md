@@ -193,3 +193,19 @@ A full PSP executable like Persona 3 Portable contains ~12,000 to 18,000 functio
   `-O2 -mcpu=mpcore -mfloat-abi=hard -mfpu=vfpv2 -fno-exceptions -fno-rtti`
   `-ffunction-sections -fdata-sections -Wl,--gc-sections` (strips unused symbols).
 - Link-Time Optimization (`-flto`) should be disabled initially to avoid compiler timeouts on large translation units.
+
+### 8.2. Measured: transfer-record diagnostics (PC host proxy, 2026-10-01)
+`-DP3P_AOT_TRANSFER_RECORDS=OFF` makes `psp_recomp --no-transfer-records` omit the `rt.record_transfer` call emitted at every branch/jump (860 in `generated_unit_0000.cpp` alone). Measured on the PC host (x86-64 GCC 16.1 `-O2`, i5-12400F, `-j10`, clean builds of the same tree), **not** on devkitARM:
+
+| | with records (default) | without |
+|---|---|---|
+| generated C++ (237 units) | 127.9 MB | 115.8 MB |
+| `p3p_aot` objects | 106.4 MB | 96.5 MB |
+| `p3p_pc_bootstrap.exe` text | 81.54 MB | 73.68 MB (−9.6%) |
+| clean build wall time | 642 s | 583 s (−9%) |
+| 20M dispatches to the title screen (2 runs each) | 43.6 / 44.2 s | 36.2 / 36.4 s (−17%) |
+
+Behaviour is unchanged: identical 3,863 frame hashes, byte-identical WAV, same stop PC. Without records the frontier tooling has no transfer trace (thread-entry provenance, blocker classification), so the default stays ON for PC development. [VERIFIED] on PC; the ARM11 effect is [UNVERIFIED].
+
+### 8.3. Blocked: devkitARM size measurements and the minimal 3DS harness
+devkitPro/devkitARM is not installed on this host (no `DEVKITPRO`, no `C:\devkitPro`), and installing global toolchains needs the maintainer's permission (CLAUDE.md section 2). Not done: `platform/3ds` CMake/.3dsx harness (`osSetSpeedupEnable`, citro3d clear), `-Os` vs `-O2` ARM11 text size of the full `.text`. These need devkitARM and, for speed, New 3DS hardware or Citra.

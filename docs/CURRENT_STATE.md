@@ -2,6 +2,11 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## AOT without transfer-record diagnostics (2026-10-01)
+
+- [VERIFIED] `psp_recomp --no-transfer-records` / CMake `-DP3P_AOT_TRANSFER_RECORDS=OFF` omit the per-branch `rt.record_transfer` calls. PC host: text 81.54 to 73.68 MB, clean build 642 to 583 s, 20M dispatches 43.9 to 36.3 s, with identical frame hashes, WAV and stop PC (table: `docs/3DS_PLATFORM.md` section 8.2). Default build unchanged (replay SHA-256 `399C7DBC...27D4` as before). 21/21 CTest.
+- [UNVERIFIED] devkitARM is not installed, so the 3DS harness and ARM11 size measurements were not done (section 8.3).
+
 ## PCM output on PC (2026-10-01)
 
 - [VERIFIED] `platform/pc/pcm_mixer.hpp`: every accepted `sceAudio` buffer (AudioState PcmSink, volume-scaled) is mixed at its virtual start time into a 44.1 kHz stereo S16 timeline; `--wav <file>` streams it to a WAV. `tests/test_pcm_mixer.cpp` checks placement, overlap sum/clamp, late buffers and the WAV header.
