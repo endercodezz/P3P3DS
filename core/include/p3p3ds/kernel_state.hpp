@@ -11,7 +11,10 @@
 #include "p3p3ds/hle/threadman.hpp"
 #include "p3p3ds/hle/umd.hpp"
 
+#include "p3p3ds/input.hpp"
+
 #include <cstdint>
+#include <memory>
 #include <map>
 
 namespace p3p3ds {
@@ -25,6 +28,16 @@ struct HostInput {
     std::int32_t idle_unhold{-1}, idle_hold{-1};
     std::map<std::int32_t, std::uint64_t> pending_reads; // thread -> sampling deadline
     std::uint64_t last_read_vcount{0};
+    // Host source sampled at each read (none: buttons/analog above stay as set).
+    std::shared_ptr<input::InputSource> source;
+    std::uint32_t last_buttons{0}; // for the ctrl_buttons trace event
+    void refresh(std::uint64_t vblank) {
+        if (!source) return;
+        const auto pad = source->sample(vblank);
+        buttons = pad.buttons;
+        analog_x = pad.analog_x;
+        analog_y = pad.analog_y;
+    }
 };
 } // namespace hle
 

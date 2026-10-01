@@ -2,6 +2,13 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## Host input and leaving the title screen (2026-10-01)
+
+- [VERIFIED] `core/include/p3p3ds/input.hpp` / `core/src/input.cpp`: `InputSource` sampled by sceCtrl with the virtual vblank count (`HostInput::refresh`), and `InputScript`, a vblank-keyed button/stick script (`<vblank> <BUTTONS> [hold]`, `<vblank> stick x y`). Button bits from `psp/pspsdk/src/ctrl/pspctrl.h` = `references/uofw/include/ctrl.h`. Runner: `--input <file>`; `--gamepad` polls XInput pad 0 live (`platform/pc/host_input.hpp`, mapping A/B/X/Y = Cross/Circle/Square/Triangle) — live polling is [UNVERIFIED]: no pad was attached and the run is not paced to wall time. Keyboard: a default key map exists as data only (no window to receive keys). `ctrl_buttons` events trace each change.
+- [VERIFIED] `tests/test_input.cpp`: parser/semantics, XInput mapping, and `sceCtrlReadBufferPositive` returning scripted buttons at vblanks 1-4.
+- [VERIFIED] `profiles/p3p/input/title_start.txt` (`7965 START 6`): the game leaves "PRESS ANY BUTTON" and shows the main menu NEW GAME / LOAD GAME / CONFIG / DATA INSTALL (frame 3690, cursor on LOAD GAME), then without further input returns to the title (frame 4140). Checked visually in `.tmp/in1/`. Without a script the run is unchanged (SHA-256 `399C7DBC...27D4`). With the script, two 20M-dispatch replays are byte-identical: events `5D5DDB353F63CDF34899BE4DDE272B8493B6507064A1F5380E17D72D4FFFC54C`, WAV `3E4904A5...2430`. 22/22 CTest.
+- [UNVERIFIED] No window: the vendored SDL3 (`references/static-recomp/rexglue-sdk/thirdparty/sdl3`) is an empty submodule and `recomp/PSP-recompilation-project/SDL3.dll` has no headers.
+
 ## AOT without transfer-record diagnostics (2026-10-01)
 
 - [VERIFIED] `psp_recomp --no-transfer-records` / CMake `-DP3P_AOT_TRANSFER_RECORDS=OFF` omit the per-branch `rt.record_transfer` calls. PC host: text 81.54 to 73.68 MB, clean build 642 to 583 s, 20M dispatches 43.9 to 36.3 s, with identical frame hashes, WAV and stop PC (table: `docs/3DS_PLATFORM.md` section 8.2). Default build unchanged (replay SHA-256 `399C7DBC...27D4` as before). 21/21 CTest.

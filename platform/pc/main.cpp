@@ -6,6 +6,7 @@
 #include "telemetry.hpp"
 #include "frame_dump.hpp"
 #include "pcm_mixer.hpp"
+#include "host_input.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
@@ -19,10 +20,10 @@ namespace psprecomp {void register_generated_functions(Runtime &); void apply_ge
 int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
-            ms0_path="out/ms0", mods_path, frames_dir, wav_path;
+            ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path;
         std::uint64_t frame_every=30;
         std::uint64_t budget=100000;
-        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true;
+        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false;
         std::optional<std::uint32_t> expected;
         for(int i=1;i<argc;++i) {
             const std::string a=argv[i];
@@ -41,6 +42,8 @@ int main(int argc,char **argv) {
             else if(a=="--mods") mods_path=value();
             else if(a=="--frames-dir") frames_dir=value();
             else if(a=="--wav") wav_path=value();
+            else if(a=="--input") input_path=value();
+            else if(a=="--gamepad") gamepad=true;
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
@@ -50,7 +53,9 @@ int main(int argc,char **argv) {
                          <<"--no-interpreter (stop at unregistered PCs instead of interpreting)\n"
                          <<"--umd <iso> (disc0: image; default: the single *.iso in the working directory)\n"
                          <<"--frames-dir <dir> [--frame-every N] (write every Nth displayed frame as BMP)\n"
-                         <<"--wav <file> (mix all sceAudio output on the virtual clock into a 44.1 kHz stereo WAV)\n";return 0;
+                         <<"--wav <file> (mix all sceAudio output on the virtual clock into a 44.1 kHz stereo WAV)\n"
+                         <<"--input <file> (vblank-keyed button script, see core/include/p3p3ds/input.hpp)\n"
+                         <<"--gamepad (poll XInput pad 0 live; not paced to wall time)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -120,6 +125,25 @@ int main(int argc,char **argv) {
         p3p3ds::BootstrapCheckpoint checkpoint;
         std::uint64_t frames_shown=0;
         p3p3ds::PcmMixer mixer(wav_path.string());
+        {
+            auto combined=std::make_shared<p3p3ds::pc::CombinedSource>();
+            if(!input_path.empty()) {
+                std::ifstream in(input_path);
+                if(!in) throw std::runtime_error("cannot open input script "+input_path.string());
+                const std::string text((std::istreambuf_iterator<char>(in)),std::istreambuf_iterator<char>());
+                auto script=std::make_shared<p3p3ds::input::InputScript>(p3p3ds::input::InputScript::parse(text));
+                std::cout<<"Input script: "<<input_path.string()<<" ("<<script->event_count()<<" events)\n";
+                combined->add(script);
+            }
+#ifdef _WIN32
+            if(gamepad) {
+                auto pad=std::make_shared<p3p3ds::pc::XInputSource>();
+                std::cout<<"Gamepad (XInput): "<<(pad->available()?"available":"xinput1_4.dll not found")<<"\n";
+                combined->add(pad);
+            }
+#endif
+            if(!combined->empty()) kernel.input().source=combined;
+        }
         kernel.audio().set_sink([&mixer](unsigned,std::uint64_t start,const std::vector<std::int16_t> &stereo) {mixer.add(start,stereo);});
         rt.event_observer=[&] {
             if(!rt.events.empty() && rt.events.back().type=="guest_transfer")

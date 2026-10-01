@@ -45,6 +45,7 @@ void register_ctrl_module(psprecomp::Runtime &runtime, KernelState &kernel) {
         const auto count = ctx.gpr[5] & 0xFFu;
         if (count >= 64u) { ctx.set_gpr(2, kInvalidSize); return; }
         if (count != 0u && !rt.memory().contains(ctx.gpr[4], 16u * count)) { ctx.set_gpr(2, 0x800200D3u); return; }
+        kernel.input().refresh(kernel.threads().vblank_count());
         write_samples(rt.memory(), ctx.gpr[4], count, kernel.input(), static_cast<std::uint32_t>(kernel.threads().now()), negative);
         ctx.set_gpr(2, count);
     };
@@ -72,6 +73,11 @@ void register_ctrl_module(psprecomp::Runtime &runtime, KernelState &kernel) {
         const auto frames = tm.vblank_count() - input.last_read_vcount;
         input.last_read_vcount = tm.vblank_count();
         const auto n = static_cast<std::uint32_t>(std::min<std::uint64_t>(count, std::max<std::uint64_t>(frames, 1u)));
+        input.refresh(tm.vblank_count());
+        if (input.buttons != input.last_buttons) {
+            rt.event("ctrl_buttons", {{"buttons", input.buttons}, {"previous", input.last_buttons}, {"vblank", tm.vblank_count()}});
+            input.last_buttons = input.buttons;
+        }
         write_samples(rt.memory(), ctx.gpr[4], n, input, static_cast<std::uint32_t>(tm.now()), negative);
         ctx.set_gpr(2, n);
     };

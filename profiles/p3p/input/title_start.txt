@@ -1,0 +1,3 @@
+# Leave the title screen: tap START while "PRESS ANY BUTTON" is shown.
+# Title frame 3600 is at virtual 132.88 s = vblank 7965 (16,683 us period).
+7965 START 6

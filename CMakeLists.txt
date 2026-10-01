@@ -101,6 +101,7 @@ add_library(p3p3ds_core
     core/src/hle/mpeg.cpp
     core/src/hle/utils.cpp
     core/src/hle/ctrl.cpp
+    core/src/input.cpp
     core/src/ge/software_renderer.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
@@ -313,4 +314,7 @@ target_link_libraries(test_misc_hle PRIVATE p3p3ds_core)
 add_test(NAME p3p_misc_hle COMMAND test_misc_hle)
 add_executable(test_pcm_mixer tests/test_pcm_mixer.cpp)
 add_test(NAME p3p_pcm_mixer COMMAND test_pcm_mixer)
+add_executable(test_input tests/test_input.cpp)
+target_link_libraries(test_input PRIVATE p3p3ds_core)
+add_test(NAME p3p_input COMMAND test_input)
 set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
