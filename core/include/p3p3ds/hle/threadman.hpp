@@ -195,8 +195,11 @@ public:
                                std::uint32_t stack_size, std::uint32_t attributes, std::uint32_t option_address,
                                psprecomp::GuestMemory &memory);
 
+    // `allow_preempt == false` leaves the caller running (it blocks itself
+    // next); a non-zero `gp` overrides the inherited $gp (module_start threads).
     std::int32_t start_thread(std::int32_t thid, std::uint32_t arg_size, std::uint32_t arg_ptr,
-                              psprecomp::GuestMemory &memory, psprecomp::AllegrexContext &caller_ctx);
+                              psprecomp::GuestMemory &memory, psprecomp::AllegrexContext &caller_ctx,
+                              bool allow_preempt = true, std::uint32_t gp = 0u);
 
     bool exit_current_thread(std::int32_t exit_status, psprecomp::AllegrexContext &ctx, psprecomp::Runtime &runtime);
 
@@ -224,6 +227,7 @@ public:
     // PCs of PSP import stubs; ctx.pc equal to one of them means "inside an HLE
     // call", whose resume PC is $ra.
     void set_import_stubs(std::set<std::uint32_t> stubs) { import_stubs_ = std::move(stubs); }
+    void add_import_stub(std::uint32_t pc) { import_stubs_.insert(pc); }
 
     // ---- Blocking ----------------------------------------------------------
     // Blocks the current thread inside an HLE handler (resume at $ra with $v0

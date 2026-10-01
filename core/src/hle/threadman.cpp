@@ -152,7 +152,8 @@ std::int32_t ThreadManager::create_thread(std::string_view name, std::uint32_t e
 }
 
 std::int32_t ThreadManager::start_thread(std::int32_t thid, std::uint32_t arg_size, std::uint32_t arg_ptr,
-                                         psprecomp::GuestMemory &memory, psprecomp::AllegrexContext &caller_ctx) {
+                                         psprecomp::GuestMemory &memory, psprecomp::AllegrexContext &caller_ctx,
+                                         bool allow_preempt, std::uint32_t gp) {
     memory_ = &memory;
     if (thid <= 0) return SCE_KERNEL_ERROR_ILLEGAL_THID;
     auto *target = get_thread(thid);
@@ -169,9 +170,9 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid, std::uint32_t arg_si
 
     target->context = psprecomp::AllegrexContext{};
     target->context.pc = target->entry_pc;
-    target->gp = caller_ctx.gpr[28];
+    target->gp = gp != 0u ? gp : caller_ctx.gpr[28];
     target->context.set_gpr(26, target->stack_top - 256u); // $k0 = 256-byte thread context block
-    target->context.set_gpr(28, caller_ctx.gpr[28]);        // Inherit $gp
+    target->context.set_gpr(28, target->gp);                // Inherit $gp unless overridden
     target->context.set_gpr(31, kThreadReturnSentinel);     // Return to trampoline
 
     std::uint32_t sp = target->stack_top - 256u;
@@ -200,7 +201,7 @@ std::int32_t ThreadManager::start_thread(std::int32_t thid, std::uint32_t arg_si
     auto *current = current_thread();
     // Smaller number = higher priority. A strictly higher-priority new thread
     // preempts the caller immediately; the caller later resumes with 0.
-    if (current != nullptr && target->current_priority < current->current_priority) {
+    if (allow_preempt && current != nullptr && target->current_priority < current->current_priority) {
         caller_ctx.set_gpr(2, 0u);
         caller_ctx.pc = caller_ctx.gpr[31];
         current->context = caller_ctx;

@@ -2,6 +2,13 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## Game PRX modules (2026-10-01)
+
+- [VERIFIED] `USRDIR/module/libsuppreacc.prx` is an unencrypted ELF PRX (`scesupPreAcc_library`, 8 exports, imports IoFileMgr/ThreadMan/sceSuspend); `libfont.prx`/`libccc.prx` carry `~SCE` headers. `core/src/hle/modulemgr.cpp` really loads unencrypted PRX code (SysMem block, relocation at the block base), serves its imports through dynamic HLE wrappers, binds the EBOOT's imports of its libraries to its exports (7 bound stubs) and runs it via the interpreter fallback. Start follows uOFW `_StartModule`: module_start in a `SceModmgrStart` thread with the module's `$gp`, caller waits for its end; RESIDENT returns the id, NO_RESIDENT unloads; an entry-less module (this one: `e_entry` 0xFFFFFFFF, no module_start export) starts with status 0. `libfont.prx`/`libccc.prx` are accepted as HLE modules by file name [INFERRED]; any other encrypted module stops explicitly.
+- [VERIFIED] `test_modulemgr` (real UMD; skips without it) and 16/16 CTest. Two replays byte-identical, SHA-256 `723B58A2EBAF760FEA218CC8E63085E5D94BEBE34A91EDEDD91A59E53443029F`. The loaded module's code executed (370 interpreted instructions).
+
+Immediate blocker: missing `sceSasCore::__sceSasInit` (`0x42778A9F`), caller `0x08B699C8`.
+
 ## IoFileMgr, VFS and mod chain (2026-10-01)
 
 - [VERIFIED] `core/src/vfs.cpp`: ISO9660 backend (UMD image read in place, case-insensitive) and host-directory backend. `core/src/hle/iofilemgr.cpp` implements the 20 imported `IoFileMgrForUser` services plus `StdioForUser` after `references/uofw/src/kd/iofilemgr/iofilemgr.c`: one pending async op per fd, `PollAsync`=1 while pending, `WaitAsync[CB]` blocks (retry at the stub) and writes the 64-bit result, `ASYNC_BUSY`/`NO_ASYNC_OP`, 64-bit `Lseek` in `$a2:$a3`/`$t0`, `Getstat`, `Dopen/Dread/Dclose`. Synchronous calls hold the caller for [INFERRED] UMD time (200 us + bytes/2 us) on the virtual clock. The runner mounts `disc0:` from `--umd` (default: the single `*.iso` in the working directory) and `ms0:` from `--ms0` (default `out/ms0`).

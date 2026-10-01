@@ -9,6 +9,7 @@
 #include <iostream>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <memory>
 #include <vector>
 namespace psprecomp {void register_generated_functions(Runtime &); void apply_generated_patches(GuestMemory &);}
@@ -86,7 +87,12 @@ int main(int argc,char **argv) {
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
         {
             std::set<std::uint32_t> stubs;
-            for(const auto &import:elf.scan_imports(rt.memory(),*module)) stubs.insert(import.stub_address);
+            std::vector<std::tuple<std::string,std::uint32_t,std::uint32_t>> imports;
+            for(const auto &import:elf.scan_imports(rt.memory(),*module)) {
+                stubs.insert(import.stub_address);
+                imports.emplace_back(import.library,import.nid,import.stub_address);
+            }
+            kernel.modules().set_host_imports(std::move(imports));
             kernel.threads().set_import_stubs(std::move(stubs));
         }
         p3p3ds::hle::register_all_hle_modules(rt,kernel);
