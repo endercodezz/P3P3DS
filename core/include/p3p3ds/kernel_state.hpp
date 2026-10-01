@@ -3,6 +3,7 @@
 #include "p3p3ds/hle/display.hpp"
 #include "p3p3ds/hle/audio.hpp"
 #include "p3p3ds/hle/ge.hpp"
+#include "p3p3ds/hle/iofilemgr.hpp"
 #include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
 #include "p3p3ds/hle/umd.hpp"
@@ -85,11 +86,14 @@ public:
 
     hle::UmdState &umd() noexcept { return umd_; }
     const hle::UmdState &umd() const noexcept { return umd_; }
+    hle::IoManager &io() noexcept { return io_; }
+    const hle::IoManager &io() const noexcept { return io_; }
     hle::AudioState &audio() noexcept { return audio_; }
     const hle::AudioState &audio() const noexcept { return audio_; }
 private:
     // Per-kernel state, never process-global registration.
     hle::UmdState umd_;
+    hle::IoManager io_;
     bool interrupts_enabled_{true};
     hle::AudioState audio_;
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;

@@ -417,8 +417,9 @@ void ThreadManager::expire_deadlines(psprecomp::Runtime &rt) {
     for (const auto uid : due) {
         auto &t = threads_.at(uid);
         const bool timed_out = t.wait.type != WaitType::Delay && t.wait.type != WaitType::Vblank &&
-                               t.wait.type != WaitType::Audio;
-        finish_wait(rt, t, timed_out ? SCE_KERNEL_ERROR_WAIT_TIMEOUT : 0);
+                               t.wait.type != WaitType::Audio && t.wait.type != WaitType::Io;
+        // Synchronous IO already stored its result ($v0/$v1) before waiting.
+        finish_wait(rt, t, timed_out ? SCE_KERNEL_ERROR_WAIT_TIMEOUT : 0, t.wait.type != WaitType::Io);
     }
 }
 
@@ -448,7 +449,7 @@ void ThreadManager::remove_from_object(ThreadControlBlock &t) {
     }
 }
 
-void ThreadManager::finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, std::int32_t result) {
+void ThreadManager::finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, std::int32_t result, bool set_result) {
     remove_from_object(t);
     if (t.wait.timeout_ptr != 0u && memory_ != nullptr && memory_->contains(t.wait.timeout_ptr, 4u)) {
         const std::uint64_t left = t.wait.deadline == kNoDeadline || t.wait.deadline <= now_us_ ? 0u : t.wait.deadline - now_us_;
@@ -461,7 +462,7 @@ void ThreadManager::finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, s
         t.wait = {};
         return;
     }
-    t.context.set_gpr(2, u(result));
+    if (set_result) t.context.set_gpr(2, u(result));
     t.wait = {};
     if (t.status == InternalThreadState::Waiting) {
         t.status = InternalThreadState::Ready;
@@ -1158,17 +1159,6 @@ std::int32_t ThreadManager::unlock_lw_mutex(psprecomp::Runtime &rt, psprecomp::A
     preempt_if_needed(rt, ctx);
     return 0;
 }
-
-} // namespace p3p3ds::hle
-
-namespace psprecomp {
-// Defined with external linkage in recomp/PSPRecomp/src/runtime.cpp but not
-// declared in runtime.hpp; declared here to avoid touching the header that
-// every generated unit includes.
-void set_runtime_post_import_hook(void (*hook)(Runtime &, AllegrexContext &)) noexcept;
-}
-
-namespace p3p3ds::hle {
 
 void install_threadman_post_import_hook() {
     psprecomp::set_runtime_post_import_hook([](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {

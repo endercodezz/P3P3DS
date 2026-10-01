@@ -38,6 +38,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake")
 
 if(P3P_AOT_MODE STREQUAL "AUTO")
     set(P3P_AUTO_DIR "${P3P_GENERATED_DIR}/auto")
+    # Community CWCheat codes applied to the EBOOT before generation and load.
+    set(P3P_CWCHEAT_INI "${CMAKE_CURRENT_SOURCE_DIR}/p3p/p3p-patches/ULUS10512.ini")
+    set(P3P_CWCHEAT_SELECTION "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/cwcheat_patches.txt")
+    set(P3P_PATCH_LIST "${P3P_GENERATED_DIR}/patches.txt")
     set(P3P_AUTO_SOURCES "${P3P_AUTO_DIR}/generated_registry.cpp")
     math(EXPR _p3p_last_unit "${P3P_AOT_UNIT_COUNT} - 1")
     foreach(_unit RANGE 0 ${_p3p_last_unit})
@@ -48,10 +52,12 @@ if(P3P_AOT_MODE STREQUAL "AUTO")
     endforeach()
     add_custom_command(
         OUTPUT ${P3P_AUTO_SOURCES} "${P3P_AUTO_DIR}/generated_units.hpp"
-        COMMAND psp_recomp "${P3P_ELF}" --auto "${P3P_AUTO_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/cwcheat_patches.py" "${P3P_CWCHEAT_INI}" "${P3P_CWCHEAT_SELECTION}" "${P3P_PATCH_LIST}"
+        COMMAND psp_recomp "${P3P_ELF}" --auto "${P3P_AUTO_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}" "${P3P_PATCH_LIST}"
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py" "${P3P_AUTO_DIR}" "${P3P_AOT_UNIT_COUNT}" "${P3P_AOT_UNIT_SPAN}"
         DEPENDS psp_recomp "${P3P_ELF}" "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake"
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_aot_layout.py" "${CMAKE_CURRENT_SOURCE_DIR}/tools/cwcheat_patches.py"
+                "${P3P_CWCHEAT_INI}" "${P3P_CWCHEAT_SELECTION}"
         COMMENT "Generating whole-.text P3P AOT units (${P3P_AOT_UNIT_COUNT} x ${P3P_AOT_UNIT_SPAN} bytes)..."
         VERBATIM
     )
@@ -81,6 +87,8 @@ endif()
 add_library(p3p3ds_core
     core/src/frontier.cpp
     core/src/interpreter.cpp
+    core/src/vfs.cpp
+    core/src/hle/iofilemgr.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
@@ -265,3 +273,8 @@ endif()
 add_executable(test_threadman_sync tests/test_threadman_sync.cpp)
 target_link_libraries(test_threadman_sync PRIVATE p3p3ds_core)
 add_test(NAME p3p_threadman_sync COMMAND test_threadman_sync)
+
+add_executable(test_iofilemgr tests/test_iofilemgr.cpp)
+target_link_libraries(test_iofilemgr PRIVATE p3p3ds_core)
+add_test(NAME p3p_iofilemgr COMMAND test_iofilemgr)
+set_tests_properties(p3p_iofilemgr PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

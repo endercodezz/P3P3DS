@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Independent check of P3P's CPK reads using CriFsV2Lib (tools/CriFsV2Lib,
+    LGPL-3.0-or-later). The library sources are compiled in unmodified; the
+    project targets the locally installed .NET 10 reference pack so no NuGet
+    download is required.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS1591;CS8618;CS8625;CS0162</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseOutputPath>../../build/cpk-check/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>../../build/cpk-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../tools/CriFsV2Lib/CriFsV2Lib/**/*.cs" Exclude="../../tools/CriFsV2Lib/CriFsV2Lib/obj/**;../../tools/CriFsV2Lib/CriFsV2Lib/bin/**" />
+    <Compile Include="../../tools/CriFsV2Lib/CriFsV2Lib.Definitions/**/*.cs" Exclude="../../tools/CriFsV2Lib/CriFsV2Lib.Definitions/obj/**;../../tools/CriFsV2Lib/CriFsV2Lib.Definitions/bin/**" />
+  </ItemGroup>
+</Project>

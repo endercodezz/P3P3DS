@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-namespace psprecomp { void register_generated_functions(Runtime &); }
+namespace psprecomp { void register_generated_functions(Runtime &); void apply_generated_patches(GuestMemory &); }
 
 namespace {
 using psprecomp::AllegrexContext;
@@ -102,6 +102,7 @@ int main(int argc, char **argv) {
         const auto elf = psprecomp::Elf32Image::from_file(elf_path);
         Runtime rt;
         (void)elf.load_and_relocate(rt.memory());
+        psprecomp::apply_generated_patches(rt.memory());
         const auto module = elf.find_module_info(rt.memory());
         if (!module) throw std::runtime_error("missing module info");
         psprecomp::register_generated_functions(rt);

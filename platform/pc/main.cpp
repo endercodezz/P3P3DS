@@ -2,15 +2,20 @@
 #include "psprecomp/elf32.hpp"
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/interpreter.hpp"
+#include "p3p3ds/vfs.hpp"
 #include "telemetry.hpp"
 #include "p3p3ds/vram_activity.hpp"
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <set>
-namespace psprecomp {void register_generated_functions(Runtime &);}
+#include <memory>
+#include <vector>
+namespace psprecomp {void register_generated_functions(Runtime &); void apply_generated_patches(GuestMemory &);}
 int main(int argc,char **argv) {
     try {
-        std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path;
+        std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
+            ms0_path="out/ms0", mods_path;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true;
         std::optional<std::uint32_t> expected;
@@ -25,17 +30,26 @@ int main(int argc,char **argv) {
             else if(a=="--run-until-blocker") chase=true;
             else if(a=="--stop-on-any-vram-write") stop_any_vram=true;
             else if(a=="--no-interpreter") interpreter_enabled=false;
+            else if(a=="--umd") umd_path=value();
+            else if(a=="--io-trace") io_trace_path=value();
+            else if(a=="--ms0") ms0_path=value();
+            else if(a=="--mods") mods_path=value();
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
                 std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
                          <<"--run-until-blocker --expect-frontier <address> --dump-events <json>\n"
-                         <<"--elf <path> --max-dispatches <count> --stop-on-any-vram-write\n";return 0;
+                         <<"--elf <path> --max-dispatches <count> --stop-on-any-vram-write\n"
+                         <<"--no-interpreter (stop at unregistered PCs instead of interpreting)\n"
+                         <<"--umd <iso> (disc0: image; default: the single *.iso in the working directory)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
         const auto entry=elf.runtime_entry();
         psprecomp::Runtime rt;
         const auto reloc=elf.load_and_relocate(rt.memory());
+        // Profile CWCheat patches baked into the generated AOT (see
+        // profiles/p3p/config/cwcheat_patches.txt) must also patch the image.
+        psprecomp::apply_generated_patches(rt.memory());
         const auto module=elf.find_module_info(rt.memory());
         if(!module)throw std::runtime_error("missing module info");
         const auto sp=p3p3ds::profile::stack_top-0x100;
@@ -47,6 +61,28 @@ int main(int argc,char **argv) {
         // Explicit PC game-launch environment: medium present. This does not
         // imply implemented UMD activation, drive readiness or filesystem mounting.
         kernel.umd().set_medium_present(true);
+        if(umd_path.empty()) {
+            std::vector<std::filesystem::path> images;
+            for(const auto &entry:std::filesystem::directory_iterator("."))
+                if(entry.is_regular_file() && entry.path().extension()==".iso") images.push_back(entry.path());
+            if(images.size()==1) umd_path=images.front();
+        }
+        if(!umd_path.empty()) {
+            auto umd=std::make_shared<p3p3ds::vfs::IsoFileSystem>(umd_path);
+            kernel.io().mount("disc0:",umd);
+            std::cout<<"UMD image: "<<umd_path.filename().string()<<" files="<<umd->file_count()<<"\n";
+        } else std::cout<<"UMD image: none (disc0: unmounted)\n";
+        kernel.io().trace_reads=!io_trace_path.empty();
+        {
+            // ms0: memory stick root; the community Mod Support patch reads
+            // ms0:/PSP/P3P/{bind/,mod.cpk,mod1-3.cpk}, mapped onto --mods.
+            std::filesystem::create_directories(ms0_path);
+            kernel.io().mount("ms0:",std::make_shared<p3p3ds::vfs::HostFileSystem>(ms0_path),true);
+            if(!mods_path.empty()) {
+                kernel.io().alias("ms0:/PSP/P3P",std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path));
+                std::cout<<"Mods: ms0:/PSP/P3P -> "<<mods_path.string()<<"\n";
+            }
+        }
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
         {
             std::set<std::uint32_t> stubs;
@@ -59,6 +95,12 @@ int main(int argc,char **argv) {
         p3p3ds::Interpreter interpreter;
         if(interpreter_enabled) p3p3ds::install_interpreter_fallback(&interpreter);
         rt.frontier_diagnostics=true;
+        // Continuous runs: keep the first occurrences of high-frequency events
+        // (all are counted and reported in the event dump) and a larger budget.
+        rt.event_budget=400000;
+        for(const char *type:{"guest_enter","guest_transfer","hle_hit"}) rt.event_type_limits[type]=20000;
+        for(const char *type:{"thread_wait","thread_wake","thread_preempt","io_read_async","io_open","io_getstat",
+                              "callback_run","callback_return","interpreter_enter"}) rt.event_type_limits[type]=4000;
         p3p3ds::BootstrapCheckpoint checkpoint;
         rt.event_observer=[&] {
             if(!rt.events.empty() && rt.events.back().type=="guest_transfer")
@@ -111,6 +153,13 @@ int main(int argc,char **argv) {
         std::cout<<"[CPU VRAM ACTIVITY] resource="<<activity.resource<<" texture="<<activity.texture
                  <<" color="<<activity.color<<" depth="<<activity.depth<<" suppressed="<<activity.suppressed<<"\n";
         if(!events_path.empty())p3p3ds::dump_events(events_path,rt,kernel,checkpoint);
+        if(!io_trace_path.empty()) {
+            std::ofstream trace(io_trace_path);
+            trace<<"path,offset,size,fnv1a64,time_us\n";
+            for(const auto &r:kernel.io().read_log)
+                trace<<r.path<<','<<r.offset<<','<<r.size<<','<<psprecomp::hex32(static_cast<std::uint32_t>(r.fnv1a>>32))
+                     <<psprecomp::hex32(static_cast<std::uint32_t>(r.fnv1a)).substr(2)<<','<<r.time<<'\n';
+        }
         if(expected && (type!="missing_guest_function" || rt.cpu().pc!=*expected))return 4;
         if(!checkpoint.passed)return 3;
         return 0;

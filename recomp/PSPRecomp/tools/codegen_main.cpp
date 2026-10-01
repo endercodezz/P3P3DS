@@ -1221,6 +1221,9 @@ void write_import_wrappers(std::ostream &out, const std::vector<psprecomp::PspIm
     }
 }
 
+struct ImagePatch;
+void write_patch_function(std::ostream &out, const std::vector<ImagePatch> &patches); // P3P3DS
+
 int generate_manual(const std::filesystem::path &elf_path,
                     const std::filesystem::path &csv_path,
                     const std::filesystem::path &output_path) {
@@ -1293,6 +1296,7 @@ int generate_manual(const std::filesystem::path &elf_path,
     }
 
     write_import_wrappers(out, imports);
+    write_patch_function(out, {}); // P3P3DS: manual mode applies no patches
     out << "void register_generated_functions(Runtime &runtime) {\n";
     for (const auto &function : generated) {
         const auto cpp_name = safe_name(function.name, function.address);
@@ -1547,13 +1551,50 @@ bool write_text_if_changed(const std::filesystem::path &path, const std::string 
     return true;
 }
 
+// P3P3DS: profile patch list ("<address> <value> <width>" hex lines, see
+// tools/cwcheat_patches.py), applied after relocation so generated code and
+// the runtime image (apply_generated_patches) both see the patched EBOOT.
+struct ImagePatch { std::uint32_t address{}, value{}, width{}; };
+std::vector<ImagePatch> load_patches(const std::filesystem::path &path) {
+    std::vector<ImagePatch> patches;
+    if (path.empty()) return patches;
+    std::ifstream in(path);
+    if (!in) throw psprecomp::Error("Cannot open patch list: " + path.string());
+    std::string a, v, w;
+    while (in >> a >> v >> w) {
+        const ImagePatch p{parse_hex(a), parse_hex(v), static_cast<std::uint32_t>(std::stoul(w))};
+        if (p.width != 1u && p.width != 2u && p.width != 4u) throw psprecomp::Error("Invalid patch width");
+        patches.push_back(p);
+    }
+    return patches;
+}
+void apply_patches(psprecomp::GuestMemory &memory, const std::vector<ImagePatch> &patches) {
+    for (const auto &p : patches) {
+        if (p.width == 4u) memory.store32(p.address, p.value);
+        else if (p.width == 2u) memory.store16(p.address, static_cast<std::uint16_t>(p.value));
+        else memory.store8(p.address, static_cast<std::uint8_t>(p.value));
+    }
+}
+void write_patch_function(std::ostream &out, const std::vector<ImagePatch> &patches) {
+    out << "void apply_generated_patches(GuestMemory &memory) {\n";
+    if (patches.empty()) out << "    (void)memory;\n";
+    for (const auto &p : patches) {
+        const char *store = p.width == 4u ? "store32" : p.width == 2u ? "store16" : "store8";
+        out << "    memory." << store << "(" << psprecomp::hex32(p.address) << "u, " << psprecomp::hex32(p.value) << "u);\n";
+    }
+    out << "}\n";
+}
+
 int generate_auto(const std::filesystem::path &elf_path,
                   const std::filesystem::path &output_dir,
                   std::uint32_t load_base,
-                  std::uint32_t unit_span_bytes) {
+                  std::uint32_t unit_span_bytes,
+                  const std::filesystem::path &patch_path = {}) {
     const auto elf = psprecomp::Elf32Image::from_file(elf_path);
     psprecomp::GuestMemory memory;
     (void)elf.load_and_relocate(memory, load_base);
+    const auto patches = load_patches(patch_path);
+    apply_patches(memory, patches);
     std::vector<psprecomp::PspImport> imports;
     if (const auto module = elf.find_module_info(memory, load_base)) imports = elf.scan_imports(memory, *module);
     std::set<std::uint32_t> import_stubs;
@@ -1691,6 +1732,7 @@ int generate_auto(const std::filesystem::path &elf_path,
     for (const auto &unit : units) registry << "void register_generated_unit_" << unit.bucket << "(Runtime &runtime);\n";
     registry << "\n";
     write_import_wrappers(registry, imports);
+    write_patch_function(registry, patches);
     registry << "void register_generated_functions(Runtime &runtime) {\n";
     for (const auto &unit : units) registry << "    register_generated_unit_" << unit.bucket << "(runtime);\n";
     for (std::size_t i = 0; i < imports.size(); ++i) {
@@ -1739,8 +1781,8 @@ int generate_auto(const std::filesystem::path &elf_path,
 int main(int argc, char **argv) {
     try {
         if (argc >= 4 && std::string_view(argv[2]) == "--auto") {
-            if (argc > 6) {
-                std::cerr << "Usage: psp_recomp <ELF> --auto <generated_dir> [load_base_hex] [unit_span_bytes]\n";
+            if (argc > 7) {
+                std::cerr << "Usage: psp_recomp <ELF> --auto <generated_dir> [load_base_hex] [unit_span_bytes] [patch_list]\n";
                 return 2;
             }
             const std::uint32_t load_base = argc >= 5
@@ -1750,7 +1792,8 @@ int main(int argc, char **argv) {
                 ? static_cast<std::uint32_t>(std::stoul(argv[5], nullptr, 0))
                 : 0x20000u;
             if (unit_span == 0u || (unit_span & 3u) != 0u) throw psprecomp::Error("unit_span_bytes must be non-zero and 4-byte aligned");
-            return generate_auto(argv[1], argv[3], load_base, unit_span);
+            return generate_auto(argv[1], argv[3], load_base, unit_span,
+                                 argc >= 7 ? std::filesystem::path(argv[6]) : std::filesystem::path{});
         }
         if (argc == 4) return generate_manual(argv[1], argv[2], argv[3]);
         std::cerr << "Usage:\n"

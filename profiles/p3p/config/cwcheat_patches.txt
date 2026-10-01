@@ -1,0 +1,6 @@
+# CWCheat codes from p3p/p3p-patches/ULUS10512.ini applied to the EBOOT image
+# before AOT generation and at load (psp_recomp --auto patch list).
+# "Mod Support" is the community loader: ms0:/PSP/P3P/bind/ loose files, then
+# mod.cpk, mod1.cpk, mod2.cpk, mod3.cpk, then the original archives
+# (p3p/p3p-patches/README.md). Mods stay data; no rebuild per mod.
+Mod Support

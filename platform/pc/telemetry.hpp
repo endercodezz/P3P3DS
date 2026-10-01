@@ -95,6 +95,8 @@ inline void dump_events(const std::filesystem::path &path, const psprecomp::Runt
         bool f=true; for(const auto &[key,value]:e.fields) {if(!f)o<<',';f=false;o<<json_string(key)<<':'<<value;}
         o << "}}";
     }
-    o << "\n]}\n"; if(!o) throw std::runtime_error("failed writing events");
+    o << "\n],\n\"event_type_counts\":{";
+    bool fc=true; for(const auto &[type,count]:r.event_type_counts) {if(!fc)o<<',';fc=false;o<<json_string(type)<<':'<<count;}
+    o << "}}\n"; if(!o) throw std::runtime_error("failed writing events");
 }
 }

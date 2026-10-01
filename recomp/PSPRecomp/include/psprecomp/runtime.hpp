@@ -84,6 +84,12 @@ public:
     std::vector<ExecutedTransfer> recent_transfers;
     std::vector<ExecutionEvent> events;
     std::function<void()> event_observer;
+    // P3P3DS: continuous runs cap high-frequency event types individually.
+    // Every event is counted; one beyond its type limit is neither stored nor
+    // observed. `event_budget` bounds the stored total (then FrontierHalt).
+    std::map<std::string, std::uint64_t> event_type_limits;
+    std::map<std::string, std::uint64_t> event_type_counts;
+    std::uint64_t event_budget{50000u};
     void event(std::string type, std::map<std::string, std::uint64_t> fields = {}, std::string detail = {});
     void record_transfer(std::uint32_t pc, std::uint32_t word, std::uint32_t target) {
         if (frontier_diagnostics) record_transfer_impl(pc, word, target);
@@ -421,6 +427,10 @@ using RuntimePostChainedCallHook = void (*)(Runtime &, AllegrexContext &, std::u
                                             std::uint32_t native_depth);
 void set_runtime_pre_chained_call_hook(RuntimePreChainedCallHook hook) noexcept;
 void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcept;
+
+// P3P3DS: runs after every HLE import that did not stop the runtime.
+using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
+void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept;
 
 // P3P3DS: optional execution fallback (the Allegrex interpreter) for PCs
 // without a registered AOT entry. Called only from the outer dispatch loop;

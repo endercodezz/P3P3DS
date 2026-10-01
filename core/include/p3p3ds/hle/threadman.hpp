@@ -79,7 +79,7 @@ enum class InternalThreadState : std::uint32_t {
 enum class WaitType : std::uint32_t {
     None = 0, Sleep = 1, Delay = 2, Sema = 3, EventFlag = 4, ThreadEnd = 9,
     Mutex = 12, LwMutex = 13,
-    Vblank = 0x100, Audio = 0x101, GeSync = 0x102, Umd = 0x103,
+    Vblank = 0x100, Audio = 0x101, GeSync = 0x102, Umd = 0x103, Io = 0x104,
 };
 
 inline constexpr std::uint64_t kNoDeadline = std::numeric_limits<std::uint64_t>::max();
@@ -316,7 +316,7 @@ private:
     void load_thread(ThreadControlBlock &t, psprecomp::AllegrexContext &ctx, std::int32_t from_uid);
     void expire_deadlines(psprecomp::Runtime &rt);
     void remove_from_object(ThreadControlBlock &t);
-    void finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, std::int32_t result);
+    void finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, std::int32_t result, bool set_result = true);
     void insert_waiter(std::vector<std::int32_t> &waiters, std::int32_t uid, bool priority_order);
     bool start_callback(ThreadControlBlock &t, psprecomp::AllegrexContext &ctx,
                         const psprecomp::AllegrexContext &resume, bool rewait);

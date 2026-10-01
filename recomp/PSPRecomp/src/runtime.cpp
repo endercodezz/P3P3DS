@@ -20,7 +20,6 @@ std::uint64_t g_runtime_starvation_interval_fast = 0u;
 std::uint64_t g_runtime_thread_switch_generation_fast = 0u;
 
 namespace {
-using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
 RuntimePostImportHook g_post_import_hook = nullptr;
 std::int32_t g_runtime_thread_uid = -1;
 std::array<char, 64> g_runtime_thread_name{};
@@ -1107,7 +1106,11 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
 
 void Runtime::event(std::string type, std::map<std::string, std::uint64_t> fields, std::string detail) {
     if (!frontier_diagnostics) return;
-    if (events.size() >= 50000u) {
+    // P3P3DS: per-type caps for continuous runs (see runtime.hpp).
+    const auto count = ++event_type_counts[type];
+    if (const auto limit = event_type_limits.find(type); limit != event_type_limits.end() && count > limit->second)
+        return;
+    if (events.size() >= event_budget) {
         if (stopped_) return;
         stopped_ = true; stop_reason_ = "Diagnostic event budget exceeded";
         throw FrontierHalt{};
