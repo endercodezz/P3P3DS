@@ -15,6 +15,7 @@
 #include "p3p3ds/input.hpp"
 #include "p3p3ds/interpreter.hpp"
 #include "p3p3ds/kernel_state.hpp"
+#include "p3p3ds/profile.hpp"
 #include "p3p3ds/vfs.hpp"
 #include "bootstrap_expectations.hpp"
 #include "psprecomp/elf32.hpp"
@@ -82,7 +83,12 @@ struct Stats {
     std::uint32_t buttons{};
     std::string status{"booting"};
     std::string iso;
+    // Wall-time split (ARM11 system ticks): presentation is timed here, HLE
+    // (includes GE rendering) and rendering by the shared profilers.
+    u64 run_start_ticks{}, present_ticks{};
 };
+
+double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM11; }
 
 // 3DS buttons -> PSP buttons by position (PSP: Cross bottom, Circle right,
 // Square left, Triangle top).
@@ -136,6 +142,36 @@ void present(psprecomp::GuestMemory &m, const p3p3ds::hle::DisplayFramebufInfo &
         const std::uint32_t bpp = fb.pixelformat == 3 ? 4u : 2u;
         const auto stride = static_cast<std::uint32_t>(fb.bufferwidth);
         if (!m.contains(fb.topaddr, stride * 272u * bpp)) return;
+        // Fast path: framebuffer in guest VRAM, read straight from its bytes
+        // (the checked accessors cost 20 % of wall time in Azahar).
+        const std::uint32_t c = psprecomp::GuestMemory::canonical(fb.topaddr);
+        const std::uint32_t vram_off = (c - psprecomp::GuestMemory::kVramPhysicalBase) % psprecomp::GuestMemory::kVramSize;
+        using GM = psprecomp::GuestMemory;
+        if (c >= GM::kVramPhysicalBase && c - GM::kVramPhysicalBase < GM::kVramAddressSpan && vram_off + stride * 272u * bpp <= m.vram_bytes().size()) {
+            static std::uint16_t row_of[240], col_of[400];
+            for (std::uint32_t y = 0; y < 240u; ++y) row_of[y] = static_cast<std::uint16_t>(y * 272u / 240u);
+            for (std::uint32_t x = 0; x < 400u; ++x) col_of[x] = static_cast<std::uint16_t>(x * 480u / 400u);
+            const std::uint8_t *base = m.vram_bytes().data() + vram_off;
+            for (std::uint32_t x = 0; x < 400u; ++x) {
+                auto *column = dst + x * 240u;
+                const std::uint32_t sx = col_of[x];
+                for (std::uint32_t y = 0; y < 240u; ++y) {
+                    const std::uint8_t *s = base + (row_of[y] * stride + sx) * bpp;
+                    std::uint32_t r, g, b;
+                    if (bpp == 4u) { r = s[0]; g = s[1]; b = s[2]; }
+                    else {
+                        const std::uint32_t v = s[0] | (s[1] << 8);
+                        if (fb.pixelformat == 0) { r = (v & 0x1F) << 3; g = ((v >> 5) & 0x3F) << 2; b = ((v >> 11) & 0x1F) << 3; }
+                        else if (fb.pixelformat == 1) { r = (v & 0x1F) << 3; g = ((v >> 5) & 0x1F) << 3; b = ((v >> 10) & 0x1F) << 3; }
+                        else { r = (v & 0xF) * 17; g = ((v >> 4) & 0xF) * 17; b = ((v >> 8) & 0xF) * 17; }
+                    }
+                    column[239u - y] = (r << 24) | (g << 16) | (b << 8) | 0xFFu;
+                }
+            }
+            gfxFlushBuffers();
+            gfxSwapBuffers();
+            return;
+        }
         // GSP framebuffers are rotated: column x holds 240 pixels, bottom row first.
         for (std::uint32_t x = 0; x < 400u; ++x) {
             const std::uint32_t sx = x * 480u / 400u;
@@ -150,11 +186,29 @@ void present(psprecomp::GuestMemory &m, const p3p3ds::hle::DisplayFramebufInfo &
     gfxSwapBuffers();
 }
 
+std::string profile_text(const Stats &s) {
+    if (s.run_start_ticks == 0) return {};
+    const double run = ticks_to_s(svcGetSystemTick() - s.run_start_ticks);
+    if (run <= 0) return {};
+    const auto &h = psprecomp::runtime_profile();
+    const auto &p = p3p3ds::host_profile();
+    const double hle = static_cast<double>(h.hle_ns) / 1e9, render = static_cast<double>(p.render_ns) / 1e9;
+    const double present = ticks_to_s(s.present_ticks), interp = static_cast<double>(p.interpreter_ns) / 1e9;
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+        "time   : hle %.0f%% (render %.0f%%)\n"
+        "         present %.0f%% interp %.1f%%\n"
+        "         aot+dispatch %.0f%%  calls %llu\n",
+        100 * hle / run, 100 * render / run, 100 * present / run, 100 * interp / run,
+        100 * (run - hle - present - interp) / run, static_cast<unsigned long long>(h.hle_calls));
+    return buf;
+}
+
 std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::KernelState &k) {
     const u64 now = osGetTime();
     const double wall = static_cast<double>(now - s.start_ms) / 1000.0;
     const double guest = static_cast<double>(k.threads().now()) / 1e6;
-    char buf[1024];
+    char buf[1536];
     std::snprintf(buf, sizeof buf,
         "P3P3DS - Persona 3 Portable (ULUS-10512)\n"
         "static recompilation port\n"
@@ -171,6 +225,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "linear free : %lu KiB\n"
         "iso    : %s\n"
         "stop   : %s\n"
+        "%s"
         "\nSTART+SELECT: quit\n",
         kAuthor, P3P3DS_BUILD_ID, s.status.c_str(), s.fps, wall > 0 ? 100.0 * guest / wall : 0.0, guest, wall,
         static_cast<unsigned long long>(s.frames), static_cast<unsigned long long>(k.threads().vblank_count()),
@@ -178,7 +233,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         static_cast<unsigned long>(osGetMemRegionFree(MEMREGION_APPLICATION) / 1024u),
         static_cast<unsigned long>(osGetMemRegionSize(MEMREGION_APPLICATION) / 1024u),
         static_cast<unsigned long>(linearSpaceFree() / 1024u), s.iso.c_str(),
-        rt.stopped() ? rt.stop_reason().c_str() : "-");
+        rt.stopped() ? rt.stop_reason().c_str() : "-", profile_text(s).c_str());
     return buf;
 }
 
@@ -305,7 +360,16 @@ int main() {
         kernel.input().source = hid;
 
         stats.status = "running";
+        psprecomp::runtime_profile().enabled = true;
+        p3p3ds::host_profile().enabled = true;
+        stats.run_start_ticks = svcGetSystemTick();
+        // on_vblank fires once per guest vblank wait, several times per virtual
+        // vblank (5,808 calls for 1,854 vblanks in Azahar): present once per vblank.
+        std::uint64_t last_presented_vblank = ~0ull;
         kernel.display().on_vblank = [&](const p3p3ds::hle::DisplayFramebufInfo &fb) {
+            const auto vblank = kernel.threads().vblank_count();
+            if (vblank == last_presented_vblank) return;
+            last_presented_vblank = vblank;
             if (!aptMainLoop()) { rt.stop("Closed by the system (HOME)"); throw psprecomp::FrontierHalt{}; }
             hid->poll();
             stats.buttons = hid->pad.buttons;
@@ -313,7 +377,9 @@ int main() {
                 rt.stop("Quit by user (START+SELECT)");
                 throw psprecomp::FrontierHalt{};
             }
+            const u64 present_start = svcGetSystemTick();
             present(rt.memory(), fb);
+            stats.present_ticks += svcGetSystemTick() - present_start;
             ++stats.frames;
             const u64 now = osGetTime();
             if (now - stats.last_fps_ms >= 1000u) {
