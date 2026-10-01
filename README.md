@@ -4,17 +4,17 @@
 
 ---
 
-## Status: NOT PLAYABLE (boots on New 3DS at 1–2 fps; reaches the first school day on PC)
+## Status: NOT PLAYABLE (New 3DS: title screen and main menu at ~90 % speed; PC: first school day)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On **New 3DS** the `.3dsx` build starts and runs the opening — ATLUS and CRIWARE logos on the top screen, a live debug report on the bottom screen — but only at **1–2 fps** (about 5 % of full speed), with no sound: graphics are still drawn by the CPU.
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On **New 3DS** the `.3dsx` build renders on the PICA200 GPU and reaches the title screen and the main menu at about **90 % of full speed (45 fps)** in the Azahar emulator, with no sound; the opening movie is skipped automatically (no video decoder yet), and LOAD GAME / saving are not implemented yet.
 
 On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8.3 and 8.5):
 
 | Milestone | Result |
 |---|---|
 | `.3dsx` build | devkitARM, 44 MB of recompiled ARM code (cut from 77 MB), clean build in about 9 minutes |
-| Boot | runs the logos; the opening movie is black, as on PC (no video decoder yet) |
-| Speed | 1–2 fps, about 5 % of real time; 91 % of the time goes to the CPU software renderer, the game's own code takes a few percent |
+| Boot | logos, title screen and main menu, drawn by the PICA200; logo positions pixel-identical to the PC renderer; the opening movie is skipped (no video decoder yet) |
+| Speed | about 90 % of real time, 45 fps on the title screen and menu (CPU rendering before: 5 %, 2 fps) |
 | Memory | 59 MB of a 79 MB heap in use during the opening |
 | Screens | top: the game; bottom: authorship and debug data (fps, speed, time split, memory), also saved to `sdmc:/p3p3ds/report.txt` |
 
@@ -52,7 +52,8 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] Name entry, introduction and first controllable section (scripted input)
 - [ ] Complete renderer (filtering, lines, lighting/skinning as the game needs) and movie decoding
 - [x] New Nintendo 3DS homebrew build (`.3dsx`) that boots (1–2 fps)
-- [ ] PICA200 (citro3d) renderer for playable speed on New 3DS
+- [x] PICA200 (citro3d) renderer: logos, title screen, main menu
+- [ ] Savedata (LOAD GAME / saving), lighting, movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
 

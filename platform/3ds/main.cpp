@@ -9,8 +9,16 @@
 // The decrypted executable is read from romfs:/eboot.elf (embedded at build
 // time from the local build; it must match the generated AOT code).
 //
-// Rendering uses the target-agnostic software renderer (no PICA200 backend
-// yet) and there is no audio output in this build.
+// GE rendering runs on the PICA200 (gpu_renderer.cpp); no audio output yet.
+// Frame dumps for comparison with the PC runner: put a number N in
+// sdmc:/p3p3ds/dump_every.txt to save the top screen every N vblanks to
+// sdmc:/p3p3ds/frames/.
+// Movies: there is no H.264 decoder yet (pictures are black), so while the
+// game decodes movie frames START is pressed for it, which skips the opening
+// movie (checked on the PC runner: title screen 0.6 s after START instead of
+// at 133 s). Only while the screen shows a CPU-written picture: the title
+// screen also decodes video, and a START there would pick a menu entry.
+// An empty sdmc:/p3p3ds/play_movies.txt turns this off.
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/input.hpp"
 #include "p3p3ds/interpreter.hpp"
@@ -18,6 +26,7 @@
 #include "p3p3ds/profile.hpp"
 #include "p3p3ds/vfs.hpp"
 #include "bootstrap_expectations.hpp"
+#include "gpu_renderer.hpp"
 #include "psprecomp/elf32.hpp"
 #include "psprecomp/runtime.hpp"
 
@@ -42,13 +51,14 @@ void apply_generated_patches(GuestMemory &);
 } // namespace psprecomp
 
 // libctru: main thread stack. Translated guest code chains through host calls.
-// Linear (GPU-visible) heap: only the GSP framebuffers and the console live
-// there for now. libctru's default split caps the normal heap at 24 MiB
+// Linear (GPU-visible) heap: screen framebuffers, the citro3d command buffer,
+// vertices and decoded textures (gpu_renderer.cpp budgets 6 MiB of them).
+// libctru's default split caps the normal heap at 24 MiB
 // (libctru/source/system/allocateHeaps.c, HEAP_SPLIT_SIZE_CAP), which cannot
 // hold the 32 MiB guest RAM; a fixed linear size gives the rest to the heap.
 extern "C" {
 u32 __stacksize__ = 1024u * 1024u;
-u32 __ctru_linear_heap_size = 4u * 1024u * 1024u;
+u32 __ctru_linear_heap_size = 12u * 1024u * 1024u;
 }
 
 // Heap diagnostics for the report: size of the last allocation that failed.
@@ -86,6 +96,9 @@ struct Stats {
     // Wall-time split (ARM11 system ticks): presentation is timed here, HLE
     // (includes GE rendering) and rendering by the shared profilers.
     u64 run_start_ticks{}, present_ticks{};
+    std::uint64_t dump_every{};
+    bool skip_movies{true};
+    std::uint64_t movie_vblanks{}, movie_frames_seen{};
 };
 
 double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM11; }
@@ -117,73 +130,44 @@ public:
     }
 };
 
-std::uint32_t psp_pixel(psprecomp::GuestMemory &m, std::uint32_t address, int format) {
-    // Returns 0xRRGGBBAA for GSP_RGBA8_OES.
-    std::uint32_t r, g, b;
-    if (format == 3) {
-        const auto c = m.load32(address);
-        r = c & 0xFF; g = (c >> 8) & 0xFF; b = (c >> 16) & 0xFF;
-    } else {
-        const auto c = m.load16(address);
-        if (format == 0) { r = (c & 0x1F) << 3; g = ((c >> 5) & 0x3F) << 2; b = ((c >> 11) & 0x1F) << 3; }
-        else if (format == 1) { r = (c & 0x1F) << 3; g = ((c >> 5) & 0x1F) << 3; b = ((c >> 10) & 0x1F) << 3; }
-        else { r = (c & 0xF) * 17; g = ((c >> 4) & 0xF) * 17; b = ((c >> 8) & 0xF) * 17; }
+p3p3ds::n3ds::GpuRenderer *g_gpu = nullptr;
+std::uint64_t g_skip_presses = 0;
+
+void write_bmp(const char *path, const std::vector<std::uint8_t> &rgb, std::uint32_t w, std::uint32_t h) {
+    FILE *f = std::fopen(path, "wb");
+    if (!f) return;
+    const std::uint32_t row = (w * 3u + 3u) & ~3u, size = 54u + row * h;
+    std::uint8_t header[54] = {'B', 'M'};
+    auto put32 = [&](int at, std::uint32_t v) { for (int i = 0; i < 4; ++i) header[at + i] = static_cast<std::uint8_t>(v >> (8 * i)); };
+    put32(2, size); put32(10, 54); put32(14, 40); put32(18, w); put32(22, h);
+    header[26] = 1; header[28] = 24; put32(34, row * h);
+    std::fwrite(header, 1, sizeof header, f);
+    std::vector<std::uint8_t> line(row, 0);
+    for (std::uint32_t y = h; y-- > 0;) { // BMP rows bottom-up, BGR
+        for (std::uint32_t x = 0; x < w; ++x) {
+            const auto *p = &rgb[(static_cast<std::size_t>(y) * w + x) * 3u];
+            line[x * 3u] = p[2]; line[x * 3u + 1u] = p[1]; line[x * 3u + 2u] = p[0];
+        }
+        std::fwrite(line.data(), 1, row, f);
     }
-    return (r << 24) | (g << 16) | (b << 8) | 0xFFu;
+    std::fclose(f);
 }
 
-void present(psprecomp::GuestMemory &m, const p3p3ds::hle::DisplayFramebufInfo &fb) {
-    u16 w = 0, h = 0;
-    auto *dst = reinterpret_cast<std::uint32_t *>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, &w, &h)); // w=240 (rows), h=400
-    if (!dst) return;
-    if (!fb.active || fb.topaddr == 0) {
-        std::memset(dst, 0, static_cast<std::size_t>(w) * h * 4u);
-    } else {
-        const std::uint32_t bpp = fb.pixelformat == 3 ? 4u : 2u;
-        const auto stride = static_cast<std::uint32_t>(fb.bufferwidth);
-        if (!m.contains(fb.topaddr, stride * 272u * bpp)) return;
-        // Fast path: framebuffer in guest VRAM, read straight from its bytes
-        // (the checked accessors cost 20 % of wall time in Azahar).
-        const std::uint32_t c = psprecomp::GuestMemory::canonical(fb.topaddr);
-        const std::uint32_t vram_off = (c - psprecomp::GuestMemory::kVramPhysicalBase) % psprecomp::GuestMemory::kVramSize;
-        using GM = psprecomp::GuestMemory;
-        if (c >= GM::kVramPhysicalBase && c - GM::kVramPhysicalBase < GM::kVramAddressSpan && vram_off + stride * 272u * bpp <= m.vram_bytes().size()) {
-            static std::uint16_t row_of[240], col_of[400];
-            for (std::uint32_t y = 0; y < 240u; ++y) row_of[y] = static_cast<std::uint16_t>(y * 272u / 240u);
-            for (std::uint32_t x = 0; x < 400u; ++x) col_of[x] = static_cast<std::uint16_t>(x * 480u / 400u);
-            const std::uint8_t *base = m.vram_bytes().data() + vram_off;
-            for (std::uint32_t x = 0; x < 400u; ++x) {
-                auto *column = dst + x * 240u;
-                const std::uint32_t sx = col_of[x];
-                for (std::uint32_t y = 0; y < 240u; ++y) {
-                    const std::uint8_t *s = base + (row_of[y] * stride + sx) * bpp;
-                    std::uint32_t r, g, b;
-                    if (bpp == 4u) { r = s[0]; g = s[1]; b = s[2]; }
-                    else {
-                        const std::uint32_t v = s[0] | (s[1] << 8);
-                        if (fb.pixelformat == 0) { r = (v & 0x1F) << 3; g = ((v >> 5) & 0x3F) << 2; b = ((v >> 11) & 0x1F) << 3; }
-                        else if (fb.pixelformat == 1) { r = (v & 0x1F) << 3; g = ((v >> 5) & 0x1F) << 3; b = ((v >> 10) & 0x1F) << 3; }
-                        else { r = (v & 0xF) * 17; g = ((v >> 4) & 0xF) * 17; b = ((v >> 8) & 0xF) * 17; }
-                    }
-                    column[239u - y] = (r << 24) | (g << 16) | (b << 8) | 0xFFu;
-                }
-            }
-            gfxFlushBuffers();
-            gfxSwapBuffers();
-            return;
-        }
-        // GSP framebuffers are rotated: column x holds 240 pixels, bottom row first.
-        for (std::uint32_t x = 0; x < 400u; ++x) {
-            const std::uint32_t sx = x * 480u / 400u;
-            auto *column = dst + x * 240u;
-            for (std::uint32_t y = 0; y < 240u; ++y) {
-                const std::uint32_t sy = y * 272u / 240u;
-                column[239u - y] = psp_pixel(m, fb.topaddr + (sy * stride + sx) * bpp, fb.pixelformat);
-            }
-        }
-    }
-    gfxFlushBuffers();
-    gfxSwapBuffers();
+std::string gpu_text() {
+    if (g_gpu == nullptr) return {};
+    const auto &g = g_gpu->gpu_stats();
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+        "gpu    : draws %llu tris %llu skip %llu\n"
+        "         tex %lu up %llu hit %llu rtt %llu\n"
+        "         present gpu %llu cpu %llu\n"
+        "movie  : skip presses %llu\n",
+        static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
+        static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
+        static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
+        static_cast<unsigned long long>(g.target_textures), static_cast<unsigned long long>(g.gpu_presents),
+        static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g_skip_presses));
+    return buf;
 }
 
 std::string profile_text(const Stats &s) {
@@ -201,7 +185,7 @@ std::string profile_text(const Stats &s) {
         "         aot+dispatch %.0f%%  calls %llu\n",
         100 * hle / run, 100 * render / run, 100 * present / run, 100 * interp / run,
         100 * (run - hle - present - interp) / run, static_cast<unsigned long long>(h.hle_calls));
-    return buf;
+    return buf + gpu_text();
 }
 
 std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::KernelState &k) {
@@ -271,8 +255,6 @@ void wait_exit(const std::string &message) {
 int main() {
     osSetSpeedupEnable(true); // New 3DS: 804 MHz + L2 cache
     gfxInitDefault();
-    gfxSetScreenFormat(GFX_TOP, GSP_RGBA8_OES);
-    gfxSetDoubleBuffering(GFX_TOP, true);
     consoleInit(GFX_BOTTOM, nullptr);
     romfsInit();
     std::cout.rdbuf(nullptr); // runtime diagnostics on std::cout are discarded on 3DS
@@ -358,6 +340,18 @@ int main() {
         static p3p3ds::Interpreter interpreter;
         p3p3ds::install_interpreter_fallback(&interpreter);
         kernel.input().source = hid;
+        stage = "init gpu";
+        auto gpu = std::make_unique<p3p3ds::n3ds::GpuRenderer>();
+        g_gpu = gpu.get();
+        kernel.ge().set_renderer(std::move(gpu));
+        rt.memory().vram_write_observer = [](std::uint32_t address, std::size_t bytes) { g_gpu->note_cpu_write(address, bytes); };
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/play_movies.txt", "r")) { stats.skip_movies = false; std::fclose(f); }
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/dump_every.txt", "r")) {
+            unsigned long long every = 0;
+            if (std::fscanf(f, "%llu", &every) == 1) stats.dump_every = every;
+            std::fclose(f);
+            if (stats.dump_every) std::filesystem::create_directories(std::string(kBase) + "/frames", ec);
+        }
 
         stats.status = "running";
         psprecomp::runtime_profile().enabled = true;
@@ -372,14 +366,36 @@ int main() {
             last_presented_vblank = vblank;
             if (!aptMainLoop()) { rt.stop("Closed by the system (HOME)"); throw psprecomp::FrontierHalt{}; }
             hid->poll();
+            if (stats.skip_movies) {
+                std::uint64_t decoded = 0;
+                for (const auto &[handle, inst] : kernel.mpeg().instances) decoded += inst.video_decoded;
+                if (decoded != stats.movie_frames_seen && g_gpu->last_present_from_cpu()) {
+                    stats.movie_frames_seen = decoded;
+                    // Hold START for 6 vblanks out of every 40 while movie frames are decoded.
+                    if (stats.movie_vblanks++ % 40u < 6u) {
+                        hid->pad.buttons |= p3p3ds::input::button::Start;
+                        ++g_skip_presses;
+                    }
+                } else {
+                    stats.movie_vblanks = 0;
+                }
+            }
             stats.buttons = hid->pad.buttons;
             if ((hidKeysHeld() & (KEY_START | KEY_SELECT)) == (KEY_START | KEY_SELECT)) {
                 rt.stop("Quit by user (START+SELECT)");
                 throw psprecomp::FrontierHalt{};
             }
             const u64 present_start = svcGetSystemTick();
-            present(rt.memory(), fb);
+            g_gpu->present(rt.memory(), fb);
             stats.present_ticks += svcGetSystemTick() - present_start;
+            if (stats.dump_every && vblank % stats.dump_every == 0u) {
+                std::vector<std::uint8_t> rgb;
+                if (g_gpu->read_top_screen(rgb)) {
+                    char path[96];
+                    std::snprintf(path, sizeof path, "%s/frames/vblank_%06llu.bmp", kBase, static_cast<unsigned long long>(vblank));
+                    write_bmp(path, rgb, 400u, 240u);
+                }
+            }
             ++stats.frames;
             const u64 now = osGetTime();
             if (now - stats.last_fps_ms >= 1000u) {
@@ -407,6 +423,8 @@ int main() {
     write_report(text);
     show(text);
     wait_exit("Report saved to sdmc:/p3p3ds/report.txt");
+    g_gpu = nullptr;
+    kernel_owner.reset(); // the GPU renderer (citro3d) shuts down before gfx
     romfsExit();
     gfxExit();
     return 0;

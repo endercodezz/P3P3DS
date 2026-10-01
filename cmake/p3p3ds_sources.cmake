@@ -13,6 +13,7 @@ set(P3P3DS_CORE_SOURCES
     core/src/hle/utility.cpp
     core/src/hle/ctrl.cpp
     core/src/input.cpp
+    core/src/ge/geometry.cpp
     core/src/ge/software_renderer.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp

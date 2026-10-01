@@ -2,6 +2,13 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## New 3DS: GPU renderer, title screen and main menu (2026-10-01)
+
+- [VERIFIED] PICA200 GE backend (`platform/3ds/gpu_renderer.cpp`, design and measurements in `docs/3DS_PLATFORM.md` 4.4). In Azahar the logos, the title screen and the main menu render correctly; logo positions are pixel-identical to the PC software frames. Speed 92 % of real time, 45 fps (was 6 %, 2 fps with CPU rendering). Frame dumps: `sdmc:/p3p3ds/dump_every.txt`.
+- [VERIFIED] Vertex/texel decoding moved to `core/src/ge/geometry.cpp`, shared by both renderers: PC first-day frames unchanged (7,199 frame hashes identical to the run before the move); `tests/test_ge_geometry.cpp` checks `decode_texture` against `fetch_texel` for all non-DXT formats. 25/25 CTest.
+- [VERIFIED] The opening movie (black: no decoder) is skipped with START (PC check); the 3DS runner presses START while a CPU-written picture is shown and movie frames are decoded. `BlankMpegDecoder` fills rows instead of 130k checked stores per picture.
+- Blocker: LOAD GAME calls `sceUtilitySavedataInitStart` (0x50C4CD57), not implemented. [UNVERIFIED] hardware.
+
 ## First New 3DS build boots in Azahar (2026-10-01)
 
 - [VERIFIED] `platform/3ds/` builds `p3p3ds.3dsx` (devkitARM GCC 16.1). Core and runtime sources are shared with the host build through `cmake/p3p3ds_sources.cmake`; `DisplayState::on_vblank` is the presentation hook. ARM fixes: `std::min/max/clamp` with explicit types (`uint32_t`/`int32_t` are `long` on ARM newlib), including a one-line patch in `recomp/PSPRecomp/include/psprecomp/allegrex_context.hpp`.

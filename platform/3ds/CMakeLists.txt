@@ -79,9 +79,13 @@ target_link_libraries(p3p3ds_core PUBLIC psprecomp_runtime)
 
 execute_process(COMMAND git -C "${P3P_ROOT}" rev-parse --short HEAD
                 OUTPUT_VARIABLE P3P_BUILD_ID OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-add_executable(p3p3ds main.cpp)
+# GE renderer on the PICA200: vertex shader assembled by picasso and embedded.
+ctr_add_shader_library(p3p_ge_shader "${CMAKE_CURRENT_SOURCE_DIR}/shaders/ge.v.pica" OUTPUT "${CMAKE_BINARY_DIR}/ge.shbin")
+dkp_add_embedded_binary_library(p3p_ge_shader_bin p3p_ge_shader)
+
+add_executable(p3p3ds main.cpp gpu_renderer.cpp)
 target_compile_definitions(p3p3ds PRIVATE P3P3DS_BUILD_ID="${P3P_BUILD_ID}")
-target_link_libraries(p3p3ds PRIVATE p3p_aot p3p3ds_core)
+target_link_libraries(p3p3ds PRIVATE p3p_aot p3p3ds_core p3p_ge_shader_bin citro3d)
 
 # romfs: the decrypted EBOOT the AOT code was generated from.
 set(ROMFS_DIR "${CMAKE_BINARY_DIR}/romfs")

@@ -3,6 +3,7 @@
 // sampling, top-left fill rule, sprite UV mapping, transform-mode clipping
 // (primitives with any vertex behind the eye are dropped, no near clipping).
 #include "p3p3ds/ge/renderer.hpp"
+#include "p3p3ds/ge/geometry.hpp"
 
 #include "psprecomp/guest_memory.hpp"
 
@@ -13,29 +14,6 @@
 namespace p3p3ds::ge {
 namespace {
 
-struct Vertex {
-    float x{}, y{}, z{}, w{1.0f};
-    float u{}, v{};
-    std::array<std::uint8_t, 4> color{255, 255, 255, 255};
-    bool clipped{};
-};
-
-std::uint32_t component_size(std::uint32_t format, std::uint32_t one, std::uint32_t two, std::uint32_t three) {
-    return format == 1 ? one : format == 2 ? two : format == 3 ? three : 0u;
-}
-
-std::array<std::uint8_t, 4> unpack16(std::uint32_t c, std::uint32_t format) {
-    auto expand = [](std::uint32_t v, int bits) { return static_cast<std::uint8_t>((v << (8 - bits)) | (v >> (2 * bits - 8 > 0 ? 2 * bits - 8 : 0))); };
-    switch (format) {
-    case 0: return {expand(c & 0x1F, 5), expand((c >> 5) & 0x3F, 6), expand((c >> 11) & 0x1F, 5), 255};
-    case 1: return {expand(c & 0x1F, 5), expand((c >> 5) & 0x1F, 5), expand((c >> 10) & 0x1F, 5), static_cast<std::uint8_t>((c >> 15) ? 255 : 0)};
-    default: return {static_cast<std::uint8_t>((c & 0xF) * 17), static_cast<std::uint8_t>(((c >> 4) & 0xF) * 17),
-                     static_cast<std::uint8_t>(((c >> 8) & 0xF) * 17), static_cast<std::uint8_t>(((c >> 12) & 0xF) * 17)};
-    }
-}
-std::array<std::uint8_t, 4> unpack32(std::uint32_t c) {
-    return {static_cast<std::uint8_t>(c), static_cast<std::uint8_t>(c >> 8), static_cast<std::uint8_t>(c >> 16), static_cast<std::uint8_t>(c >> 24)};
-}
 std::uint32_t pack(const std::array<std::uint8_t, 4> &c, std::uint32_t format) {
     switch (format) {
     case 0: return (c[0] >> 3) | ((c[1] >> 2) << 5) | ((c[2] >> 3) << 11);
@@ -52,53 +30,9 @@ struct Context {
     bool enabled(std::uint32_t i) const { return (g.reg[i] & 1u) != 0u; }
 };
 
-// ---- Texture sampling --------------------------------------------------------
-struct Texture {
-    std::uint32_t address{}, stride{}, width{1}, height{1}, format{}, clut_format{};
-    bool swizzled{};
-};
-
-std::uint32_t clut_lookup(const Context &c, std::uint32_t index) {
-    const auto cf = c.r(0xC5);
-    const auto shift = (cf >> 2) & 0x1F, mask = (cf >> 8) & 0xFF, start = (cf >> 16) & 0x1F;
-    const auto i = (((index >> shift) & mask) | (start << 4)) & 0x1FF;
-    const auto pf = cf & 3;
-    if (pf == 3) return c.g.clut[i & 0xFF];
-    const auto word = c.g.clut[(i >> 1) & 0xFF];
-    return (i & 1u) ? (word >> 16) : (word & 0xFFFF);
-}
-
-std::array<std::uint8_t, 4> fetch_texel(const Context &c, const Texture &t, std::int32_t x, std::int32_t y) {
-    static constexpr std::uint32_t bits_per_texel[11] = {16, 16, 16, 32, 4, 8, 16, 32, 4, 8, 8};
-    const auto bpp = t.format < 11 ? bits_per_texel[t.format] : 32u;
-    if (t.format >= 8) {
-        // DXT: not observed yet; render magenta to make the gap visible.
-        return {255, 0, 255, 255};
-    }
-    const std::uint32_t row_bytes = t.stride * bpp / 8u;
-    const std::uint32_t xbits = static_cast<std::uint32_t>(x) * bpp;
-    std::uint32_t offset;
-    if (t.swizzled) {
-        const auto xbytes = xbits / 8u;
-        const auto bx = xbytes / 16u, by = static_cast<std::uint32_t>(y) / 8u;
-        offset = (by * (row_bytes / 16u) + bx) * 128u + (static_cast<std::uint32_t>(y) % 8u) * 16u + xbytes % 16u;
-    } else {
-        offset = static_cast<std::uint32_t>(y) * row_bytes + xbits / 8u;
-    }
-    const auto a = t.address + offset;
-    if (!c.memory.contains(a, bpp >= 16 ? bpp / 8u : 1u)) return {0, 0, 0, 0};
-    std::uint32_t raw;
-    switch (bpp) {
-    case 4: raw = (c.memory.load8(a) >> ((xbits & 4u) ? 4 : 0)) & 0xF; break;
-    case 8: raw = c.memory.load8(a); break;
-    case 16: raw = c.memory.load16(a); break;
-    default: raw = c.memory.load32(a); break;
-    }
-    if (t.format <= 2) return unpack16(raw, t.format);
-    if (t.format == 3) return unpack32(raw);
-    const auto entry = clut_lookup(c, raw);
-    return t.clut_format == 3 ? unpack32(entry) : unpack16(entry, t.clut_format);
-}
+// ---- Texture sampling (texels from geometry.cpp) ----------------------------------
+using Texture = TextureInfo;
+using Vertex = ScreenVertex;
 
 std::array<std::uint8_t, 4> sample(const Context &c, const Texture &t, float u, float v) {
     // u, v in texels. Nearest filtering; wrap or clamp per TEXWRAP.
@@ -108,7 +42,7 @@ std::array<std::uint8_t, 4> sample(const Context &c, const Texture &t, float u, 
         if (clamp) return std::clamp<std::int32_t>(i, 0, static_cast<std::int32_t>(size) - 1);
         return static_cast<std::int32_t>(static_cast<std::uint32_t>(i) & (size - 1u));
     };
-    return fetch_texel(c, t, coord(u, t.width, wrap & 1u), coord(v, t.height, (wrap >> 8) & 1u));
+    return fetch_texel(c.memory, c.g, t, coord(u, t.width, wrap & 1u), coord(v, t.height, (wrap >> 8) & 1u));
 }
 
 // ---- Fragment pipeline ---------------------------------------------------------
@@ -236,6 +170,12 @@ std::array<std::uint8_t, 4> shade(const Context &c, const Texture *tex, std::arr
 
 } // namespace
 
+namespace {
+std::uint32_t component_size(std::uint32_t format, std::uint32_t one, std::uint32_t two, std::uint32_t three) {
+    return format == 1 ? one : format == 2 ? two : format == 3 ? three : 0u;
+}
+} // namespace
+
 VertexLayout vertex_layout(std::uint32_t vtype) {
     VertexLayout l;
     l.uv_format = vtype & 3u;
@@ -270,99 +210,13 @@ void SoftwareRenderer::draw(psprecomp::GuestMemory &memory, const GeRegisters &r
     Context c{memory, regs};
     ++stats_.prims;
     const auto layout = vertex_layout(c.r(0x12));
-    // Decode the referenced vertices.
-    auto read_component = [&](std::uint32_t at, std::uint32_t format, bool signed_value, float normal_scale8, float normal_scale16) -> float {
-        switch (format) {
-        case 1: return signed_value ? static_cast<std::int8_t>(memory.load8(at)) / normal_scale8 : memory.load8(at) / normal_scale8;
-        case 2: return signed_value ? static_cast<std::int16_t>(memory.load16(at)) / normal_scale16 : memory.load16(at) / normal_scale16;
-        case 3: { const auto bits = memory.load32(at); float f; std::memcpy(&f, &bits, 4); return f; }
-        default: return 0.0f;
-        }
-    };
-    const auto material = (c.r(0x55) & 0xFFFFFFu) | ((c.r(0x58) & 0xFFu) << 24);
-    auto decode = [&](std::uint32_t index) {
-        Vertex v;
-        const auto base = vertex_address + index * layout.size;
-        if (!memory.contains(base, std::max<std::uint32_t>(layout.size, 1u))) { v.clipped = true; return v; }
-        // Positions
-        const auto pe = component_size(layout.pos_format, 1, 2, 4);
-        if (layout.through) {
-            // Through mode: s16/float screen coordinates (x, y), u16 z; integer texel UVs.
-            const bool f = layout.pos_format == 3;
-            v.x = f ? read_component(base + layout.pos_offset, 3, true, 1, 1) : read_component(base + layout.pos_offset, layout.pos_format, true, 1.0f, 1.0f);
-            v.y = f ? read_component(base + layout.pos_offset + 4, 3, true, 1, 1) : read_component(base + layout.pos_offset + pe, layout.pos_format, true, 1.0f, 1.0f);
-            v.z = f ? read_component(base + layout.pos_offset + 8, 3, true, 1, 1) : read_component(base + layout.pos_offset + 2 * pe, layout.pos_format, false, 1.0f, 1.0f);
-        } else {
-            v.x = read_component(base + layout.pos_offset, layout.pos_format, true, 128.0f, 32768.0f);
-            v.y = read_component(base + layout.pos_offset + pe, layout.pos_format, true, 128.0f, 32768.0f);
-            v.z = read_component(base + layout.pos_offset + 2 * pe, layout.pos_format, true, 128.0f, 32768.0f);
-        }
-        // Texture coordinates
-        if (layout.uv_format) {
-            const auto ue = component_size(layout.uv_format, 1, 2, 4);
-            if (layout.through) {
-                v.u = read_component(base + layout.uv_offset, layout.uv_format, false, 1.0f, 1.0f);
-                v.v = read_component(base + layout.uv_offset + ue, layout.uv_format, false, 1.0f, 1.0f);
-            } else {
-                v.u = read_component(base + layout.uv_offset, layout.uv_format, false, 128.0f, 32768.0f);
-                v.v = read_component(base + layout.uv_offset + ue, layout.uv_format, false, 128.0f, 32768.0f);
-            }
-        }
-        // Colour (material ambient when the vertex has none)
-        if (layout.color_format == 7u) v.color = unpack32(memory.load32(base + layout.color_offset));
-        else if (layout.color_format >= 4u) v.color = unpack16(memory.load16(base + layout.color_offset), layout.color_format == 4u ? 0u : layout.color_format == 5u ? 1u : 2u);
-        else v.color = unpack32(material);
-        return v;
-    };
-
-    std::vector<Vertex> vertices(count);
-    for (std::uint32_t i = 0; i < count; ++i) {
-        std::uint32_t index = i;
-        if (layout.index_format == 1u) index = memory.load8(index_address + i);
-        else if (layout.index_format == 2u) index = memory.load16(index_address + 2u * i);
-        vertices[i] = decode(index);
-    }
+    std::vector<Vertex> vertices;
+    decode_screen_vertices(memory, regs, count, vertex_address, index_address, vertices);
     stats_.vertices += count;
 
     // Texture setup
-    Texture texture;
-    const bool textured = c.enabled(0x1E) && layout.uv_format != 0u && (c.r(0xD3) & 1u) == 0u;
-    if (textured) {
-        texture.address = (c.r(0xA0) & 0xFFFFF0u) | ((c.r(0xA8) >> 16) & 0xFFu) << 24;
-        texture.stride = c.r(0xA8) & 0xFFFFu;
-        texture.width = 1u << (c.r(0xB8) & 0xFu);
-        texture.height = 1u << ((c.r(0xB8) >> 8) & 0xFu);
-        texture.format = c.r(0xC3) & 0xFu;
-        texture.swizzled = (c.r(0xC2) & 1u) != 0u;
-        texture.clut_format = c.r(0xC5) & 3u;
-    }
-
-    // Transform to screen space.
-    const float offset_x = static_cast<float>(c.r(0x4C) & 0xFFFFu) / 16.0f, offset_y = static_cast<float>(c.r(0x4D) & 0xFFFFu) / 16.0f;
-    for (auto &v : vertices) {
-        if (layout.through || v.clipped) continue;
-        const auto &w = regs.world, &vw = regs.view;
-        const float wx = v.x * w[0] + v.y * w[3] + v.z * w[6] + w[9];
-        const float wy = v.x * w[1] + v.y * w[4] + v.z * w[7] + w[10];
-        const float wz = v.x * w[2] + v.y * w[5] + v.z * w[8] + w[11];
-        const float ex = wx * vw[0] + wy * vw[3] + wz * vw[6] + vw[9];
-        const float ey = wx * vw[1] + wy * vw[4] + wz * vw[7] + vw[10];
-        const float ez = wx * vw[2] + wy * vw[5] + wz * vw[8] + vw[11];
-        const auto &p = regs.proj;
-        const float cx = ex * p[0] + ey * p[4] + ez * p[8] + p[12];
-        const float cy = ex * p[1] + ey * p[5] + ez * p[9] + p[13];
-        const float cz = ex * p[2] + ey * p[6] + ez * p[10] + p[14];
-        const float cw = ex * p[3] + ey * p[7] + ez * p[11] + p[15];
-        if (cw <= 0.0f) { v.clipped = true; continue; }
-        v.x = ge_float(c.r(0x42)) * cx / cw + ge_float(c.r(0x45)) - offset_x;
-        v.y = ge_float(c.r(0x43)) * cy / cw + ge_float(c.r(0x46)) - offset_y;
-        v.z = ge_float(c.r(0x44)) * cz / cw + ge_float(c.r(0x47));
-        v.w = cw;
-        if (textured) {
-            v.u = (v.u * ge_float(c.r(0x48)) + ge_float(c.r(0x4A))) * static_cast<float>(texture.width);
-            v.v = (v.v * ge_float(c.r(0x49)) + ge_float(c.r(0x4B))) * static_cast<float>(texture.height);
-        }
-    }
+    const bool textured = draw_is_textured(regs, layout);
+    const Texture texture = textured ? texture_info(regs) : Texture{};
 
     Target target;
     target.color_address = 0x04000000u | ((c.r(0x9C) & 0xFFFFF0u) | ((c.r(0x9D) >> 16) & 0xFFu) << 24);

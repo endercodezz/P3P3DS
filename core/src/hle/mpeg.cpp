@@ -121,12 +121,18 @@ bool BlankMpegDecoder::decode_video(const MpegAccessUnit &, psprecomp::GuestMemo
                                     std::uint32_t stride, std::uint32_t format) {
     const std::uint32_t bpp = format == 3u ? 4u : 2u;
     const std::uint32_t black = format == 3u ? 0xFF000000u : format == 0u ? 0u : 0x8000u; // opaque where alpha exists
-    for (std::uint32_t y = 0; y < 272u; ++y)
+    // Row fills (one VRAM-write notification per row): per-pixel stores cost
+    // 130k checked writes per movie frame on the New 3DS.
+    for (std::uint32_t y = 0; y < 272u; ++y) {
+        const auto row = dest + y * stride * bpp;
+        std::uint8_t *p = memory.raw_pointer(row, 480u * bpp);
+        if (p == nullptr) return false;
         for (std::uint32_t x = 0; x < 480u; ++x) {
-            const auto a = dest + (y * stride + x) * bpp;
-            if (!memory.contains(a, bpp)) return false;
-            if (bpp == 4u) memory.store32(a, black); else memory.store16(a, static_cast<std::uint16_t>(black));
+            if (bpp == 4u) std::memcpy(p + x * 4u, &black, 4u);
+            else { const auto v = static_cast<std::uint16_t>(black); std::memcpy(p + x * 2u, &v, 2u); }
         }
+        memory.notify_vram_write(row, 480u * bpp);
+    }
     return true;
 }
 
@@ -160,7 +166,7 @@ void release(psprecomp::GuestMemory &m, MpegInstance &inst) {
     if (s(total) > 0) m.store32(rb + RbRead, (m.load32(rb + RbRead) + freed) % total);
 }
 
-// sceMpegGetAvcAu attribute: 1 for a reference picture, 0 otherwise — the
+// sceMpegGetAvcAu attribute: 1 for a reference picture, 0 otherwise ï¿½ the
 // nal_ref_idc of the AU's first slice NAL (basic.expected: AUs 58/110/169 of
 // test.pmf are the only non-reference slices and the only attr=0 results).
 std::uint32_t avc_attribute(const std::vector<std::uint8_t> &au) {

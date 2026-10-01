@@ -128,6 +128,21 @@ PICA200 Hardware Rendering into 3DS Top Screen Render Target
 
 ---
 
+### 4.4. Implemented: PICA200 GE backend (2026-10-01)
+`platform/3ds/gpu_renderer.cpp` (`GpuRenderer`, a `GeRenderer`). Vertex decoding/transform and texel decoding are shared with the software renderer in `core/src/ge/geometry.cpp`; the CPU produces screen-space vertices `(x*w, y*w, z*w, w)` and the vertex shader (`platform/3ds/shaders/ge.v.pica`) only maps pixels to clip space.
+
+Design driven by the GE census of the first game day (2,018,478 draws, PC runner): exactly two render targets, `0x04000000` and `0x04088000`, both 8888; 35,446 textured draws sample a texture that starts exactly at one of them (render-to-texture); no block transfers; all 117,286 sprites are clear-mode draws; 1,498 CPU stores into a colour buffer (the movie).
+- One 512x512 RGBA8 VRAM texture + render target per PSP framebuffer address (max 4), one shared D24S8 depth buffer; a texture at a target's address binds the target (render-to-texture).
+- Texture cache keyed by parameters + palette, validated by a content hash once per GPU frame; decoded to RGB565/RGBA5551/RGBA4/RGBA8 matching the PSP format; textures used by the current frame are never rewritten (new texture, old one freed next frame); 6 MiB budget with LRU eviction.
+- Fragment state from GE registers: texture function (modulate/decal/blend/replace/add, colour doubling) on TEV stage 0, alpha test, blending (doubled-alpha factors and the second fixed colour approximated), depth test/mask, per-channel colour mask (alpha/stencil never written outside clear mode), clear mode, scissor, culling, texture filter/wrap.
+- CPU-written framebuffers (`vram_write_observer`) are uploaded from guest memory, both for presentation and before the GE draws on top of them.
+- Presentation: the displayed target is scaled to 400x240 by the GPU (linear filter).
+- Not done: lights, fog, points/lines (31,086 line strips in the first day, not drawn by the software renderer either), stencil/logic ops, GPU pixels written back to guest EDRAM (CPU readback of a GPU-drawn frame sees stale data).
+
+Orientation [VERIFIED] in Azahar with test bars drawn by the GPU and by CPU tiling: a PICA texture's memory rows run bottom-up (memory row k is sampled at t = (h-1-k)/h); with NDC y growing with PSP y, GPU-drawn PSP row y is read back at t = y/512. CPU uploads therefore store PSP row y in memory row h-1-y. Result: the ATLUS and CRIWARE logo bounding boxes on the 3DS frame dumps are identical to the PC software frames scaled to 400x240 ((93,91)-(306,150) and (150,67)-(249,172)).
+
+Measured in Azahar (New 3DS mode, emulator speed, not hardware): logos/title/main menu at 92 % of real time and 45 presented fps (software renderer: 6 %, 2 fps); wall time split HLE 49 % (GE rendering 6 %, presentation 6 %), AOT + dispatch 45 %. Movies: no H.264 decoder, so while a CPU-written picture is shown and movie frames are decoded the runner presses START, which skips the opening movie (PC: title 0.6 s after START instead of at 133 s). Next blocker: `sceUtilitySavedataInitStart` (LOAD GAME).
+
 ## 5. Audio Subsystem: NDSP Integration
 
 ### 5.1. Hardware DSP (Digital Signal Processor)

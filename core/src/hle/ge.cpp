@@ -3,6 +3,7 @@
 #include "p3p3ds/kernel_state.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/common.hpp"
+#include <cstdio>
 #include <iostream>
 #include <vector>
 namespace p3p3ds::hle {
@@ -119,6 +120,11 @@ void GeManager::count_features(std::uint32_t prim_type) {
     const auto layout=ge::vertex_layout(r[0x12]);
     static constexpr const char *kPrims[]={"prim_points","prim_lines","prim_line_strip","prim_triangles","prim_triangle_strip","prim_triangle_fan","prim_sprites","prim_7"};
     ++features_["draws"]; ++features_[kPrims[prim_type&7u]];
+    // Render targets (FBP/FBW, PSM) and textures sampled from EDRAM: what a
+    // hardware backend must keep as GPU surfaces.
+    char key[48];
+    std::snprintf(key,sizeof key,"target_%08X_fmt%u",static_cast<unsigned>(0x04000000u|(r[0x9C]&0x1FFFF0u)),static_cast<unsigned>(r[0xD2]&3u));
+    ++features_[key];
     ++features_[layout.through?"through_mode":"transform_mode"];
     const bool clear=(r[0xD3]&1u)!=0u;
     if(clear){ ++features_["clear_mode"]; return; }
@@ -144,6 +150,11 @@ void GeManager::count_features(std::uint32_t prim_type) {
         if((r[0xC6]&0x4u)!=0u) ++features_["tex_mipmap_filter"]; // min filter 4..7
         if(!layout.through && (r[0xC0]&3u)!=0u) ++features_["texgen"];
         if((r[0xC2]&0xFF0000u)!=0u) ++features_["tex_levels"];
+        const auto tex=(r[0xA0]&0xFFFFF0u)|((r[0xA8]>>16)&0xFFu)<<24;
+        if((tex&0x0F000000u)==0x04000000u) {
+            std::snprintf(key,sizeof key,"tex_from_edram_%08X",static_cast<unsigned>(tex&0x0FFFFFFFu));
+            ++features_[key];
+        }
     }
 }
 
@@ -208,7 +219,13 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         for(std::uint32_t i=0;i<bytes;i+=4) if(mem.contains(address+i,4)) regs_.clut[i/4]=mem.load32(address+i);
         break;
     }
-    case 0xEA: { const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); renderer_->transfer(mem,regs_); break; }
+    case 0xEA: {
+        const auto src=(regs_.reg[0xB2]&0xFFFFF0u)|((regs_.reg[0xB3]>>16)&0xFFu)<<24, dst=(regs_.reg[0xB4]&0xFFFFF0u)|((regs_.reg[0xB5]>>16)&0xFFu)<<24;
+        char key[48];
+        std::snprintf(key,sizeof key,"transfer_%s_to_%s",(src&0x0F000000u)==0x04000000u?"edram":"ram",(dst&0x0F000000u)==0x04000000u?"edram":"ram");
+        ++features_[key];
+        const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); renderer_->transfer(mem,regs_); break;
+    }
     default: break;
     }
     l.pc+=4;
