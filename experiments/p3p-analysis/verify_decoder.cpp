@@ -55,7 +55,7 @@ bool opcode_kind_has_codegen_lowering(const psprecomp::DecodedInstruction &d) {
     case K::RoundWS: case K::TruncWS: case K::CeilWS: case K::FloorWS: case K::CvtWS: case K::CvtSW: case K::FpuCompare:
     case K::Vflush: case K::Vpfx: case K::Viim: case K::Vfim: case K::Vf2h: case K::Vh2f: case K::Vf2i: case K::Vi2f: case K::Vx2i:
     case K::Mtv: case K::Mfv: case K::VmidT: case K::Vmmov: case K::VfpuMatrixInit: case K::Vidt: case K::Vtfm:
-    case K::VfpuVectorInit: case K::Vmmul: case K::Vmscl: case K::Vrot: case K::Vocp: case K::VfpuHorizontal: case K::VfpuVec3:
+    case K::VfpuVectorInit: case K::Vmmul: case K::Vmscl: case K::Vrot: case K::Vocp: case K::VfpuCross: case K::VfpuButterfly1: case K::VfpuSign: case K::VfpuSocp: case K::VfpuI2uc: case K::VfpuHorizontal: case K::VfpuVec3:
     case K::Vdot: case K::Vhdp: case K::VcrossQuat: case K::Vminmax: case K::VfpuCompare3: case K::Vcmp: case K::Vcmov:
     case K::Vscl: case K::VfpuUnary: case K::Vcst: case K::Lvs: case K::Svs: case K::Lvq: case K::Svq:
         return true;
@@ -192,14 +192,14 @@ int main(int argc, char **argv) {
             const bool g_break = (break_count == 251u);
             const bool g_unsupp = (decoder_unsupported == 251u);
             const bool g_rec = (decoder_recognized == 912808u);
-            const bool g_low = (codegen_lowerable == 912746u);
-            const bool g_not_low = (recognized_not_lowerable == 62u);
+            const bool g_low = (codegen_lowerable == 912808u);
+            const bool g_not_low = (recognized_not_lowerable == 0u);
 
             std::cout << "5. Ground truth break check (251):         " << (g_break ? "PASS" : "FAIL") << "\n";
             std::cout << "6. Ground truth decoder unsupported (251): " << (g_unsupp ? "PASS" : "FAIL") << "\n";
             std::cout << "7. Ground truth decoder recognized (912808): " << (g_rec ? "PASS" : "FAIL") << "\n";
-            std::cout << "8. Ground truth decoded-not-lowered (62):  " << (g_not_low ? "PASS" : "FAIL") << "\n";
-            std::cout << "9. Ground truth codegen lowerable (912746):" << (g_low ? "PASS" : "FAIL") << "\n";
+            std::cout << "8. Ground truth decoded-not-lowered (0):   " << (g_not_low ? "PASS" : "FAIL") << "\n";
+            std::cout << "9. Ground truth codegen lowerable (912808):" << (g_low ? "PASS" : "FAIL") << "\n";
 
             if (!g_break || !g_unsupp || !g_rec || !g_low || !g_not_low) {
                 std::cerr << "Assertion Failed: measured ground truth discrepancy detected!\n";

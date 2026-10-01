@@ -458,6 +458,11 @@ bool Interpreter::execute_regular(Runtime &rt, AllegrexContext &ctx, const Decod
         ctx.execute_vfpu_vrot(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word), (d.word >> 16u) & 31u);
         break;
     case K::Vocp: ctx.execute_vfpu_vocp(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word)); break;
+    case K::VfpuCross: ctx.execute_vfpu_vcrs(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, (d.word >> 16u) & 0x7Fu); break;
+    case K::VfpuButterfly1: ctx.execute_vfpu_vbfy1(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word)); break;
+    case K::VfpuSign: ctx.execute_vfpu_vsgn(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word)); break;
+    case K::VfpuSocp: ctx.execute_vfpu_vsocp(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word)); break;
+    case K::VfpuI2uc: ctx.execute_vfpu_vi2uc(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu); break;
     case K::VfpuHorizontal:
         ctx.execute_vfpu_horizontal(d.word & 0x7Fu, (d.word >> 8u) & 0x7Fu, size_code_length(d.word),
                                     ((d.word >> 16u) & 31u) == 7u);

@@ -592,6 +592,24 @@ std::string emit_regular(const psprecomp::DecodedInstruction &d, std::uint32_t p
             << length << "u, " << immediate << "u);\n";
         break;
     }
+    // P3P3DS: VFPU operations implemented as AllegrexContext helpers.
+    case psprecomp::OpcodeKind::VfpuCross:
+        out << "    ctx.execute_vfpu_vcrs(" << (d.word & 0x7Fu) << "u, " << ((d.word >> 8u) & 0x7Fu) << "u, "
+            << ((d.word >> 16u) & 0x7Fu) << "u);\n";
+        break;
+    case psprecomp::OpcodeKind::VfpuButterfly1:
+    case psprecomp::OpcodeKind::VfpuSign:
+    case psprecomp::OpcodeKind::VfpuSocp: {
+        const std::uint32_t length = (((d.word >> 7u) & 1u) | (((d.word >> 15u) & 1u) << 1u)) + 1u;
+        const char *helper = d.kind == psprecomp::OpcodeKind::VfpuButterfly1 ? "execute_vfpu_vbfy1"
+                           : d.kind == psprecomp::OpcodeKind::VfpuSign ? "execute_vfpu_vsgn" : "execute_vfpu_vsocp";
+        out << "    ctx." << helper << "(" << (d.word & 0x7Fu) << "u, " << ((d.word >> 8u) & 0x7Fu) << "u, "
+            << length << "u);\n";
+        break;
+    }
+    case psprecomp::OpcodeKind::VfpuI2uc:
+        out << "    ctx.execute_vfpu_vi2uc(" << (d.word & 0x7Fu) << "u, " << ((d.word >> 8u) & 0x7Fu) << "u);\n";
+        break;
     case psprecomp::OpcodeKind::Vocp: {
         const std::uint32_t size_code = ((d.word >> 7u) & 1u) | (((d.word >> 15u) & 1u) << 1u);
         const std::uint32_t length = size_code + 1u;

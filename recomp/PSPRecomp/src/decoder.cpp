@@ -245,6 +245,9 @@ DecodedInstruction decode_allegrex(std::uint32_t word) {
         } else if (operation == 4u) {
             d.kind = OpcodeKind::Vhdp;
             d.mnemonic = "vhdp";
+        } else if (operation == 5u) { // P3P3DS: psp/vfpu-docs opcode 011001101
+            d.kind = OpcodeKind::VfpuCross;
+            d.mnemonic = "vcrs";
         } else {
             d.kind = OpcodeKind::Vfpu;
             d.mnemonic = "vfpu1";
@@ -326,6 +329,19 @@ DecodedInstruction decode_allegrex(std::uint32_t word) {
         } else if (group == 2u && operation == 4u) {
             d.kind = OpcodeKind::Vocp;
             d.mnemonic = "vocp";
+        // P3P3DS: rt-field encodings from psp/vfpu-docs/inst-vfpu-desc.yaml.
+        } else if (group == 1u && operation == 28u) {
+            d.kind = OpcodeKind::VfpuI2uc;
+            d.mnemonic = "vi2uc";
+        } else if (group == 2u && operation == 2u) {
+            d.kind = OpcodeKind::VfpuButterfly1;
+            d.mnemonic = "vbfy1";
+        } else if (group == 2u && operation == 5u) {
+            d.kind = OpcodeKind::VfpuSocp;
+            d.mnemonic = "vsocp";
+        } else if (group == 2u && operation == 10u) {
+            d.kind = OpcodeKind::VfpuSign;
+            d.mnemonic = "vsgn";
         } else if (group == 2u && (operation == 6u || operation == 7u)) {
             d.kind = OpcodeKind::VfpuHorizontal;
             d.mnemonic = operation == 6u ? "vfad" : "vavg";

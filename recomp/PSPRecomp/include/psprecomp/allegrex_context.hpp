@@ -1181,6 +1181,55 @@ struct alignas(16) AllegrexContext {
         write_vfpu_vector_with_destination_prefix(value, destination_register, length);
     }
 
+    // P3P3DS: VFPU operations used by ULUS-10512 but absent upstream. Semantics
+    // and prefix applicability from psp/vfpu-docs/inst-vfpu-desc.yaml (pcode,
+    // "prefix" field: 'd' = destination only, 'sd' = source and destination).
+    void execute_vfpu_vcrs(std::uint32_t destination_register, std::uint32_t source_register,
+                           std::uint32_t target_register) noexcept {
+        float s[4]{}, t[4]{};
+        read_vfpu_vector(s, source_register, 3u);
+        read_vfpu_vector(t, target_register, 3u);
+        const float r[4]{s[1] * t[2], s[2] * t[0], s[0] * t[1], 0.0f};
+        write_vfpu_vector_with_destination_prefix(r, destination_register, 3u);
+    }
+    void execute_vfpu_vbfy1(std::uint32_t destination_register, std::uint32_t source_register,
+                            std::uint32_t length) noexcept {
+        float s[4]{};
+        read_vfpu_vector(s, source_register, length);
+        const float r[4]{s[0] + s[1], s[0] - s[1], s[2] + s[3], s[2] - s[3]};
+        write_vfpu_vector_with_destination_prefix(r, destination_register, length);
+    }
+    void execute_vfpu_vsgn(std::uint32_t destination_register, std::uint32_t source_register,
+                           std::uint32_t length) noexcept {
+        float s[4]{}, r[4]{};
+        read_vfpu_vector_with_source_prefix(s, source_register, length, 0u);
+        for (std::uint32_t i = 0; i < length; ++i) r[i] = s[i] < 0.0f ? -1.0f : (s[i] > 0.0f ? 1.0f : 0.0f);
+        write_vfpu_vector_with_destination_prefix(r, destination_register, length);
+    }
+    void execute_vfpu_vsocp(std::uint32_t destination_register, std::uint32_t source_register,
+                            std::uint32_t input_length) noexcept {
+        float s[4]{}, r[4]{};
+        read_vfpu_vector(s, source_register, input_length);
+        for (std::uint32_t i = 0; i < input_length; ++i) {
+            r[2 * i] = std::fmin(std::fmax(1.0f - s[i], 0.0f), 1.0f);
+            r[2 * i + 1] = std::fmin(std::fmax(s[i], 0.0f), 1.0f);
+        }
+        write_vfpu_vector(r, destination_register, input_length * 2u);
+        eat_vfpu_prefixes();
+    }
+    void execute_vfpu_vi2uc(std::uint32_t destination_register, std::uint32_t source_register) noexcept {
+        float s[4]{};
+        read_vfpu_vector(s, source_register, 4u);
+        std::uint32_t packed = 0u;
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const std::uint32_t v = std::bit_cast<std::uint32_t>(s[i]);
+            if ((v & 0x80000000u) == 0u) packed |= (v >> 23u) << (8u * i);
+        }
+        const float r[1]{std::bit_cast<float>(packed)};
+        write_vfpu_vector(r, destination_register, 1u);
+        eat_vfpu_prefixes();
+    }
+
     void execute_vfpu_vocp(std::uint32_t destination_register, std::uint32_t source_register,
                            std::uint32_t length) noexcept {
         if (length == 0u || length > 4u) return;

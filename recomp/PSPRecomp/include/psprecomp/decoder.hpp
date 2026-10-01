@@ -20,6 +20,7 @@ enum class OpcodeKind {
     Bc1f, Bc1t, Bc1fl, Bc1tl, Bvf, Bvt, Bvfl, Bvtl,
     Mfv, Mtv, Vpfx, Viim, Vfim, Vh2f, Vf2h, Vf2i, Vi2f, Vx2i, VmidT, Vmmov, VfpuMatrixInit, Vidt, Vcst, Vocp, VfpuHorizontal, Vrot, Vtfm, VfpuVectorInit, VfpuVec3, Vscl, Vdot, Vhdp, Vcmp, Vminmax, VfpuCompare3, Vcmov, VfpuUnary, Vmmul, Vmscl, VcrossQuat, Lvs, Svs, Lvq, Svq,
     Syscall,
+    VfpuCross, VfpuButterfly1, VfpuSign, VfpuSocp, VfpuI2uc, // P3P3DS
     Vflush,
     Vfpu,
     Unsupported,
