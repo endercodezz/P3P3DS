@@ -110,7 +110,7 @@ Phase 4: Nintendo 3DS Backend Integration
 
 ### Render reference captures needed from PPSSPP (maintainer)
 
-The local PPSSPP (`D:ds\PPSSPP`) is the GUI build only, without PPSSPPHeadless, so frames cannot be captured by script. Capture these screens by hand in PPSSPP (ULUS-10512, internal resolution 1x = 480x272, no texture filtering/upscaling, "Software rendering" if possible) as lossless PNG and put them in `.tmp/reference/` (not committed) with the file names below. P3P3DS frame numbers come from `--frame-every 30`/`60` runs with the listed input script; screens are identified by content, not by frame number.
+The local PPSSPP (`D:\3ds\PPSSPP`) is the GUI build only, without PPSSPPHeadless, so frames cannot be captured by script. Capture these screens by hand in PPSSPP (ULUS-10512, internal resolution 1x = 480x272, no texture filtering/upscaling, "Software rendering" if possible) as lossless PNG and put them in `.tmp/reference/` (not committed) with the file names below. P3P3DS frame numbers come from `--frame-every 30`/`60` runs with the listed input script; screens are identified by content, not by frame number.
 
 | File | Screen | P3P3DS frame / script |
 |---|---|---|
