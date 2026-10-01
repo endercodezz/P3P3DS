@@ -4,11 +4,13 @@
 #include "p3p3ds/interpreter.hpp"
 #include "p3p3ds/vfs.hpp"
 #include "telemetry.hpp"
+#include "frame_dump.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <set>
+#include <cstdio>
 #include <tuple>
 #include <memory>
 #include <vector>
@@ -16,7 +18,8 @@ namespace psprecomp {void register_generated_functions(Runtime &); void apply_ge
 int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
-            ms0_path="out/ms0", mods_path;
+            ms0_path="out/ms0", mods_path, frames_dir;
+        std::uint64_t frame_every=30;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true;
         std::optional<std::uint32_t> expected;
@@ -35,13 +38,16 @@ int main(int argc,char **argv) {
             else if(a=="--io-trace") io_trace_path=value();
             else if(a=="--ms0") ms0_path=value();
             else if(a=="--mods") mods_path=value();
+            else if(a=="--frames-dir") frames_dir=value();
+            else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
                 std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
                          <<"--run-until-blocker --expect-frontier <address> --dump-events <json>\n"
                          <<"--elf <path> --max-dispatches <count> --stop-on-any-vram-write\n"
                          <<"--no-interpreter (stop at unregistered PCs instead of interpreting)\n"
-                         <<"--umd <iso> (disc0: image; default: the single *.iso in the working directory)\n";return 0;
+                         <<"--umd <iso> (disc0: image; default: the single *.iso in the working directory)\n"
+                         <<"--frames-dir <dir> [--frame-every N] (write every Nth displayed frame as BMP)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -106,8 +112,10 @@ int main(int argc,char **argv) {
         rt.event_budget=400000;
         for(const char *type:{"guest_enter","guest_transfer","hle_hit"}) rt.event_type_limits[type]=20000;
         for(const char *type:{"thread_wait","thread_wake","thread_preempt","io_read_async","io_open","io_getstat",
-                              "callback_run","callback_return","interpreter_enter"}) rt.event_type_limits[type]=4000;
+                              "callback_run","callback_return","interpreter_enter","cpu_vram_write","ge_enqueue",
+                              "ge_finish","ge_stall_update","ge_signal","ge_callback","ge_callback_complete"}) rt.event_type_limits[type]=4000;
         p3p3ds::BootstrapCheckpoint checkpoint;
+        std::uint64_t frames_shown=0;
         rt.event_observer=[&] {
             if(!rt.events.empty() && rt.events.back().type=="guest_transfer")
                 kernel.threads().invalidate_thread_entry();
@@ -121,6 +129,22 @@ int main(int argc,char **argv) {
                 rt.cpu().pc=rt.last_transfer.target;
                 rt.stop("Stable bootstrap checkpoint reached");
                 throw psprecomp::FrontierHalt{};
+            }
+            // Frame capture (after the checkpoint, which inspects events.back()): every displayed framebuffer is hashed (event
+            // "frame"); every --frame-every-th one is written as BMP.
+            if(!rt.events.empty() && rt.events.back().type=="display_framebuffer") {
+                const auto f=rt.events.back().fields;
+                const auto rgb=p3p3ds::framebuffer_rgb(rt.memory(),static_cast<std::uint32_t>(f.at("address")),
+                    static_cast<std::uint32_t>(f.at("stride")),static_cast<std::uint32_t>(f.at("format")));
+                const auto index=frames_shown++;
+                std::uint64_t nonblack=0; for(std::size_t i=0;i<rgb.size();i+=3) nonblack+=(rgb[i]|rgb[i+1]|rgb[i+2])!=0;
+                if(!frames_dir.empty() && index%frame_every==0) {
+                    std::filesystem::create_directories(frames_dir);
+                    char name[32]; std::snprintf(name,sizeof name,"frame_%05llu.bmp",static_cast<unsigned long long>(index));
+                    p3p3ds::write_bmp(std::filesystem::path(frames_dir)/name,rgb);
+                }
+                rt.event("frame",{{"index",index},{"fnv1a",p3p3ds::fnv1a(rgb)},{"nonblack_pixels",nonblack},
+                    {"time_us",kernel.threads().now()}});
             }
         };
         psprecomp::set_runtime_pre_dispatch_hook([](auto &r,auto &,auto pc,auto) {r.diagnostic_pc=pc;r.event("guest_enter",{{"target",pc}});});

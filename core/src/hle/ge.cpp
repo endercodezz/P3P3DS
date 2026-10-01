@@ -11,15 +11,6 @@ constexpr std::int32_t invalid_mode=static_cast<std::int32_t>(0x80000107u);
 constexpr std::int32_t invalid_pointer=static_cast<std::int32_t>(0x80000023u);
 constexpr std::int32_t invalid_size=static_cast<std::int32_t>(0x80000104u);
 constexpr std::int32_t already=static_cast<std::int32_t>(0x80000020u);
-bool setup_opcode(unsigned op) {
-    // Whitelist of register writes in the captured static reset and dynamic setup.
-    return op==0 || op==1 || op==2 || op==0x10 || op==0x12 || op==0x13 ||
-        (op>=0x15 && op<=0x28) || (op>=0x2A && op<=0x33) ||
-        (op>=0x36 && op<=0x38) || (op>=0x3A && op<=0x4D) ||
-        op==0x50 || op==0x51 || (op>=0x53 && op<=0x58) ||
-        (op>=0x5B && op<=0xB5) || (op>=0xB8 && op<=0xD0) ||
-        (op>=0xD2 && op<=0xE9) || op==0xEB || op==0xEC || op==0xEE;
-}
 }
 const GeListInfo *GeManager::find(int id) const { auto i=lists_.find(id); return i==lists_.end()?nullptr:&i->second; }
 std::int32_t GeManager::set_callback(psprecomp::GuestMemory &mem, std::uint32_t ptr) {
@@ -83,34 +74,6 @@ std::int32_t GeManager::sync(psprecomp::Runtime &rt, int id, int mode, bool all)
     }
     return static_cast<std::int32_t>(status);
 }
-void GeManager::capture_writer(psprecomp::Runtime &rt, const GeListInfo &l, std::uint32_t word) {
-    writer_observed_=true; writer_pc_=l.pc;
-    rt.event("first_graphics_writer", {{"list",l.id}, {"ge_pc",l.pc}, {"word",word},
-        {"opcode",word>>24}, {"argument",word&0xFFFFFF}, {"callback",static_cast<std::uint32_t>(l.callback_id)},
-        {"stall",l.stall_address}, {"color",state_.color_address()}, {"depth",state_.depth_address()},
-        {"stride",state_.color_stride()}, {"format",state_.format()}, {"vertex",state_.vertex},
-        {"index",state_.index}, {"offset",state_.offset}});
-    // Complete bounded state snapshot, including viewport/texture/blend/depth.
-    for (unsigned op=0;op<256;++op) rt.event("ge_register", {{"register",op},{"value",state_.registers[op]}});
-    for (auto a:{state_.vertex,state_.index}) for(unsigned off=0;off<64 && rt.memory().contains(a+off,4);off+=4)
-        rt.event("writer_memory", {{"address",a+off},{"word",rt.memory().load32(a+off)}});
-    std::cout << "[GE FIRST WRITER] id=" << l.id << " pc=" << psprecomp::hex32(l.pc)
-              << " word=" << psprecomp::hex32(word) << " op=" << psprecomp::hex32(word>>24)
-              << " arg=" << psprecomp::hex32(word&0xFFFFFF) << " cb=" << l.callback_id
-              << " stall=" << psprecomp::hex32(l.stall_address) << "\n";
-    report();
-    for(unsigned op : {0x10u,0x12u,0x13u,0x1Eu,0x42u,0x43u,0x44u,0x45u,0x46u,0x47u,0x4Cu,0x4Du,0xA0u,0xA8u,0xB8u,0xC2u,0xC3u,0xD3u,0xD4u,0xD5u})
-        std::cout << "  reg=" << psprecomp::hex32(op) << " arg=" << psprecomp::hex32(state_.registers[op]) << "\n";
-    std::cout << "  VADDR=" << psprecomp::hex32(state_.vertex) << " IADDR=" << psprecomp::hex32(state_.index)
-              << " offset=" << psprecomp::hex32(state_.offset) << "\n";
-    // Bounded raw prefix only; exact vertex stride will be decoded after the writer is observed.
-    for(auto a : {state_.vertex,state_.index}) {
-        std::cout << "  memory prefix " << psprecomp::hex32(a) << ":";
-        for(unsigned i=0;i<64 && rt.memory().contains(a+i,4);i+=4) std::cout << " " << psprecomp::hex32(rt.memory().load32(a+i));
-        std::cout << "\n";
-    }
-    rt.stop("GE first writer requires implementation");
-}
 void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo &l, std::uint32_t end_pc) {
     if (l.callback_id<0) return;
     const auto &callback=callbacks_.at(l.callback_id);
@@ -146,45 +109,96 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     if (!rt.stopped()) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
                                  << " token=" << l.finish_token << " end=" << psprecomp::hex32(end_pc) << "\n";
 }
+// GE command execution. Opcodes: PSPSDK psp/pspsdk/src/ge/pspge.h and the
+// gu command list (pspgu.h); PPSSPP GPU/ge_constants.h cross-checked only.
+void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t word) {
+    const auto op=word>>24, arg=word&0xFFFFFF;
+    auto &mem=rt.memory();
+    regs_.reg[op]=arg;
+    state_.registers[op]=arg;
+    auto target=[&](std::uint32_t a){ return state_.relative(a)&~3u; };
+    switch(op) {
+    case 0x01: state_.vertex=state_.relative(arg); break;
+    case 0x02: state_.index=state_.relative(arg); break;
+    case 0x04: { // PRIM
+        const auto count=arg&0xFFFF, type=(arg>>16)&7;
+        if(type==7) { rt.stop("GE PRIM type 7 unsupported"); return; }
+        renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
+        const auto layout=ge::vertex_layout(regs_.reg[0x12]);
+        if(layout.index_format) state_.index+=count*(layout.index_format==1?1u:2u);
+        else state_.vertex+=count*layout.size;
+        if(!writer_observed_) { writer_observed_=true; writer_pc_=l.pc;
+            rt.event("first_graphics_writer",{{"list",static_cast<std::uint32_t>(l.id)},{"ge_pc",l.pc},{"word",word}}); }
+        break;
+    }
+    case 0x05: case 0x06: rt.stop("GE BEZIER/SPLINE unsupported "+psprecomp::hex32(word)); return;
+    case 0x07: l.bbox_failed=false; break; // [INFERRED] bounding boxes treated as visible
+    case 0x08: l.pc=target(arg); return;
+    case 0x09: if(l.bbox_failed) { l.pc=target(arg); return; } break;
+    case 0x0A:
+        if(l.call_stack.size()>=32) { rt.stop("GE call stack overflow"); return; }
+        l.call_stack.emplace_back(l.pc+4,state_.offset);
+        l.pc=target(arg); return;
+    case 0x0B:
+        if(l.call_stack.empty()) { rt.stop("GE RET with empty call stack"); return; }
+        l.pc=l.call_stack.back().first; state_.offset=l.call_stack.back().second; l.call_stack.pop_back(); return;
+    case 0x0E: { // SIGNAL: behaviours 1-3 call the signal handler (pspge.h PSP_GE_SIGNAL_HANDLER_*)
+        const auto behaviour=arg>>16;
+        if(behaviour<1 || behaviour>3) { rt.stop("GE SIGNAL behaviour unsupported "+psprecomp::hex32(word)); return; }
+        rt.event("ge_signal",{{"list",static_cast<std::uint32_t>(l.id)},{"behaviour",behaviour},{"value",arg&0xFFFF}});
+        break;
+    }
+    case 0x0F: l.finish_token=arg&0xFFFF; break;
+    case 0x13: state_.offset=arg<<8; break;
+    case 0x14: state_.offset=l.pc; break; // ORIGIN
+    case 0x2A: regs_.reg[0x2A]=arg; state_.matrix_index[0]=arg&0x7F; break;
+    case 0x2B: { auto &i=state_.matrix_index[0]; if(i<regs_.bone.size()) regs_.bone[i]=ge::ge_float(arg); ++i; break; }
+    case 0x3A: state_.matrix_index[1]=arg&0xF; break;
+    case 0x3B: { auto &i=state_.matrix_index[1]; if(i<12) regs_.world[i]=ge::ge_float(arg); ++i; break; }
+    case 0x3C: state_.matrix_index[2]=arg&0xF; break;
+    case 0x3D: { auto &i=state_.matrix_index[2]; if(i<12) regs_.view[i]=ge::ge_float(arg); ++i; break; }
+    case 0x3E: state_.matrix_index[3]=arg&0xF; break;
+    case 0x3F: { auto &i=state_.matrix_index[3]; if(i<16) regs_.proj[i]=ge::ge_float(arg); ++i; break; }
+    case 0x40: state_.matrix_index[4]=arg&0xF; break;
+    case 0x41: { auto &i=state_.matrix_index[4]; if(i<12) regs_.tgen[i]=ge::ge_float(arg); ++i; break; }
+    case 0xC4: { // LOADCLUT: arg blocks of 32 bytes from CLUTADDR (+ upper bits)
+        const auto address=(regs_.reg[0xB0]&0xFFFFF0u)|((regs_.reg[0xB1]&0x0F0000u)<<8);
+        const auto bytes=std::min<std::uint32_t>((arg&0x3F)*32u,1024u);
+        regs_.clut.fill(0); regs_.clut_words=bytes/4u;
+        for(std::uint32_t i=0;i<bytes;i+=4) if(mem.contains(address+i,4)) regs_.clut[i/4]=mem.load32(address+i);
+        break;
+    }
+    case 0xEA: renderer_->transfer(mem,regs_); break;
+    default: break;
+    }
+    l.pc+=4;
+}
+
 void GeManager::pump(psprecomp::Runtime &rt) {
-    unsigned budget=65536;
+    std::uint64_t budget=4u<<20;
     while(!queue_.empty() && !rt.stopped()) {
         auto &l=lists_.at(queue_.front());
         if(l.status==GeStatus::Paused) return;
         if(l.pc==l.stall_address && l.stall_address) { l.status=GeStatus::Stalled; return; }
         l.status=GeStatus::Running;
         if(!budget--) {rt.stop("GE command budget exceeded");return;}
-        if((l.pc&3) || !rt.memory().contains(l.pc,4)) {rt.stop("GE invalid command fetch");return;}
-        const auto word=rt.memory().load32(l.pc), op=word>>24, arg=word&0xFFFFFF;
-        if(op==4 || op==5 || op==6 || op==0xEA) { capture_writer(rt,l,word); return; }
-        if(op==0x0B) {rt.stop("GE unsupported RET (not FINISH)");return;}
-        if(op==0x0E) {rt.stop("GE unsupported SIGNAL");return;}
-        if(op==0x0C) {
-            if(l.previous!=0x0F) {rt.stop("GE END without FINISH unsupported");return;}
-            ++l.commands; l.pc+=4; ++l.completions; l.status=GeStatus::Completed;
-            std::cout << "[GE COMPLETED] id=" << l.id << " commands=" << l.commands << " completions=" << l.completions << "\n";
+        if((l.pc&3) || !rt.memory().contains(l.pc,4)) {rt.stop("GE invalid command fetch at "+psprecomp::hex32(l.pc));return;}
+        const auto word=rt.memory().load32(l.pc), op=word>>24;
+        ++l.commands;
+        if(op==0x0C) { // END (after FINISH: completion; after SIGNAL: continue)
+            l.pc+=4;
+            if(l.previous==0x0E) { l.previous=op; continue; }
+            ++l.completions; l.status=GeStatus::Completed;
             queue_.pop_front();
             rt.event("ge_finish", {{"list",l.id},{"ge_pc",l.pc},{"commands",l.commands},{"completions",l.completions}});
-            deliver_finish_callback(rt,l,l.pc);
+            if(l.previous==0x0F) deliver_finish_callback(rt,l,l.pc);
             continue;
         }
-        if(op==0x0F) l.finish_token=arg&0xFFFF;
-        else {
-            if(!setup_opcode(op)) {rt.stop("GE unsupported command "+psprecomp::hex32(word));return;}
-            if(op==0xC4 && arg) {rt.stop("GE nonzero CLUT load requires implementation");return;}
-            state_.registers[op]=arg;
-            if(op==1) state_.vertex=state_.relative(arg);
-            if(op==2) state_.index=state_.relative(arg);
-            if(op==0x13) state_.offset=arg<<8;
-            const unsigned matrix_ops[]={0x2A,0x3A,0x3C,0x3E,0x40};
-            for(unsigned m=0;m<5;++m) {
-                if(op==matrix_ops[m]) state_.matrix_index[m]=arg&127;
-                if(op==matrix_ops[m]+1) state_.matrices[m][state_.matrix_index[m]++&127]=arg;
-            }
-        }
-        ++l.commands; l.pc+=4; l.previous=op;
+        execute(rt,l,word);
+        l.previous=op;
     }
 }
+
 void GeManager::report() const {
     std::cout << "[GE STATE] color=" << psprecomp::hex32(state_.color_address()) << " stride=" << state_.color_stride()
               << " format=" << state_.format() << " depth=" << psprecomp::hex32(state_.depth_address())

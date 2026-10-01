@@ -50,7 +50,9 @@ struct VramActivity {
             r.event("cpu_vram_write",{{"address",address},{"bytes",bytes},{"color",is_color},{"depth",is_depth},{"texture",is_texture},
                 {"instruction",r.memory().contains(r.diagnostic_pc,4)?r.memory().load32(r.diagnostic_pc):0}},category);
         } else ++suppressed;
-        if(is_color || is_depth || stop_any) {
+        // With GE rendering implemented, CPU writes to render targets are
+        // ordinary; only --stop-on-any-vram-write halts.
+        if(stop_any) {
             r.cpu().pc=r.diagnostic_pc;
             r.stop(is_color?"CPU VRAM color target write observed":is_depth?"CPU VRAM depth target write observed":"CPU VRAM write observed; inspect target and producer");
             throw psprecomp::FrontierHalt{};

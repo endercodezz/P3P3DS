@@ -134,14 +134,22 @@ int main() {
         r.stop("replacement");CHECK(r.stop_reason().starts_with("No recompiled"));
         CHECK(p3p3ds::json_string("a\n\"\\")=="\"a\\u000a\\\"\\\\\"");
     }
+    // GE lists execute: PRIM/TRANSFERSTART reach the renderer and the list
+    // completes; BEZIER/SPLINE are explicit unsupported stops.
     for(unsigned op:{4u,5u,6u,0xEAu}) {
-        Runtime r;p3p3ds::hle::GeManager g;r.frontier_diagnostics=true;
-        r.memory().store32(0x08800000,(op<<24)|3);
+        Runtime r;p3p3ds::KernelState k;auto &g=k.ge();r.frontier_diagnostics=true;
+        r.memory().store32(0x08800000,(op<<24)|(op==4u?0u:3u));
+        r.memory().store32(0x08800004,0x0F000000u);r.memory().store32(0x08800008,0x0C000000u);
         auto id=g.enqueue_list(r,0x08800000,0,-1,0);
-        CHECK(r.stopped());CHECK(g.writer_observed());CHECK(g.writer_pc()==0x08800000);
-        CHECK(g.find(id)->commands==0);CHECK(r.memory().vram_writes().operations==0);
-        bool found=false;for(auto &e:r.events)found|=e.type=="first_graphics_writer" && e.fields.at("opcode")==op;
-        CHECK(found);
+        bool found=false;for(auto &e:r.events)found|=e.type=="first_graphics_writer" && e.fields.at("word")>>24==op;
+        CHECK(g.writer_observed()==(op==4u));CHECK(found==(op==4u));
+        if(op==4u) CHECK(g.writer_pc()==0x08800000);
+        if(op==5u || op==6u) {
+            CHECK(r.stopped());CHECK(r.stop_reason().starts_with("GE BEZIER/SPLINE"));
+            CHECK(p3p3ds::blocker_type(r,k)=="graphics");
+        } else {
+            CHECK(!r.stopped());CHECK(g.find(id)->commands==3);CHECK(g.find(id)->status==p3p3ds::hle::GeStatus::Completed);
+        }
     }
     {
         GuestMemory m;unsigned count=0;
@@ -168,8 +176,10 @@ int main() {
         k.display().set_framebuf(0x04088000,512,3,1);
         activity.observe(r,k,0x04088000,4);CHECK(!r.stopped());
         k.display().advance_vblank();
-        try {activity.observe(r,k,0x04088000,4);CHECK(false);}catch(const FrontierHalt &){}
-        CHECK(r.stopped());CHECK(r.cpu().pc==0x08801000);CHECK(activity.color==1);
+        // Render-target writes are classified but only halt on request.
+        activity.observe(r,k,0x04088000,4);CHECK(!r.stopped());CHECK(activity.color==1);
+        try {activity.observe(r,k,0x04088000,4,true);CHECK(false);}catch(const FrontierHalt &){}
+        CHECK(r.stopped());CHECK(r.cpu().pc==0x08801000);CHECK(activity.color==2);
     }
     {
         Runtime r;p3p3ds::KernelState k;p3p3ds::VramActivity activity;r.frontier_diagnostics=true;
@@ -182,8 +192,8 @@ int main() {
         activity.observe(r,k,0x0418001F,1);CHECK(activity.texture==2); // minimum stride is four pixels
         activity.observe(r,k,0x04180020,1);CHECK(activity.resource==1);
         activity.observe(r,k,0x04154004,4);CHECK(activity.resource==2);CHECK(!r.stopped());
-        try {activity.observe(r,k,0x04110000,4);CHECK(false);}catch(const FrontierHalt &){}
-        CHECK(activity.depth==1);CHECK(activity.color==0);CHECK(r.stopped());
+        activity.observe(r,k,0x04110000,4);CHECK(!r.stopped());
+        CHECK(activity.depth==1);CHECK(activity.color==0);
     }
     std::cout<<"frontier checks failures="<<failures<<"\n";return failures?1:0;
 }

@@ -42,7 +42,7 @@ struct BootstrapCheckpoint {
 };
 inline std::string blocker_type(const psprecomp::Runtime &r, const KernelState &k) {
     const auto &s=r.stop_reason();
-    if(k.ge().writer_observed()) return "graphics_writer";
+    if(s.starts_with("GE ")) return "graphics";
     if(s.starts_with("CPU VRAM")) return "cpu_vram_write";
     if(s.starts_with("Missing HLE")) return "missing_hle";
     if(s.starts_with("Unsupported Allegrex")) return "unsupported_instruction";

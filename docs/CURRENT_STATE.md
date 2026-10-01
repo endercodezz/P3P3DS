@@ -2,6 +2,16 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## GE display-list execution and first visible frames (2026-10-01)
+
+- [VERIFIED] `core/src/hle/ge.cpp` executes GE lists (JUMP/BJUMP/CALL/RET, SIGNAL 1-3, FINISH/END, BASE/OFFSET/ORIGIN, bone/world/view/proj/texgen matrices, LOADCLUT, TRANSFERSTART, PRIM) and hands the decoded register file to a `ge::GeRenderer` (`core/include/p3p3ds/ge/renderer.hpp`). `ge::SoftwareRenderer` (`core/src/ge/software_renderer.cpp`) is the target-agnostic reference backend: it rasterizes into guest EDRAM (points/lines are not drawn; sprites, triangles, strips, fans; through and transform mode; 16/32-bit and CLUT4/8/16/32 textures, swizzle; texture functions; alpha/depth tests; blending; clear mode; masks; block transfer). DXT textures render magenta, BEZIER/SPLINE stop explicitly. Rasterization rules are [INFERRED] (not compared to hardware captures).
+- [VERIFIED] `tests/test_ge_renderer.cpp` (sprite coverage + scissor, linear vs swizzled CLUT4 sampled exactly, 50% alpha blend, clear mode, block transfer). CPU writes to render targets no longer halt the run (only `--stop-on-any-vram-write`).
+- [VERIFIED] The runner hashes every displayed framebuffer (`frame` event, FNV-1a, non-black pixel count) and writes BMPs with `--frames-dir <dir> [--frame-every N]` (`platform/pc/frame_dump.hpp`). In one run (virtual 12.6 s, 227 frames, ~5 s wall) the game shows a loading indicator, the **ATLUS logo** (frames ~70-140) and the **CRIWARE logo** (frames ~150-220); checked visually from `.tmp/frames`. No PPSSPP screenshot comparison was possible offline.
+- [VERIFIED] 18/18 CTest, `--verify-bootstrap` PASS. Two `--run-until-blocker --max-dispatches 400000000 --ms0 .tmp/ms0` replays byte-identical, SHA-256 `F983FD7AF8B7B12463A266C311AD2E84042EDAE6CF1254F853CFCD56C3F52B3D`; identical frame hash sequences.
+- [UNVERIFIED] No host window yet: SDL3 is not available offline (vendored `SDL3` tree empty), so presentation is frame dumps only.
+
+Immediate blocker: missing `sceMpeg::0x682A619B` (`sceMpegInit`) — the opening movie (item 5).
+
 ## SAS, controller, cache/time services and remaining VFPU (2026-10-01)
 
 - [VERIFIED] `core/src/hle/sascore.cpp`: all 27 `sceSasCore` imports — VAG ADPCM / PCM / noise voices, pitch, volumes, ADSR state machine (32-sample key-on delay, linear/bent/exponential/direct curves), pause/end flags, grain mixing into stereo S16 (`__sceSasCore`, `WithMix`). Reverb parameters are stored but not mixed [UNVERIFIED]. `tests/test_sascore.cpp` replays the call sequences of `pspautotests/tests/audio/sascore/adsrcurve.cpp` and matches **53/53** hardware envelope traces in `adsrcurve.expected` exactly, plus init/volume/pitch/PCM/VAG/ADSR-mode/key-on/off checks from the other `.expected` files. Envelope-to-amplitude scaling is [INFERRED]. P3P initializes SAS with grain 256, 32 voices, stereo.

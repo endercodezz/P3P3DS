@@ -4,6 +4,9 @@
 #include <map>
 #include <deque>
 #include <string>
+#include <memory>
+#include <vector>
+#include "p3p3ds/ge/renderer.hpp"
 namespace psprecomp { class Runtime; class GuestMemory; struct AllegrexContext; }
 namespace p3p3ds { class KernelState; }
 namespace p3p3ds::hle {
@@ -15,6 +18,8 @@ struct GeListInfo {
     GeStatus status{GeStatus::Queued};
     std::uint64_t commands{}, completions{};
     std::uint32_t previous{}, finish_token{};
+    std::vector<std::pair<std::uint32_t,std::uint32_t>> call_stack; // (return pc, offset)
+    bool bbox_failed{};
 };
 struct GeState {
     std::array<std::uint32_t,256> registers{};
@@ -48,7 +53,13 @@ public:
     bool writer_observed() const { return writer_observed_; }
     std::uint32_t writer_pc() const { return writer_pc_; }
     void report() const;
+    void set_renderer(std::unique_ptr<ge::GeRenderer> renderer) { renderer_ = std::move(renderer); }
+    ge::GeRenderer &renderer() { return *renderer_; }
+    const ge::GeRegisters &registers() const { return regs_; }
 private:
+    ge::GeRegisters regs_;
+    std::unique_ptr<ge::GeRenderer> renderer_{std::make_unique<ge::SoftwareRenderer>()};
+    void execute(psprecomp::Runtime &, GeListInfo &, std::uint32_t word);
     GeState state_;
     std::map<int,GeListInfo> lists_;
     std::map<int,GeCallback> callbacks_;
@@ -56,7 +67,6 @@ private:
     int next_id_{1}, next_callback_{0};
     bool writer_observed_{};
     std::uint32_t writer_pc_{};
-    void capture_writer(psprecomp::Runtime &, const GeListInfo &, std::uint32_t);
     void deliver_finish_callback(psprecomp::Runtime &, const GeListInfo &, std::uint32_t end_pc);
 };
 void register_ge_module(psprecomp::Runtime &, KernelState &);

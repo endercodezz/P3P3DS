@@ -93,6 +93,7 @@ add_library(p3p3ds_core
     core/src/hle/sascore.cpp
     core/src/hle/utils.cpp
     core/src/hle/ctrl.cpp
+    core/src/ge/software_renderer.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
@@ -291,4 +292,7 @@ set_tests_properties(p3p_modulemgr PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT
 add_executable(test_sascore tests/test_sascore.cpp)
 target_link_libraries(test_sascore PRIVATE p3p3ds_core)
 add_test(NAME p3p_sascore COMMAND test_sascore)
+add_executable(test_ge_renderer tests/test_ge_renderer.cpp)
+target_link_libraries(test_ge_renderer PRIVATE p3p3ds_core)
+add_test(NAME p3p_ge_renderer COMMAND test_ge_renderer)
 set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
