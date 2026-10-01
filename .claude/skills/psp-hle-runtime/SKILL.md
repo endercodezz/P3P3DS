@@ -61,11 +61,36 @@ When a missing NID call is logged by the runtime:
 
 ---
 
-## 4. Critical Subsystem Checklists
+## 4. P3P3DS Implementation Mechanics
+
+**Name the NID first:** `bash .claude/skills/psp-hle-runtime/scripts/nid_lookup.sh 0xNNNNNNNN` prints the PSPSDK name, uOFW export/source files, pspautotests sources with `.expected` hardware output, and whether `core/` already registers it. NIDs absent from PSPSDK (e.g. `sceMpegAvcDecodeFlush` 0x4571CC64) are named from the pspautotests sources' `extern` declarations.
+
+**Where code goes:** one file per module in `core/src/hle/<module>.cpp` with `register_<module>_module(Runtime&, KernelState&)`, called from `core/src/hle/hle_modules.cpp`; module state lives in `KernelState` (`kernel_state.hpp`, accessor like `kernel.sas()` / `kernel.mpeg()`). Small singletons go in `core/src/hle/utils.cpp`. Handler shape:
+
+```cpp
+runtime.register_hle("sceFoo", 0x12345678u, [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+    const auto arg0 = ctx.gpr[4];                  // a0..a3 = gpr[4..7], then t0.. = gpr[8..]
+    if (!rt.memory().contains(arg0, 4u)) { ctx.set_gpr(2, kErrorCode); return; }
+    rt.event("foo_call", {{"arg", arg0}});         // bounded diagnostics
+    ctx.set_gpr(2, result);                         // $v0
+});
+```
+
+**Blocking services:** never spin or fake completion. Use `kernel.threads().block_current(rt, ctx, WaitInfo{...})` (wait queues, deadlines on the virtual clock, +1 us per HLE call); a wait that must re-run the service when woken sets `retry` and resumes at the import stub. Callbacks run only at CB waits / `sceKernelCheckCallback`.
+
+**Calling guest code from a service** (ringbuffer/read callbacks): `kernel.threads().call_guest(rt, ctx, resume, function, {a0, a1, a2}, gp, then)` runs the guest function on the calling thread (it may block, e.g. in `sceIoRead`) and invokes `then(rt, ctx, v0)` on return, which sets the result or chains another call (see `put_step` in `core/src/hle/mpeg.cpp`). Interrupt-context handlers (GE finish callbacks) cannot block and run isolated via `rt.invoke_isolated_aot`.
+
+**Tests:** one `tests/test_<module>.cpp` per module, registered in `CMakeLists.txt` (`SKIP_RETURN_CODE 77` when it needs UMD/assets that may be absent). Harness pattern (copy from `tests/test_misc_hle.cpp`): `register_all_hle_modules`, `init_root_thread`, then call the import with `rt.invoke_import(lib, nid, ctx)` after setting `gpr[4..]`, `gpr[31]`=return PC and `pc`=fake stub; when the service starts a guest call, dispatch with `rt.invoke_isolated_aot(ctx.pc, ctx)` until `pc` returns (guest callbacks can be host functions registered with `rt.register_function`).
+
+**Strongest evidence available: replay the hardware transcript.** When pspautotests has a `.c` + `.expected` pair, reimplement the test's calls in C++ and print lines in the exact `checkpoint` format, then compare line by line with the `.expected` file (strip the `[x] `/`[r] ` prefix and CRLF; normalize heap addresses that differ). `tests/test_mpeg.cpp` matches all 2,905 lines of `video/mpeg/basic.expected` this way; `tests/test_sascore.cpp` matches 53 ADSR traces. Mismatching lines are research leads (the AVC attribute turned out to be the slice `nal_ref_idc`).
+
+After implementing, rerun the game with the `p3p-run-triage` skill and confirm the guest continued past the call.
+
+## 5. Critical Subsystem Checklists
 
 - **ThreadMan (`sceKernelCreateThread`, `sceKernelStartThread`, `sceKernelDelayThread`):**
   - Thread priorities are inverted (0 = highest, 127 = lowest; default user thread is 32).
-  - Delay units are in microseconds (convert accurately to host clock).
+  - Delay units are microseconds on the deterministic virtual clock (`ThreadManager::now()`), never the host clock.
 - **Event Flags (`sceKernelCreateEventFlag`, `sceKernelWaitEventFlag`, `sceKernelSetEventFlag`):**
   - Verify wait modes: `PSP_EVENT_WAITAND` (0x00), `PSP_EVENT_WAITOR` (0x01), clear on exit (`PSP_EVENT_WAITCLEAR` 0x20).
 - **File I/O (`sceIoOpen`, `sceIoRead`, `sceIoClose`):**
@@ -73,10 +98,11 @@ When a missing NID call is logged by the runtime:
   - Return distinct integer file descriptors (UIDs), tracking open offsets and file sizes.
 - **Audio Synthesizer (`sceSasCore`):**
   - Used for P3P sound effects and menu clicks. Must process ADPCM voices and render 16-bit PCM blocks.
+- **Implemented so far** (see `docs/CURRENT_STATE.md` for status and evidence): SysMem, ThreadMan (threads, semaphores, event flags, mutexes, lwmutexes, callbacks, delays, vblank waits), IoFileMgr over ISO9660/host VFS with the CWCheat mod chain, ModuleMgr (unencrypted PRX), sceAudio, sceSasCore, sceCtrl, sceUmd, sceDisplay, sceGe (+ software renderer), sceMpeg (demux; decoding stubbed behind `MpegDecoder`), UtilsForUser, sceDmac, sceSuspendForUser.
 
 ---
 
-## 5. Expected Output Format
+## 6. Expected Output Format
 
 When implementing or documenting an HLE function:
 

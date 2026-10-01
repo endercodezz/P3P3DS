@@ -4,16 +4,21 @@
 
 ---
 
-## Status: NOT PLAYABLE
+## Status: NOT PLAYABLE (reaches the title screen on PC)
 
-> **IMPORTANT:** This project is in early research and bootstrap stages. The game is **NOT PLAYABLE** on PC or Nintendo 3DS. It does not render 3D scenes, play audio, or run gameplay.
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio, and then loops its attract sequence because there is no controller input yet. Nothing runs on 3DS hardware yet.
 
-### What is currently verified and working:
-1. The decrypted P3P executable is analyzed and loaded into a 32 MiB PSP user RAM arena.
-2. All 178,513 PRX relocations are applied without unsupported or invalid types.
-3. The game's entry point (`module_start`, `0x08804108`) and primary thread entry (`user_main`, `0x0880421C`) have been statically recompiled into native C++ using execution-driven CFG coverage.
-4. The recompiled code executes natively on PC through a lightweight PSP runtime harness, dispatches `SysMemUserForUser` services (`sceKernelSetCompiledSdkVersion600_602`, `sceKernelSetCompilerVersion`), creates and starts the primary guest thread via `ThreadManForUser` (`sceKernelCreateThread`, `sceKernelStartThread`), performs a cooperative context switch, and executes guest instructions inside `user_main` (`0x0880421C`) to the first internal function call at `0x08B4E6A0`.
-5. An automated verification test strictly validates this execution milestone (entry PC `0x08804108`, stop PC `0x08B4E6A0`, return address `$ra == 0x08804268`, active thread `user_main` [UID 2], SDK version `0x06020010`, compiler version `0x00030306`, and stop reason).
+Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)):
+
+| Milestone | Result |
+|---|---|
+| Whole `.text` statically recompiled | 237 C++ units, 751,453 instruction PCs; leftovers run through an interpreter fallback (0 mismatches vs AOT on 1,200 differential cases) |
+| Boot | ThreadMan, SysMem, IoFileMgr (UMD ISO + memory stick + the community mod chain), ModuleMgr, UMD, Display services drive the game through CRI middleware startup |
+| First rendered frames | ATLUS and CRIWARE logos drawn by the GE display-list executor + software renderer |
+| Opening movie | 100 s PSMF movie demultiplexed by `sceMpeg` (on the pspautotests sample movie, container behaviour matches PSP hardware output line for line); picture and movie audio are placeholders (black / silence) |
+| Title screen | "PRESS ANY BUTTON" at frame 3600 (~133 s virtual time), title-screen audio recorded to WAV (not yet checked by ear) |
+| Stability | 38,314 frames (24 min virtual) of the attract loop without a blocker; runs are bit-for-bit deterministic |
+| Tests | 21/21 CTest suites, several replaying pspautotests hardware transcripts |
 
 ---
 
@@ -22,15 +27,16 @@
 - [x] Analyze P3P executable structure (ELF32 PRX, segments, sections)
 - [x] Full PRX relocation and library import table extraction (178,513 relocations, 221 import stubs)
 - [x] Independent relocation-aware validation tooling matching PSPRecomp 100%
-- [x] Minimal Ahead-of-Time (AOT) MIPS-to-C++ code generation with CFG out-of-line block traversal
-- [x] Execute recompiled P3P `module_start` on PC
-- [x] Guest execution through SysMem HLE services into ThreadMan (`ThreadManForUser::sceKernelCreateThread` / `sceKernelStartThread`)
-- [x] Context switch and execution of `user_main` (`0x0880421C`) to next internal callsite
-- [ ] Core PSP kernel and memory services (`SysMemUserForUser`, `ThreadManForUser`, `UtilsForUser`)
-- [ ] Virtual File System (VFS) with CRI CPK streaming and mod overlay support
-- [ ] Graphics display pipeline (PSP GE display list translation)
-- [ ] Audio backend (NDSP audio streaming and `sceSasCore` software synth)
-- [ ] New Nintendo 3DS native homebrew build (`.3dsx` / `.cia`)
+- [x] Whole-`.text` Ahead-of-Time (AOT) MIPS-to-C++ generation in fixed 16 KiB units, with an interpreter fallback
+- [x] Core PSP kernel services (SysMem, ThreadMan with waits/callbacks/virtual time, UtilsForUser, ModuleMgr)
+- [x] Virtual File System: UMD ISO9660, memory stick, CWCheat "Mod Support" chain (`bind/` → `mod.cpk` → `mod1-3.cpk` → original CPKs)
+- [x] GE display-list execution with a reference software renderer (first visible frames, title screen)
+- [x] `sceAudio`, `sceSasCore` and PCM output to WAV on PC
+- [x] `sceMpeg` container/ringbuffer behaviour (PSMF demux)
+- [ ] H.264 / ATRAC3plus decoding for the opening movie
+- [ ] Controller input and a live window / audio device on PC
+- [ ] Gameplay beyond the title screen
+- [ ] New Nintendo 3DS native homebrew build (`.3dsx` / `.cia`) — blocked on a devkitARM install
 - [ ] Playable game on New Nintendo 3DS hardware
 
 ---
@@ -58,29 +64,33 @@ We are **not** building a general-purpose PSP emulator, nor an all-encompassing 
 The project employs **Hybrid Static Recompilation (AOT)**:
 
 ```text
-Decrypted P3P Executable (Allegrex MIPS ELF)
+Decrypted P3P Executable (Allegrex MIPS ELF) + community CWCheat patches
                     │
                     ▼
-     Offline Static Recompiler (AOT)
-  (Lowers Allegrex MIPS to native C++ functions)
+     Offline Static Recompiler (recomp/PSPRecomp, psp_recomp --auto)
+  (lowers all of .text to 237 C++ translation units of 16 KiB each)
                     │
                     ▼
        Native Host C++ Compilation
-     (GCC / Clang on PC  ──►  devkitARM GCC on 3DS)
+     (GCC on PC  ──►  devkitARM GCC on 3DS, planned)
                     │
                     ▼
-          P3P3DS Runtime Harness
-  ├── Lightweight PSP HLE Kernel (SysMem, ThreadMan, IoFileMgr)
-  ├── Multi-tier Virtual File System (SDMC asset & mod redirection)
-  └── Platform Backend:
-       ├── PC Runner (Debugging & rapid development)
-       └── 3DS Native (Citro3D / PICA200 GPU + NDSP Audio)
+          P3P3DS Runtime (core/)
+  ├── Interpreter fallback for PCs without an AOT entry
+  ├── PSP HLE kernel: SysMem, ThreadMan (deterministic virtual clock),
+  │   IoFileMgr, ModuleMgr, UMD, Display, Ctrl, Audio, SasCore, Mpeg, ...
+  ├── Virtual File System (UMD ISO9660 / host directories, mod overlay)
+  ├── GE display-list executor → GeRenderer interface
+  │     └── SoftwareRenderer (reference backend, draws into guest VRAM)
+  └── Platform backends:
+       ├── platform/pc  — development runner: frame dumps, WAV output, event traces
+       └── platform/3ds — planned: Citro3D / PICA200 renderer + NDSP audio
 ```
 
-1. **Game Machine Code:** Recompiled offline ahead-of-time into native C++ translation units. The resulting code compiles directly to native ARM machine code with compiler optimization.
-2. **PSP Kernel & Services:** Handled by a modular, lightweight High-Level Emulation (HLE) runtime implemented in C/C++.
-3. **Graphics Engine (GE):** Interprets PSP display lists and maps primitives directly to the 3DS PICA200 GPU via `citro3d`.
-4. **Audio:** Decoded and streamed via the 3DS hardware DSP (`ndsp`).
+1. **Game Machine Code:** Recompiled offline into native C++ translation units; PCs the static analysis missed are executed by an interpreter whose semantics mirror the code generator (checked by a differential test).
+2. **PSP Kernel & Services:** A lightweight High-Level Emulation (HLE) runtime implementing only what P3P imports, with contracts taken from uOFW, PSPSDK and pspautotests hardware output.
+3. **Graphics Engine (GE):** Display lists are executed in `core/`; a renderer interface lets the PC reference rasterizer and a future PICA200 (`citro3d`) backend share the same command processing.
+4. **Audio:** Guest PCM (`sceAudio`, `sceSasCore`, CRI middleware) is mixed on the virtual clock; on 3DS it is intended for the hardware DSP (`ndsp`).
 
 ---
 
@@ -105,16 +115,17 @@ While keeping classic 1:1 PSP presentation intact, the architecture is designed 
 
 Modding support and fan translations are first-class architectural requirements:
 - **Language-Agnostic Core:** No language strings, fonts, or specific localization hacks will be hardcoded into the runtime engine.
-- **VFS Fallback Pipeline:** The file system will intercept `sceIoOpen` and resolve assets with priority fallback:
+- **VFS Fallback Pipeline:** P3P on PSP loads mods through the community CWCheat "Mod Support" patch (`p3p/p3p-patches`), which the recompiler applies to the executable. The runtime serves the paths it opens, mapped to the SD card on 3DS:
   ```text
-  sdmc:/p3p3ds/mods/bind/<relative_path>   (Loose file overrides)
+  sdmc:/p3p3ds/mods/bind/<relative_path>   (loose file overrides, ms0:/PSP/P3P/bind/)
     ↓
-  sdmc:/p3p3ds/mods/mod.cpk                (User mod package)
+  sdmc:/p3p3ds/mods/mod.cpk                (user mod package)
     ↓
-  sdmc:/p3p3ds/mods/mod1.cpk ... modN.cpk  (Additional mod archives)
+  sdmc:/p3p3ds/mods/mod1.cpk ... mod3.cpk  (additional mod archives)
     ↓
-  sdmc:/p3p3ds/data/data.cpk               (Original game archive)
+  disc0:/PSP_GAME/USRDIR/umd0.cpk, umd1.cpk (original game archives)
   ```
+  On PC, `--mods <dir>` maps `ms0:/PSP/P3P` to a host directory.
 - **Translation & Mod Support (Future Goal):** The architecture aims to support community translations (such as Russian, Spanish, German, French) and mods via VFS redirection. Note that translations are not guaranteed to be drop-in asset-only packages: individual localizations may require custom font sheets, character encoding tables, `.bmd`/`.bf` script handling, or runtime executable hooks (such as glyph-spacing/kerning adjustments).
 
 ---
@@ -124,28 +135,31 @@ Modding support and fan translations are first-class architectural requirements:
 ```text
 P3P3DS/
 ├── 3ds/                 # 3DS platform libraries (libctru, citro3d, citro2d)
-├── core/                # (planned) Target-agnostic P3P runtime, HLE definitions, memory map
-├── docs/                # Architecture, verification registry, and research papers
-├── experiments/         # Standalone test harnesses and analysis scripts
+├── core/                # Target-agnostic runtime: HLE kernel, VFS, interpreter, GE executor + software renderer
+├── docs/                # Current state, architecture, verification registry, research notes
+├── experiments/         # Standalone analyses (decoder audit, CPK checker, microtests)
 ├── platform/
-│   ├── pc/              # PC host runner and bootstrap harness
+│   ├── pc/              # PC development runner (frame dumps, WAV output, event traces)
 │   └── 3ds/             # (planned) Native 3DS backend implementation
-├── profiles/p3p/        # P3P profile configuration, function maps, and game inputs
+├── profiles/p3p/        # P3P profile: AOT layout, patches, addresses, game inputs (local only)
 ├── recomp/              # Recompilation engines and tools (PSPRecomp, Yakumo, N64Recomp)
-├── references/          # Reference emulators and hardware autotests (PPSSPP, pspautotests)
+├── references/          # Reference emulators and hardware autotests (PPSSPP, pspautotests, uOFW)
 ├── psp/                 # PSP SDK headers, VFPU documentation, and Ghidra definitions
-└── tools/               # Asset tools (CriFsV2Lib, AtlusScriptTools, Amicitia)
+├── tests/               # CTest suites (HLE contracts, renderer, differential AOT/interpreter)
+└── tools/               # Build helpers and asset tools (CriFsV2Lib, AtlusScriptTools, Amicitia)
 ```
 
 ---
 
 ## Prerequisites
 
-To build the PC bootstrap harness and development tools:
+To build the PC runner and development tools:
 - **CMake** (version 3.20 or newer)
-- **Ninja** or MinGW Make
-- **C++20 Compiler** (GCC 13+, Clang 16+, or MSVC 2022+)
-- **Python 3.10+** (for analysis and verification scripts)
+- **Ninja**
+- **C++20 Compiler** (measured with GCC 16.1 / MinGW-w64; other compilers are untested)
+- **Python 3.10+** (code generation helpers, analysis and verification scripts)
+- About **5 GB of RAM** and ~11 minutes on a 12-thread CPU for a clean build of the 237 generated units (`-j10`)
+- Optional: .NET SDK for `experiments/cpk-check` (CPK inspection)
 
 ---
 
@@ -169,80 +183,59 @@ The tool automatically:
 
 *(Optional fallback: If you already have a pre-decrypted ELF, pass `--decrypted-eboot /path/to/eboot.elf`.)*
 
+The runner reads game data directly from the ISO at run time: keep the `.iso` in the repository root (it is gitignored) or pass `--umd <iso>`.
+
 ---
 
 ## Development Workflow
 
-### Build and Run the PC Bootstrap Runner
+### Build
 
 ```bash
-# 1. Configure the project
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-# 2. Build the recompiler and PC bootstrap executable
-cmake --build build --target p3p_pc_bootstrap
-
-# 3. Execute the verified module_start milestone test
-./build/p3p_pc_bootstrap.exe --verify-milestone
+cmake --build build -j10
+ctest --test-dir build -j6
 ```
 
-Expected output confirms the execution milestone:
-```text
-====================================================
-   P3P3DS PC Bootstrap Execution Harness
-====================================================
-Target ELF:       profiles/p3p/game/eboot.elf
-Dispatch budget:  1000
-Verify mode:      STRICT (--verify-milestone)
-ELF Type:         65440 (PSP PRX relocatable)
-Runtime Entry:    0x08804108
-Relocations:      178513 total (R_26=81398, R_32=14572, R_HI=37395, R_LO=45148)
-Module Info:      p3p v1.1
-Module GP:        0x08C42A50
-Module Stubs:     0x08B801DC - 0x08B80394
-Stack Arena:      0x09FF0000 - 0x0A000000
-Initial SP:       0x09FFFF00
-Initial RA:       0x00000000
-Initial A0 / A1:  0x00000000 / 0x00000000
-Registered Entries: 314 (functions, block labels, and import wrappers)
+`-DP3P_AOT_TRANSFER_RECORDS=OFF` generates code without per-branch diagnostics (smaller and ~17% faster on PC, but without the transfer trace used by the frontier tooling).
 
-=== Execution Result ===
-Stop Reason:      No recompiled function registered at 0x08B4E6A0
-Stopped:          yes
-Final Guest PC:   0x08B4E6A0
-Kernel SDK Ver:   0x06020010
+### Run the game on PC
 
-=== Guest Register State ===
-  PC: 0x08B4E6A0
-  zero = 0x00000000  at   = 0x00000000  v0   = 0x00000000  v1   = 0x00000000  
-  a0   = 0x00000000  a1   = 0x00000000  a2   = 0x00000000  a3   = 0x00000000  
-  t0   = 0x00000000  t1   = 0x00000000  t2   = 0x00000000  t3   = 0x00000000  
-  t4   = 0x00000000  t5   = 0x00000000  t6   = 0x00000000  t7   = 0x00000000  
-  s0   = 0x00000000  s1   = 0x00000000  s2   = 0x00000000  s3   = 0x00000000  
-  s4   = 0x00000000  s5   = 0x09FEFB20  s6   = 0x00000000  s7   = 0x00000000  
-  t8   = 0x00000000  t9   = 0x00000000  k0   = 0x00000000  k1   = 0x00000000  
-  gp   = 0x08C42A50  sp   = 0x09FEFAC0  fp   = 0x09FEFEC0  ra   = 0x08804268  
-
-=== Milestone Verification ===
-Target:           module_start -> user_main -> sub_08B4E6A0
-Entry (0x8804108):   OK
-SDK Ver (0x6020010): OK
-Compiler Ver (0x30306): OK
-Final PC (0x8b4e6a0): OK
-Return RA (0x8804268):OK
-Thread UID (2):      OK
-Thread Name (user_main): OK
-Stop Reason:      OK
-Result:           [VERIFIED] Milestone passed
-
-Execution milestone reached and verified successfully.
+```bash
+# Boot until the title screen (~45 s wall), dumping every 60th frame and all audio
+./build/p3p_pc_bootstrap.exe --run-until-blocker --max-dispatches 20000000 \
+    --frames-dir .tmp/frames --frame-every 60 --wav .tmp/p3p.wav --dump-events .tmp/run.json
 ```
 
-### Reproduce Full Analysis Pipeline & CTest Suite
+The runner prints the stop reason and a summary; `--dump-events` writes a JSON trace of HLE calls, thread switches, GE lists, frames (with hashes) and audio statistics.
+
+| Option | Purpose |
+|---|---|
+| `--run-until-blocker` | run until a missing service, a fault or the dispatch budget |
+| `--max-dispatches <n>` | dispatch budget (20M ≈ title screen) |
+| `--umd <iso>` | game image mounted as `disc0:` (default: the single `*.iso` in the working directory) |
+| `--ms0 <dir>` / `--mods <dir>` | memory stick root (default `out/ms0`) / directory mapped to `ms0:/PSP/P3P` for mods |
+| `--frames-dir <dir>` `--frame-every <n>` | write displayed frames as BMP |
+| `--wav <file>` | mix all game audio on the virtual clock into a 44.1 kHz stereo WAV |
+| `--dump-events <json>` / `--io-trace <csv>` | execution trace / file reads (for `experiments/cpk-check`) |
+| `--no-interpreter` | stop at PCs without AOT code instead of interpreting |
+| `--verify-bootstrap` | fixed early-boot checkpoint used by CTest |
+
+Execution is deterministic: two runs with the same options produce byte-identical traces, frames and audio.
+
+### Reproduce Full Analysis Pipeline
 
 ```bash
 bash experiments/p3p-analysis/reproduce_analysis.sh
 ```
+
+### Documentation
+
+- [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) — what works today, with evidence for every claim.
+- [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) — roadmap and the movie/audio decoding plan.
+- [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — registry of technical claims and their status.
+- [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) — New 3DS backend design and measurements.
+- [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) — engineering rules for contributors and coding agents; project skills live in `.claude/skills/`.
 
 ---
 
