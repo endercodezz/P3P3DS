@@ -18,7 +18,7 @@ description: Finish a P3P3DS task with a verified local commit (CLAUDE.md sectio
 bash .claude/skills/p3p3ds-commit/scripts/precommit_check.sh   # prints HEAD before: <sha> — keep it
 ```
 
-It fails on whitespace errors, staged `.tmp/`, `.cache/`, `build/`, `out/`, `.claude/LOCAL.md`, game-data extensions, EOL churn and AI attribution text.
+It fails on whitespace errors, absolute local paths (tracked files are public), staged `.tmp/`, `.cache/`, `build/`, `out/`, `.claude/LOCAL.md`, game-data extensions, EOL churn and AI attribution text.
 
 ## 2. Commit
 

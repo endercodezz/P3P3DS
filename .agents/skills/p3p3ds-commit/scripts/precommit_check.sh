@@ -23,5 +23,8 @@ done
 if git diff --cached | grep -Eiq '^\+[[:space:]]*(Co-Authored-By|Generated-By|Assisted-By):'; then
     echo "FAIL: AI attribution text in staged diff"; status=1
 fi
+# Tracked files are public: no machine-specific absolute paths (drive letters, user home dirs).
+paths=$(git diff --cached -U0 | grep -E '^\+' | grep -v '^+++' | grep -En '[A-Za-z]:\\[A-Za-z0-9_]|/[a-z]/Users/|[A-Za-z]:/Users/' || true)
+if [ -n "$paths" ]; then echo "FAIL: absolute local paths in staged lines:"; echo "$paths" | head -5; status=1; fi
 [ $status -eq 0 ] && echo "PRECOMMIT OK"
 exit $status
