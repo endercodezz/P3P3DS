@@ -7,7 +7,8 @@ This is the current source of truth. Historical audits describe their stated bas
 - [VERIFIED] PICA200 GE backend (`platform/3ds/gpu_renderer.cpp`, design and measurements in `docs/3DS_PLATFORM.md` 4.4). In Azahar the logos, the title screen and the main menu render correctly; logo positions are pixel-identical to the PC software frames. Speed 92 % of real time, 45 fps (was 6 %, 2 fps with CPU rendering). Frame dumps: `sdmc:/p3p3ds/dump_every.txt`.
 - [VERIFIED] Vertex/texel decoding moved to `core/src/ge/geometry.cpp`, shared by both renderers: PC first-day frames unchanged (7,199 frame hashes identical to the run before the move); `tests/test_ge_geometry.cpp` checks `decode_texture` against `fetch_texel` for all non-DXT formats. 25/25 CTest.
 - [VERIFIED] The opening movie (black: no decoder) is skipped with START (PC check); the 3DS runner presses START while a CPU-written picture is shown and movie frames are decoded. `BlankMpegDecoder` fills rows instead of 130k checked stores per picture.
-- Blocker: LOAD GAME calls `sceUtilitySavedataInitStart` (0x50C4CD57), not implemented. [UNVERIFIED] hardware.
+- [VERIFIED] Maintainer check in Azahar (2026-10-02): NEW GAME and the following scenes run and render without visible problems; no sound (no ndsp backend yet); loading a save crashes, also after starting a new game.
+- Blocker: LOAD GAME / saving call `sceUtilitySavedataInitStart` (0x50C4CD57), not implemented. [UNVERIFIED] hardware.
 
 ## First New 3DS build boots in Azahar (2026-10-01)
 
