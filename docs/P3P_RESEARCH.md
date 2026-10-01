@@ -130,16 +130,24 @@ In **P3P3DS**, the HLE `IoFileMgr` subsystem will intercept all game file reques
                          └── NO
                                  │
                                  ▼
-               Fallback: Read from original game data.cpk
-                   (SD:/p3p3ds/data/data.cpk)
+        Fallback: original archives disc0:/PSP_GAME/USRDIR/umd0.cpk, umd1.cpk
+        (ULUS-10512 has no data.cpk; the chain itself is the CWCheat "Mod Support" patch)
 ```
 
 ### 6.2. Russification & Font Handling
 Russian fan translations for Persona 3 Portable (such as the translation by The Miracle / DniweTamp):
-1. **Text Encoding:** Replaces US/Japanese font tables with custom 1-byte Cyrillic character tables (CP1251 or custom Atlus encoding table).
-2. **Font Textures:** Modifies the bitmap font textures (`font.fnt` or font `.tm2`/`.gim` files) stored inside `data.cpk`.
-3. **Dialogue Scripts:** Contains modified `.bmd` files containing Russian translated strings.
+1. **Text Encoding:** `[UNVERIFIED]` expected to map Cyrillic onto a custom 1-byte table used by the replaced font; the real translation package has not been examined.
+2. **Font Textures:** `[INFERRED]` modifies the game font; `umd0.cpk` contains exactly one `.fnt` file (CPK listing via `experiments/cpk-check`).
+3. **Dialogue Scripts:** `[INFERRED]` modified `.bf` (1,272 in `umd0.cpk`, flow scripts with embedded messages) and `.bmd` files.
 4. **Potential Executable Patches:** May require EBOOT-level binary hooks for glyph spacing, line wrapping, or proportional font widths (`[UNVERIFIED]` - requires empirical test against translated assets).
 
 **Architectural Requirement for P3P3DS:**
 The runtime must remain language-agnostic. While dialogue assets and textures resolve cleanly through the VFS (`SD:/p3p3ds/mods/mod.cpk` or `SD:/p3p3ds/mods/bind/`), any necessary executable-level font or spacing patches must be modularly supported via profile hook tables in `profiles/p3p/config/` without hardcoding language-specific logic into the core engine.
+
+### 6.3. Measured: where P3P's visible text lives (2026-10-01)
+Search of the decrypted EBOOT for strings seen on the first-day screens:
+- **In the EBOOT (`.rodata`):** UI and location labels — "Enter your last name", "Your Room", "School Entranceway", "Main Lobby", "Faculty Office", "Dark Hour", "Early Morning", "Evening", "NEW GAME"; 4,038 printable ASCII strings of 12+ characters in total. Translating them needs EBOOT data patches. `[VERIFIED]`
+- **Not in the EBOOT:** dialogue such as "You are tired today..." and "Welcome to the world of P3P." (archive scripts/messages, i.e. a CPK/`bind/` mod). `[VERIFIED]`
+- **Neither:** "PRESS ANY BUTTON", "LOAD GAME" — drawn from textures, so a translation replaces images. `[INFERRED]`
+
+Consequence for P3P3DS: assets of a translation work unchanged through the mod chain (`--mods`, VFS verified with a CPK). EBOOT changes split in two kinds: pure data (string bytes, tables) can be applied to guest memory at load because AOT code reads data at run time; any change to instructions (including `lui`/`addiu` pairs that build string addresses, which is how MIPS code references data) must reach the code generator. Today `profiles/p3p/config/cwcheat_patches.txt` patches are applied before AOT generation (`apply_generated_patches`), so a code-patching translation means a rebuild per patch set — unless patched code ranges are routed to the interpreter fallback at run time (interpreter: ~29 M instructions/s on the PC host, measured with `p3p_autotest`; 3DS speed `[UNVERIFIED]`). Which kind the Russian translation needs is `[UNVERIFIED]` until its package is examined.

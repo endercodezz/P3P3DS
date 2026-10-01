@@ -212,3 +212,18 @@ Behaviour is unchanged: identical 3,863 frame hashes, byte-identical WAV, same s
 
 ### 8.3. Blocked: devkitARM size measurements and the minimal 3DS harness
 devkitPro/devkitARM is not installed on this host (no `DEVKITPRO`, no `C:\devkitPro`), and installing global toolchains needs the maintainer's permission (CLAUDE.md section 2). Not done: `platform/3ds` CMake/.3dsx harness (`osSetSpeedupEnable`, citro3d clear), `-Os` vs `-O2` ARM11 text size of the full `.text`. These need devkitARM and, for speed, New 3DS hardware or Citra.
+
+## 9. Feasibility: higher resolution / better graphics as a 3DS mod (2026-10-01)
+
+Measured inputs:
+- **Screens** (`3ds/libctru/libctru/include/3ds/services/gspgpu.h`, `gfx.h`): top 400x240 (240x400 framebuffer), "wide" 800x240 with non-square pixels, mutually exclusive with stereo 3D and not on Old 2DS; bottom 320x240. The PSP's 480x272 is *larger* than the top screen: the base port must already scale down (x0.833 / x0.882, or 800x240 wide with vertical x0.882). `[VERIFIED]`
+- **Memory**: VRAM 6 MiB (`os.h` `OS_VRAM_SIZE`), New 3DS QTM 4 MiB (`OS_QTMRAM_SIZE`). Application heap sizes per memory mode are not defined in libctru headers: `[UNVERIFIED]`.
+- **Textures** (`gpu/enums.h`, citro3d `texture.c:35`): no paletted formats, sizes 8..1024. P3P's textured draws are CLUT4/CLUT8 (794,259 of 829,705 on the first day), so every 3DS renderer converts palettes at upload regardless of mods. `[VERIFIED]`
+- **What P3P draws** (GE census, `ge_feature_summary`, first-day script, 858 s virtual): 2,018,478 draws; 2,005,794 (99.4 %) in through mode (pre-positioned 2D: pre-rendered backgrounds, portraits, sprites, UI); 12,684 transformed 3D draws, all lit; no skinning, morphing, fog, stencil or texgen; 794,766 textured draws request linear filtering, 695,668 mipmap filtering; 34,709 line draws. `[VERIFIED]` for this stretch; Tartarus/battles not yet measured.
+- **Cost on PC**: software rendering is 73 % of wall time in that run (408.8 s of 559.8 s, `--profile`). On 3DS the PICA200 does rasterization; translation, palette conversion and upload remain CPU work. `[VERIFIED]` PC only.
+
+Assessment:
+1. **"Higher internal resolution" adds little.** Almost everything is 2D art authored at 480x272; rendering it at a higher resolution does not add detail, and the output screen is smaller than the PSP's. The only gain is sharper scaling/edges of the few 3D draws and text, possible as supersampling (render 2x, filter down) at the cost of VRAM (a 960x544 RGBA8 + D24S8 target is about 4 MiB of the 6 MiB) and fill rate. Low value, moderate cost. `[INFERRED]`
+2. **Texture replacement is the real "better graphics" mod.** Replace textures by content hash with higher-resolution art (backgrounds, portraits, UI, fonts), loaded from the mod directory like other mod assets. Limits: 1024x1024 per texture, 6 MiB VRAM / FCRAM budget, ETC1/ETC1A4 compression for large art, non-paletted storage. Needs: a texture cache with hashing in the 3DS GE backend (needed anyway for palette conversion), a replacement lookup, and art at 2x scale of 400x240-relevant content. Engineering effort moderate; art effort large. `[INFERRED]`
+3. **Better use of the 3DS screens** (layout mods: 800x240 wide UI, moving UI elements to the bottom screen) is possible only where the game's 2D layers can be separated per draw; the through-mode census makes per-draw routing technically feasible but each screen needs mapping work. `[UNVERIFIED]`
+4. **Prerequisite for all of it:** the citro3d backend of the GE renderer interface (`core/include/p3p3ds/ge/renderer.hpp`) and devkitARM to measure real cost on hardware.
