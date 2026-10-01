@@ -53,6 +53,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [ ] Complete renderer (filtering, lines, lighting/skinning as the game needs) and movie decoding
 - [x] New Nintendo 3DS homebrew build (`.3dsx`) that boots (1–2 fps)
 - [x] PICA200 (citro3d) renderer: logos, title screen, main menu
+- [x] P3P3DS Builder: ISO -> `.3dsx` on the user's PC (Windows wizard)
 - [ ] Savedata (LOAD GAME / saving), lighting, movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
@@ -61,17 +62,30 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 
 ## Running on a New 3DS
 
-There are **no downloads**: the `.3dsx` contains code generated from the game's executable (and the decrypted executable itself), so it must never be shared. Everyone builds it from their own copy of the game.
+There is **no ready-made download of the game**: the `.3dsx` contains code generated from the game's executable (and the decrypted executable itself), so it must never be shared. Instead, the **P3P3DS Builder** turns your own copy of the game into `p3p3ds.3dsx` on your PC.
 
 You need:
 - a **New 3DS / New 3DS XL / New 2DS XL** with custom firmware and the Homebrew Launcher (Old 3DS models are not supported);
 - your own *Persona 3 Portable* `ULUS-10512` ISO;
-- a PC with the tools listed under [Prerequisites](#prerequisites), including devkitPro.
+- Windows 10/11 and [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the **3DS Development** component (official installer; the builder uses its ARM compiler and 3DS libraries).
 
-Steps:
+### With the P3P3DS Builder (recommended)
+
+1. Download `P3P3DS-Builder-<version>.zip` from the GitHub Releases page and unpack it anywhere.
+2. Run `P3P3DS-Builder.exe`, choose your ISO (devkitPro is found automatically when installed in the usual place) and press **Build**.
+3. Wait about 5-15 minutes: the game's code is translated to C++ and compiled for the 3DS on all CPU cores, with a progress bar, a time estimate and Persona 3 trivia. An interrupted build continues where it stopped.
+4. The builder can copy everything to your SD card itself; otherwise copy as shown below.
+
+The builder package (about 2 MB zipped) contains no game data: only the prebuilt P3P3DS runtime for the 3DS, the code generator and the community CWCheat patch list; everything made from the game is generated on your PC. Measured clean builds on a 12-thread CPU: 4 min 23 s with 12 compiler jobs, 4 min 55 s with 7 (the builder picks the number from CPU cores and free memory).
+
+### By hand (developers)
+
 1. Prepare the game files once: `python tools/prepare_game.py "/path/to/Persona 3 Portable.iso"` ([Game Setup](#game-setup-one-command-preparation)).
 2. Build the PC tools ([Build](#build)), then the 3DS runner ([Build for New 3DS](#build-for-new-3ds)). The result is `build/3ds/p3p3ds.3dsx`.
-3. Copy to the microSD card:
+
+### On the SD card
+
+1. Copy to the microSD card:
    ```text
    SD card
    ├── 3ds/
@@ -80,7 +94,7 @@ Steps:
        └── <any name>.iso       <- your ULUS-10512 image (the first .iso found is used)
    ```
    The runner creates `p3p3ds/ms0/` (memory stick), `p3p3ds/mods/` (mod chain, see below) and `p3p3ds/report.txt` itself.
-4. Start **P3P3DS** from the Homebrew Launcher.
+2. Start **P3P3DS** from the Homebrew Launcher.
 
 The top screen shows the game, the bottom screen authorship and a live debug report (fps, speed, memory, time split), also written to `sdmc:/p3p3ds/report.txt` every few seconds and on exit — please attach it to bug reports.
 
@@ -272,6 +286,15 @@ make -C build/3ds -j10
 A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Installing and running it: [Running on a New 3DS](#running-on-a-new-3ds). The `.3dsx` embeds code generated from your game executable: it is for your own use, never for distribution.
 
 Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`).
+
+### Build the P3P3DS Builder release
+
+```bash
+cmake --build build --target p3p3ds_builder          # P3P3DS-Builder.exe (Win32, static)
+python platform/pc/builder/make_release.py --version 0.1.0 --devkitpro <devkitPro folder>
+```
+
+`make_release.py` needs the host build (`psp_recomp.exe`) and the New 3DS build in `build/3ds/` (runtime objects, CWCheat patch list); it writes `out/P3P3DS-Builder-<version>/` and a `.zip` for GitHub Releases. `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--jobs <n>]` runs the same build without the window. Sources: `platform/pc/builder/` (pipeline, EBOOT decryption, wizard, trivia).
 
 ### Run the game on PC
 

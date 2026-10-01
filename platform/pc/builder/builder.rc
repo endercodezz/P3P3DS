@@ -1,0 +1,29 @@
+// P3P3DS Builder resources: visual-styles manifest and version information.
+#include <winuser.h>
+#include <winver.h>
+
+1 RT_MANIFEST "builder.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "enderlit aka endercodezz"
+            VALUE "FileDescription", "P3P3DS Builder - Persona 3 Portable for New 3DS"
+            VALUE "FileVersion", "0.1.0"
+            VALUE "LegalCopyright", "MIT License. Persona 3 Portable (c) ATLUS."
+            VALUE "ProductName", "P3P3DS Builder"
+            VALUE "ProductVersion", "0.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

@@ -2,6 +2,11 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## P3P3DS Builder: ISO -> .3dsx on the user's PC (2026-10-02)
+
+- [VERIFIED] `platform/pc/builder/` (`P3P3DS-Builder.exe` + `sdk/`): Windows wizard with progress, time estimate and Persona 3 trivia; decrypts EBOOT.BIN in C++ (same SHA-256 as `tools/prepare_game.py`), generates and compiles the 237 units with the user's devkitARM, links prebuilt runtime objects, packages the `.3dsx`, optionally copies it and the ISO to the SD card. Clean build from the release package: 263 s (12 jobs); the result reaches the title screen in Azahar. Release package: `make_release.py`, 2.3 MB zip without game data. Details: `docs/3DS_PLATFORM.md` 8.5-8.6. 26/26 CTest (new: `p3p_psp_eboot`).
+- [UNVERIFIED] The builder on a PC other than the maintainer's (devkitPro detection, older CPUs).
+
 ## New 3DS: GPU renderer, title screen and main menu (2026-10-01)
 
 - [VERIFIED] PICA200 GE backend (`platform/3ds/gpu_renderer.cpp`, design and measurements in `docs/3DS_PLATFORM.md` 4.4). In Azahar the logos, the title screen and the main menu render correctly; logo positions are pixel-identical to the PC software frames. Speed 92 % of real time, 45 fps (was 6 %, 2 fps with CPU rendering). Frame dumps: `sdmc:/p3p3ds/dump_every.txt`.

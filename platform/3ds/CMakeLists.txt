@@ -19,7 +19,9 @@ endif()
 get_filename_component(P3P_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 set(P3P_HOST_BUILD "${P3P_ROOT}/build" CACHE PATH "Host build directory providing psp_recomp")
 set(P3P_ELF "${P3P_ROOT}/profiles/p3p/game/eboot.elf" CACHE FILEPATH "Decrypted ULUS-10512 EBOOT")
-set(P3P_AOT_OPT "-Os" CACHE STRING "Optimization flags for the generated AOT units")
+# Same flags as the P3P3DS Builder (platform/pc/builder/pipeline.cpp): GCSE and
+# scheduling cost 27 % of the compile time for 0.8 % of code (docs/3DS_PLATFORM.md 8.5).
+set(P3P_AOT_OPT "-Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2" CACHE STRING "Optimization flags for the generated AOT units")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

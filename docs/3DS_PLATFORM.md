@@ -250,6 +250,11 @@ Largest generated unit (`generated_unit_0049.cpp`), devkitARM GCC 16.1, `-march=
 
 The 3DS build uses the last `-Os` row. Whole program: ELF `.text` 77,420,288 -> 44,413,060 bytes, `.3dsx` 83.4 -> 50.4 MB, clean build including code generation 2,542 s -> 527 s (`-j10`, i5-12400F). The x86 host build is unchanged (none of these macros is defined there). [VERIFIED] sizes; the run-time cost of the out-of-line chain on ARM11 is [UNVERIFIED] (one extra call per cross-unit transfer).
 
+Whole-program compile of the 237 units (devkitARM GCC 16.1, `-j10`, i5-12400F, objects only): `-Os` 327 s / 47.19 MB; `-Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2` **239 s (-27 %)** / 47.57 MB (+0.8 %); the same with 8 KiB units (474 files) 288 s / 49.29 MB, so the 16 KiB layout stays. Peak compiler working set on the largest unit: 383 MiB. The faster flags are now the default for `P3P_AOT_OPT` and the P3P3DS Builder. [VERIFIED] sizes and times; run-time speed of the code built without GCSE/scheduling is [UNVERIFIED] on hardware.
+
+### 8.6. P3P3DS Builder (2026-10-02)
+`platform/pc/builder/`: a Windows wizard (`P3P3DS-Builder.exe`, Win32, statically linked, system DLLs only) that turns the user's ULUS-10512 ISO into `p3p3ds.3dsx` without CMake, msys2 or Python: EBOOT decryption in C++ (`psp_eboot.cpp`, tested against the reference SHA-256 by `tests/test_psp_eboot.cpp`), the bundled `psp_recomp.exe`, the user's devkitARM for the 237 units (largest first, jobs = min(cores, (free RAM - 1.5 GiB) / 450 MiB), below-normal priority, a Windows job object so compilers die with the builder), and a link against prebuilt runtime objects (`main.o`, `gpu_renderer.o`, the shader, `libp3p3ds_core.a`, `libpsprecomp_runtime.a`, debug info stripped). Generated code and objects are cached in `work/`, so an interrupted build resumes. `platform/pc/builder/make_release.py` assembles the 9.6 MB package (2.3 MB zip). Measured clean builds from the package: 263 s with 12 jobs, 295 s with 7; the resulting `.3dsx` reaches the title screen in Azahar.
+
 ## 9. Feasibility: higher resolution / better graphics as a 3DS mod (2026-10-01)
 
 Measured inputs:

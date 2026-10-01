@@ -81,6 +81,13 @@ osSetSpeedupEnable(true);       // Boost CPU to 804 MHz and enable L2 cache
 - Test in Azahar (New 3DS mode) with the ISO in its virtual `sdmc/p3p3ds/`. Read `sdmc/p3p3ds/report.txt`: `stage`, heap size/in use, and `failed alloc: <bytes> from <addr>`; resolve the address with `arm-none-eabi-addr2line -f -C -i -e build/3ds/p3p3ds.elf <addr>`. The maintainer may be running Azahar too: do not kill an instance you did not start, and do not trust a report without checking its build id and timestamp.
 - Never write `sdmc` or emulator paths of the maintainer's machine into tracked files.
 
+## 3b. P3P3DS Builder release
+
+- Sources: `platform/pc/builder/` (`pipeline.cpp` = the build steps, `psp_eboot.cpp` = decryption, `builder_main.cpp` = Win32 wizard, `fun_facts.hpp`). Compile flags, unit count and load base in `pipeline.cpp` must match `platform/3ds/CMakeLists.txt` and `profiles/p3p/config/aot_layout.cmake`; runtime-layout defines must match the prebuilt objects.
+- Release: build the host (`--target p3p3ds_builder`, psp_recomp) and `build/3ds`, then `python platform/pc/builder/make_release.py --version X --devkitpro <dir>` -> `out/P3P3DS-Builder-X/` + `.zip` (it deletes and recreates that folder, including any `work/` cache in it).
+- Test without the window: `P3P3DS-Builder.exe --cli --iso <iso> [--jobs n]`, then run `output/p3p3ds.3dsx` in Azahar. Never put a `.3dsx`, `work/` or `output/` into a release: they contain code made from the game.
+- Facts in `fun_facts.hpp` must be well-known public facts or P3P3DS measurements; no guesses.
+
 ## 4. Standalone Experiment Requirement
 
 Before integrating any 3DS subsystem into the full P3P runtime, create and verify a standalone test in `experiments/`:
