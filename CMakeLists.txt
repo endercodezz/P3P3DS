@@ -90,6 +90,9 @@ add_library(p3p3ds_core
     core/src/vfs.cpp
     core/src/hle/iofilemgr.cpp
     core/src/hle/modulemgr.cpp
+    core/src/hle/sascore.cpp
+    core/src/hle/utils.cpp
+    core/src/hle/ctrl.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
@@ -284,3 +287,8 @@ add_executable(test_modulemgr tests/test_modulemgr.cpp)
 target_link_libraries(test_modulemgr PRIVATE p3p3ds_core)
 add_test(NAME p3p_modulemgr COMMAND test_modulemgr)
 set_tests_properties(p3p_modulemgr PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" SKIP_RETURN_CODE 77)
+
+add_executable(test_sascore tests/test_sascore.cpp)
+target_link_libraries(test_sascore PRIVATE p3p3ds_core)
+add_test(NAME p3p_sascore COMMAND test_sascore)
+set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

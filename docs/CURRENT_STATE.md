@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## SAS, controller, cache/time services and remaining VFPU (2026-10-01)
+
+- [VERIFIED] `core/src/hle/sascore.cpp`: all 27 `sceSasCore` imports — VAG ADPCM / PCM / noise voices, pitch, volumes, ADSR state machine (32-sample key-on delay, linear/bent/exponential/direct curves), pause/end flags, grain mixing into stereo S16 (`__sceSasCore`, `WithMix`). Reverb parameters are stored but not mixed [UNVERIFIED]. `tests/test_sascore.cpp` replays the call sequences of `pspautotests/tests/audio/sascore/adsrcurve.cpp` and matches **53/53** hardware envelope traces in `adsrcurve.expected` exactly, plus init/volume/pitch/PCM/VAG/ADSR-mode/key-on/off checks from the other `.expected` files. Envelope-to-amplitude scaling is [INFERRED]. P3P initializes SAS with grain 256, 32 voices, stereo.
+- [VERIFIED] `UtilsForUser` cache maintenance is a real no-op on coherent host memory (same policy as `CACHE` in codegen); libc clock/time/gettimeofday use the virtual clock with an [INFERRED] fixed 2008-01-01 epoch. `sceCtrl` follows `references/uofw/src/kd/ctrl/ctrl.c` (sampling mode returns the previous mode, idle threshold range, Read* waits for the next vblank sample, Peek* immediate) with a host input state (no buttons, centred sticks by default).
+- [VERIFIED] VFPU: `vcrs.t`, `vi2uc`, `vbfy1`, `vsgn`, `vsocp` lowered per `psp/vfpu-docs/inst-vfpu-desc.yaml`; `verify_p3p_decoder`: 912,808 lowerable, 0 decoded-but-unlowered, 251 BREAK.
+- [VERIFIED] 17/17 CTest; two replays byte-identical, SHA-256 `3E279BA9F8328472AC1B1D7E04B89FFF1DDBB463305EAF40CFD5F2EF47D79223`. New threads `sas thread` (32) and `SDK WRAP` (33) start.
+
+Immediate blocker: GE display-list command the setup-only GE model rejects (`GE unsupported command`, list near `0x08D647C4`) — real GE execution (item 6).
+
 ## Game PRX modules (2026-10-01)
 
 - [VERIFIED] `USRDIR/module/libsuppreacc.prx` is an unencrypted ELF PRX (`scesupPreAcc_library`, 8 exports, imports IoFileMgr/ThreadMan/sceSuspend); `libfont.prx`/`libccc.prx` carry `~SCE` headers. `core/src/hle/modulemgr.cpp` really loads unencrypted PRX code (SysMem block, relocation at the block base), serves its imports through dynamic HLE wrappers, binds the EBOOT's imports of its libraries to its exports (7 bound stubs) and runs it via the interpreter fallback. Start follows uOFW `_StartModule`: module_start in a `SceModmgrStart` thread with the module's `$gp`, caller waits for its end; RESIDENT returns the id, NO_RESIDENT unloads; an entry-less module (this one: `e_entry` 0xFFFFFFFF, no module_start export) starts with status 0. `libfont.prx`/`libccc.prx` are accepted as HLE modules by file name [INFERRED]; any other encrypted module stops explicitly.

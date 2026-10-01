@@ -5,13 +5,27 @@
 #include "p3p3ds/hle/ge.hpp"
 #include "p3p3ds/hle/iofilemgr.hpp"
 #include "p3p3ds/hle/modulemgr.hpp"
+#include "p3p3ds/hle/sascore.hpp"
 #include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
 #include "p3p3ds/hle/umd.hpp"
 
 #include <cstdint>
+#include <map>
 
 namespace p3p3ds {
+
+namespace hle {
+// Host-provided controller state (PSP button bits, analog 0..255, 128 = centre).
+struct HostInput {
+    std::uint32_t buttons{0};
+    std::uint8_t analog_x{128}, analog_y{128};
+    std::uint32_t sampling_mode{0};
+    std::int32_t idle_unhold{-1}, idle_hold{-1};
+    std::map<std::int32_t, std::uint64_t> pending_reads; // thread -> sampling deadline
+    std::uint64_t last_read_vcount{0};
+};
+} // namespace hle
 
 class KernelState {
 public:
@@ -88,6 +102,8 @@ public:
     hle::UmdState &umd() noexcept { return umd_; }
     const hle::UmdState &umd() const noexcept { return umd_; }
     hle::ModuleManager &modules() noexcept { return modules_; }
+    hle::SasState &sas() noexcept { return sas_; }
+    hle::HostInput &input() noexcept { return input_; }
     hle::IoManager &io() noexcept { return io_; }
     const hle::IoManager &io() const noexcept { return io_; }
     hle::AudioState &audio() noexcept { return audio_; }
@@ -97,6 +113,8 @@ private:
     hle::UmdState umd_;
     hle::IoManager io_;
     hle::ModuleManager modules_;
+    hle::SasState sas_;
+    hle::HostInput input_;
     bool interrupts_enabled_{true};
     hle::AudioState audio_;
     static constexpr std::uint32_t kSystemFlagSdkSet = 0x1000u;
