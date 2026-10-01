@@ -6,7 +6,7 @@
 
 ## Status: NOT PLAYABLE (reaches the first school day on PC with scripted input)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. Nothing runs on 3DS hardware yet.
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. A first New 3DS build (`.3dsx`, software rendering, no audio) boots in the Azahar emulator at about 5 % of full speed; it has not been tested on hardware.
 
 Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)):
 
@@ -41,7 +41,8 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] Main menu and New Game start
 - [x] Name entry, introduction and first controllable section (scripted input)
 - [ ] Complete renderer (filtering, lines, lighting/skinning as the game needs) and movie decoding
-- [ ] New Nintendo 3DS native homebrew build (`.3dsx` / `.cia`)
+- [x] New Nintendo 3DS homebrew build (`.3dsx`) that boots in an emulator
+- [ ] PICA200 renderer, ndsp audio and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
 
 ---
@@ -77,7 +78,7 @@ Decrypted P3P Executable (Allegrex MIPS ELF) + community CWCheat patches
                     │
                     ▼
        Native Host C++ Compilation
-     (GCC on PC  ──►  devkitARM GCC on 3DS, planned)
+     (GCC on PC, devkitARM GCC on New 3DS)
                     │
                     ▼
           P3P3DS Runtime (core/)
@@ -89,7 +90,8 @@ Decrypted P3P Executable (Allegrex MIPS ELF) + community CWCheat patches
   │     └── SoftwareRenderer (reference backend, draws into guest VRAM)
   └── Platform backends:
        ├── platform/pc  — development runner: frame dumps, WAV output, event traces
-       └── platform/3ds — planned: Citro3D / PICA200 renderer + NDSP audio
+       └── platform/3ds — New 3DS runner (.3dsx): top screen game, bottom screen
+                          debug report; Citro3D renderer + NDSP audio planned
 ```
 
 1. **Game Machine Code:** Recompiled offline into native C++ translation units; PCs the static analysis missed are executed by an interpreter whose semantics mirror the code generator (checked by a differential test).
@@ -145,7 +147,7 @@ P3P3DS/
 ├── experiments/         # Standalone analyses (decoder audit, CPK checker, microtests)
 ├── platform/
 │   ├── pc/              # PC development runner (frame dumps, WAV output, event traces)
-│   └── 3ds/             # (planned) Native 3DS backend implementation
+│   └── 3ds/             # New 3DS runner (.3dsx), built with devkitARM
 ├── profiles/p3p/        # P3P profile: AOT layout, patches, addresses, game inputs (local only)
 ├── recomp/              # Recompilation engines and tools (PSPRecomp, Yakumo, N64Recomp)
 ├── references/          # Reference emulators and hardware autotests (PPSSPP, pspautotests, uOFW)
@@ -203,6 +205,18 @@ ctest --test-dir build -j6
 ```
 
 `-DP3P_AOT_TRANSFER_RECORDS=OFF` generates code without per-branch diagnostics (smaller and ~17% faster on PC, but without the transfer trace used by the frontier tooling).
+
+### Build for New 3DS
+
+Needs [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the 3DS packages and the host build above (it provides `psp_recomp`). devkitPro's CMake toolchain only works from its own msys2 shell:
+
+```bash
+export DEVKITPRO=/opt/devkitpro DEVKITARM=/opt/devkitpro/devkitARM
+cmake -S platform/3ds -B build/3ds -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/3DS.cmake -DCMAKE_BUILD_TYPE=Release
+make -C build/3ds -j10
+```
+
+A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Copy `build/3ds/p3p3ds.3dsx` to the console or emulator, put your ULUS-10512 `.iso` in `sdmc:/p3p3ds/`, and start it (Azahar: enable New 3DS mode). The bottom screen shows the debug report, also saved to `sdmc:/p3p3ds/report.txt`; START+SELECT quits. The `.3dsx` embeds code generated from your game executable: it is for your own testing, never for distribution.
 
 ### Run the game on PC
 

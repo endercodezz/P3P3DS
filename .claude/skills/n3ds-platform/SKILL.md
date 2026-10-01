@@ -72,6 +72,15 @@ osSetSpeedupEnable(true);       // Boost CPU to 804 MHz and enable L2 cache
 
 ---
 
+## 3a. Build, Run and Diagnose the .3dsx
+
+- Configure and build only from devkitPro's msys2 bash (Windows-native cmake is rejected by `3DS.cmake`):
+  `<devkitPro>/msys2/usr/bin/bash.exe -lc "export DEVKITPRO=/opt/devkitpro DEVKITARM=/opt/devkitpro/devkitARM; cd <repo> && make -C build/3ds -j10"`
+  (first time: `cmake -S platform/3ds -B build/3ds -G 'Unix Makefiles' -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/3DS.cmake -DCMAKE_BUILD_TYPE=Release`, plus `-DPython3_EXECUTABLE=<host python>` if msys2 has none).
+- Code size is the constraint (docs/3DS_PLATFORM.md 8.5). Never add a define that changes `Runtime`'s layout to only some targets; a define that changes compile flags of `p3p_aot` rebuilds all 237 units (~9 min) — put runtime-only defines on `psprecomp_runtime`.
+- Test in Azahar (New 3DS mode) with the ISO in its virtual `sdmc/p3p3ds/`. Read `sdmc/p3p3ds/report.txt`: `stage`, heap size/in use, and `failed alloc: <bytes> from <addr>`; resolve the address with `arm-none-eabi-addr2line -f -C -i -e build/3ds/p3p3ds.elf <addr>`. The maintainer may be running Azahar too: do not kill an instance you did not start, and do not trust a report without checking its build id and timestamp.
+- Never write `sdmc` or emulator paths of the maintainer's machine into tracked files.
+
 ## 4. Standalone Experiment Requirement
 
 Before integrating any 3DS subsystem into the full P3P runtime, create and verify a standalone test in `experiments/`:

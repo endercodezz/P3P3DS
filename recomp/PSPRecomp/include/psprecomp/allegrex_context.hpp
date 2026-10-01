@@ -601,7 +601,7 @@ struct alignas(16) AllegrexContext {
             result_bits[2] = (value & 0x00FF0000u) << 8u;
             result_bits[3] = value & 0xFF000000u;
         } else { // VUS2I / VS2I
-            const std::uint32_t input_count = std::min(source_length, 2u);
+            const std::uint32_t input_count = std::min<std::uint32_t>(source_length, 2u); // P3P3DS: uint32_t is unsigned long on ARM newlib
             destination_length = source_length == 1u ? 2u : 4u;
             for (std::uint32_t lane = 0u; lane < input_count; ++lane) {
                 const std::uint32_t value = std::bit_cast<std::uint32_t>(source[lane]);

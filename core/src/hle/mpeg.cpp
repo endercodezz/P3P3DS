@@ -52,7 +52,7 @@ void PsDemuxer::push_packet(std::span<const std::uint8_t> p) {
         }
         if (id == 0xB9u) break; // program end
         const auto length = be16(pos + 4);
-        const auto body = pos + 6, next = body + length;
+        const std::size_t body = pos + 6, next = body + length;
         if (next > p.size()) break;
         const bool video = id == video_id_, audio = id == 0xBDu;
         if ((video || audio) && length >= 3u) {

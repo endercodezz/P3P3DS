@@ -210,8 +210,29 @@ Behaviour is unchanged: identical 3,863 frame hashes, byte-identical WAV, same s
 ### 8.4. Measured: where PC time goes (2026-10-01)
 `p3p_pc_bootstrap --profile`, 20M dispatches (boot, logos, movie, title, main menu; 146 s virtual), i5-12400F, GCC 16.1 `-O2`: wall 46.4 s; HLE calls 32.7 s (70.4 %, 6,125,098 calls — includes GE list execution and software rasterization started from `sceGeListEnQueue`, and the post-call scheduler hook); software rendering 17.4 s (37.6 %, 15,411 draws/transfers, nested in the HLE figure); interpreter 0.000 s (13 entries, 12-16 distinct PCs over whole first-day runs, a few thousand instructions); AOT code plus dispatch ≈ 30 %. For the 3DS this points at GE work (PICA200 instead of software rasterization) and HLE/scheduler overhead before AOT code size. [VERIFIED] on PC only; not measured on ARM11.
 
-### 8.3. Blocked: devkitARM size measurements and the minimal 3DS harness
-devkitPro/devkitARM is not installed on this host (no `DEVKITPRO`, no `C:\devkitPro`), and installing global toolchains needs the maintainer's permission (CLAUDE.md section 2). Not done: `platform/3ds` CMake/.3dsx harness (`osSetSpeedupEnable`, citro3d clear), `-Os` vs `-O2` ARM11 text size of the full `.text`. These need devkitARM and, for speed, New 3DS hardware or Citra.
+### 8.3. First New 3DS build: boots in Azahar (2026-10-01)
+`platform/3ds/` builds `p3p3ds.3dsx` with devkitARM (GCC 16.1, libctru) through devkitPro's CMake toolchain, which must run from devkitPro's msys2 shell (README, "Build for New 3DS"). The game runs on the top screen (PSP framebuffer scaled 480x272 -> 400x240, nearest, by the CPU) and the bottom screen shows authorship and live debug data (status, fps, speed, guest/wall time, vblank, input, memory, stop reason), also written to `sdmc:/p3p3ds/report.txt`. The ISO is read from `sdmc:/p3p3ds/*.iso`; the decrypted EBOOT the code was generated from is embedded in romfs, so the `.3dsx` contains game code and is for personal testing only. Software rendering, no audio.
+
+Measured in Azahar 2126.1.2 (New 3DS mode) — an emulator, so the speed says nothing about hardware:
+- [VERIFIED] A `.3dsx` gets an APPLICATION region of 98,304 KiB there; with a 4 MiB linear heap the normal heap is 79,456 KiB.
+- [VERIFIED] Three allocation failures, fixed in this order: libctru's default heap split caps the normal heap at 24 MiB (`3ds/libctru/libctru/source/system/allocateHeaps.c`, `HEAP_SPLIT_SIZE_CAP`), too small for the 32 MiB guest RAM -> `__ctru_linear_heap_size` = 4 MiB; with 77.4 MB of code the 47 MiB heap could not hold the function registry -> code size cut (section 8.5); a function registered far from the EBOOT during the run grew both direct dispatch tables by 24,117,248 bytes (`Runtime::register_function`, found with a caller-recording `operator new` + `addr2line`) -> `PSPRECOMP_DIRECT_WINDOW_MAX` = 4 MiB (entries outside stay in the hash map).
+- [VERIFIED] After that the game runs: 314 vblanks (5.2 s guest) in 111.9 s wall, about 5 % of real time, no stop. What the top screen showed was not checked.
+- [UNVERIFIED] Hardware: the memory a `.3dsx` gets under the Homebrew Launcher, and speed on a New 2DS XL. Azahar reported 126,976 KiB in use against the 98,304 KiB region, so it may not enforce the limit the console does. A `.cia` can request a larger memory mode in its exheader; no `makerom` is installed yet.
+
+### 8.5. Measured: ARM code size levers (2026-10-01)
+Largest generated unit (`generated_unit_0049.cpp`), devkitARM GCC 16.1, `-march=armv6k -mtune=mpcore`, ARM `.text` bytes (compile times measured with six compiles in parallel, so only roughly comparable):
+
+| Flags / runtime variant | `.text` | compile |
+|---|---|---|
+| `-O2` (first build) | 693,253 | 58 s alone |
+| `-O1` | 786,191 | 12 s alone |
+| `-Os` | 636,086 | 26 s |
+| `-Os` + `PSPRECOMP_AOT_PRODUCTION_FASTPATHS` | 552,391 | 24 s |
+| + `PSPRECOMP_NO_FRONTIER_DIAGNOSTICS` (drops `if (rt.frontier_diagnostics) rt.diagnostic_pc = ...` before every memory access) | 530,381 | 24 s |
+| + `PSPRECOMP_CHAIN_NOINLINE` (`invoke_chained_direct` out of line instead of force-inlined at each cross-unit call) | **309,801** | 12 s |
+| same at `-O2` | 363,698 | 19 s |
+
+The 3DS build uses the last `-Os` row. Whole program: ELF `.text` 77,420,288 -> 44,413,060 bytes, `.3dsx` 83.4 -> 50.4 MB, clean build including code generation 2,542 s -> 527 s (`-j10`, i5-12400F). The x86 host build is unchanged (none of these macros is defined there). [VERIFIED] sizes; the run-time cost of the out-of-line chain on ARM11 is [UNVERIFIED] (one extra call per cross-unit transfer).
 
 ## 9. Feasibility: higher resolution / better graphics as a 3DS mod (2026-10-01)
 

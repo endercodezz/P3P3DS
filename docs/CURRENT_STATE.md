@@ -1,6 +1,13 @@
 # P3P3DS current execution state
 
-This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
+This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
+
+## First New 3DS build boots in Azahar (2026-10-01)
+
+- [VERIFIED] `platform/3ds/` builds `p3p3ds.3dsx` (devkitARM GCC 16.1). Core and runtime sources are shared with the host build through `cmake/p3p3ds_sources.cmake`; `DisplayState::on_vblank` is the presentation hook. ARM fixes: `std::min/max/clamp` with explicit types (`uint32_t`/`int32_t` are `long` on ARM newlib), including a one-line patch in `recomp/PSPRecomp/include/psprecomp/allegrex_context.hpp`.
+- [VERIFIED] In Azahar (New 3DS mode) the game runs after three memory fixes (heap split, code size, direct-table window): 314 vblanks in 111.9 s wall, about 5 % of real time. Details, numbers and what is not verified: `docs/3DS_PLATFORM.md` sections 8.3 and 8.5.
+- [VERIFIED] `sceIoRead` stages data in 256 KiB chunks instead of one host buffer of the requested size (P3P issues reads of tens of MiB).
+- [UNVERIFIED] Real hardware (New 2DS XL): memory available to a `.3dsx` and speed. Not done: PICA200 renderer, ndsp audio, `.cia`.
 
 ## First game day with scripted input; profile and GE census (2026-10-01)
 

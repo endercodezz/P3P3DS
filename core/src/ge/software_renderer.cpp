@@ -283,7 +283,7 @@ void SoftwareRenderer::draw(psprecomp::GuestMemory &memory, const GeRegisters &r
     auto decode = [&](std::uint32_t index) {
         Vertex v;
         const auto base = vertex_address + index * layout.size;
-        if (!memory.contains(base, std::max(layout.size, 1u))) { v.clipped = true; return v; }
+        if (!memory.contains(base, std::max<std::uint32_t>(layout.size, 1u))) { v.clipped = true; return v; }
         // Positions
         const auto pe = component_size(layout.pos_format, 1, 2, 4);
         if (layout.through) {

@@ -91,28 +91,8 @@ else()
 endif()
 
 # Core P3P3DS Target-Agnostic Runtime & HLE Library
-add_library(p3p3ds_core
-    core/src/frontier.cpp
-    core/src/interpreter.cpp
-    core/src/vfs.cpp
-    core/src/hle/iofilemgr.cpp
-    core/src/hle/modulemgr.cpp
-    core/src/hle/sascore.cpp
-    core/src/hle/mpeg.cpp
-    core/src/hle/utils.cpp
-    core/src/hle/utility.cpp
-    core/src/hle/ctrl.cpp
-    core/src/input.cpp
-    core/src/ge/software_renderer.cpp
-    core/src/hle/sysmem.cpp
-    core/src/hle/hle_modules.cpp
-    core/src/hle/threadman.cpp
-    core/src/hle/threadman_hle.cpp
-    core/src/hle/display.cpp
-    core/src/hle/ge.cpp
-    core/src/hle/umd.cpp
-    core/src/hle/audio.cpp
-)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/p3p3ds_sources.cmake")
+add_library(p3p3ds_core ${P3P3DS_CORE_SOURCES})
 
 target_include_directories(p3p3ds_core PUBLIC
     core/include

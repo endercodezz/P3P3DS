@@ -108,7 +108,7 @@ std::int16_t next_sample(SasVoice &v, psprecomp::GuestMemory &memory) {
                 std::int32_t nibble = (i & 1u) ? (byte >> 4) : (byte & 0xF);
                 nibble = static_cast<std::int16_t>(nibble << 12) >> shift;
                 std::int32_t s = nibble + ((v.s1 * kVagFilter[filter][0] + v.s2 * kVagFilter[filter][1]) >> 6);
-                s = std::clamp(s, -32768, 32767);
+                s = std::clamp<std::int32_t>(s, -32768, 32767);
                 v.s2 = v.s1;
                 v.s1 = s;
                 v.block[i] = static_cast<std::int16_t>(s);
@@ -161,7 +161,7 @@ void SasState::mix(SasCore &core, psprecomp::GuestMemory &memory, std::uint32_t 
             const auto existing = static_cast<std::int16_t>(memory.load16(out + 2u * i));
             value += (existing * ((i & 1u) ? mix_right : mix_left)) >> 12;
         }
-        memory.store16(out + 2u * i, static_cast<std::uint16_t>(std::clamp(value, -32768, 32767)));
+        memory.store16(out + 2u * i, static_cast<std::uint16_t>(std::clamp<std::int32_t>(value, -32768, 32767)));
     }
 }
 

@@ -426,6 +426,21 @@ void Runtime::register_function(std::uint32_t address, RecompiledFunction functi
     // path took a cache/TLB miss per dispatch.  Growing on demand keeps it at
     // the size of the executable image instead.
     constexpr std::size_t chunk = 1024u * 1024u / 4u;
+    // P3P3DS: memory-constrained targets cap the window (bytes of guest address
+    // space). An entry outside it stays in functions_ only: lookup_function
+    // falls back to the map and chaining treats it as non-chainable. Uncapped,
+    // one registration far from the EBOOT grew both tables by 23 MiB on 3DS.
+#if defined(PSPRECOMP_DIRECT_WINDOW_MAX)
+    const std::uint64_t window_lo = direct_functions_.empty() ? (c & ~0xFFFFFu) : std::min(direct_base_, c & ~0xFFFFFu);
+    const std::uint64_t window_hi = direct_functions_.empty()
+        ? std::uint64_t{c} + 4u
+        : std::max<std::uint64_t>(direct_base_ + direct_functions_.size() * 4u, std::uint64_t{c} + 4u);
+    const bool in_window = window_hi - window_lo <= PSPRECOMP_DIRECT_WINDOW_MAX;
+#else
+    constexpr bool in_window = true;
+#endif
+    const bool chainable = functions_[address].name.starts_with("recomp_unit_");
+    if (in_window) {
     const auto shift_forward = [](std::vector<RecompiledFunction> &table, std::size_t slots) {
         std::vector<RecompiledFunction> grown(table.size() + slots, nullptr);
         std::copy(table.begin(), table.end(), grown.begin() + static_cast<std::ptrdiff_t>(slots));
@@ -453,9 +468,8 @@ void Runtime::register_function(std::uint32_t address, RecompiledFunction functi
     // Assign unconditionally -- an import stub can also be covered by a unit,
     // and a later import registration has to clear the earlier unit pointer or
     // chaining would keep running the raw code instead of the wrapper.
-    const auto &registered = functions_[address].name;
-    const bool chainable = registered.starts_with("recomp_unit_");
     direct_chainable_[index] = chainable ? function : nullptr;
+    }
 
     if (!chainable && generated_unit_span_ != 0u && c >= generated_unit_base_) {
         const std::uint32_t unit_delta = c - generated_unit_base_;

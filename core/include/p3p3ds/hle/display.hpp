@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <iostream>
 
 namespace psprecomp {
@@ -59,14 +60,18 @@ public:
     [[nodiscard]] const DisplayFramebufInfo &framebuf(unsigned sync) const noexcept {
         return sync && pending_valid_ ? pending_ : info_;
     }
-    void advance_vblank() noexcept {
+    void advance_vblank() {
         const auto next_vcount = info_.vcount + 1;
         if (pending_valid_) {
             info_ = pending_;
             pending_valid_ = false;
         }
         info_.vcount = next_vcount;
+        if (on_vblank) on_vblank(info_);
     }
+    // Host presentation hook (platform backends): called at every guest
+    // vblank with the framebuffer now being displayed.
+    std::function<void(const DisplayFramebufInfo &)> on_vblank;
 
 private:
     DisplayFramebufInfo info_;

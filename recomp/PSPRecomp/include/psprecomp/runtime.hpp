@@ -41,6 +41,15 @@ extern std::uint64_t g_runtime_thread_switch_generation_fast;
 #define PSPRECOMP_RESTRICT
 #endif
 
+// P3P3DS: size-constrained targets (New 3DS) keep the compile-time chain out
+// of line. Force-inlining it at every cross-unit call site made the largest
+// P3P unit 2.2x larger on ARM (docs/3DS_PLATFORM.md section 8.5).
+#if defined(PSPRECOMP_CHAIN_NOINLINE) && (defined(__GNUC__) || defined(__clang__))
+#define PSPRECOMP_CHAIN_INLINE __attribute__((noinline))
+#else
+#define PSPRECOMP_CHAIN_INLINE PSPRECOMP_RUNTIME_FORCEINLINE
+#endif
+
 // The cross-unit hot-register cache (AotHotRegisterCache) was removed here.  It
 // kept seven GPRs and six scalar FPRs live in a second object alongside
 // AllegrexContext for the whole duration of a generated unit.  Inside the
@@ -78,7 +87,13 @@ public:
 
     // P3P3DS: enabled only by diagnostic runners; generated transfers supply
     // actual executed call sites, never a guess based on a stale $ra.
+#if defined(PSPRECOMP_NO_FRONTIER_DIAGNOSTICS)
+    // P3P3DS: compiled out (New 3DS) so generated code drops the per-access
+    // diagnostic_pc stores; must be defined for every translation unit.
+    static constexpr bool frontier_diagnostics = false;
+#else
     bool frontier_diagnostics{false};
+#endif
     std::uint32_t diagnostic_pc{};
     ExecutedTransfer last_transfer;
     std::vector<ExecutedTransfer> recent_transfers;
@@ -181,7 +196,7 @@ public:
     // path and unwind to outer dispatch instead of bypassing the replacement.
     template <auto Function, std::uint32_t UnitIndex, std::uint16_t DirectEntryId = 0u,
               std::uint32_t DirectTargetPc = 0u>
-    [[nodiscard]] PSPRECOMP_RUNTIME_FORCEINLINE bool invoke_chained_direct(
+    [[nodiscard]] PSPRECOMP_CHAIN_INLINE bool invoke_chained_direct(
         AllegrexContext &ctx, GuestMemory::AotFastView *shared_aot_mem = nullptr) {
 #if defined(PSPRECOMP_AOT_PRODUCTION_FASTPATHS)
         if (UnitIndex >= kGeneratedUnitFastCapacity || !generated_unit_layout_valid_) {

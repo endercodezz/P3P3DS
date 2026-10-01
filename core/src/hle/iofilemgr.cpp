@@ -191,14 +191,22 @@ void register_iofilemgr_module(psprecomp::Runtime &runtime, KernelState &kernel)
 
     const auto do_read = [&io, &tm](psprecomp::Runtime &rt, IoManager::Fd &f, std::uint32_t buffer, std::uint32_t size) -> std::int64_t {
         if (size != 0u && !rt.memory().contains(buffer, size)) return static_cast<std::int32_t>(0x800200D3u);
-        std::vector<std::uint8_t> data(size);
-        const auto n = f.source->read(f.position, data.data(), size);
-        if (n != 0u) rt.memory().copy_in(buffer, std::span<const std::uint8_t>(data.data(), n));
-        if (io.trace_reads && io.read_log.size() < 200000u) {
-            std::uint64_t hash = 0xCBF29CE484222325ull;
-            for (std::size_t i = 0; i < n; ++i) { hash ^= data[i]; hash *= 0x100000001B3ull; }
-            io.read_log.push_back({f.path, f.position, n, hash, tm.now()});
+        // Bounded staging buffer: P3P issues single reads of tens of MiB, and a
+        // host copy of that size does not fit next to guest RAM on the 3DS.
+        constexpr std::size_t kChunk = 256u * 1024u;
+        std::vector<std::uint8_t> data(std::min<std::size_t>(size, kChunk));
+        std::size_t n = 0;
+        std::uint64_t hash = 0xCBF29CE484222325ull;
+        while (n < size) {
+            const std::size_t want = std::min<std::size_t>(size - n, kChunk);
+            const auto got = f.source->read(f.position + n, data.data(), want);
+            if (got != 0u) rt.memory().copy_in(buffer + static_cast<std::uint32_t>(n), std::span<const std::uint8_t>(data.data(), got));
+            if (io.trace_reads)
+                for (std::size_t i = 0; i < got; ++i) { hash ^= data[i]; hash *= 0x100000001B3ull; }
+            n += got;
+            if (got < want) break;
         }
+        if (io.trace_reads && io.read_log.size() < 200000u) io.read_log.push_back({f.path, f.position, n, hash, tm.now()});
         f.position += n;
         return static_cast<std::int64_t>(n);
     };
