@@ -100,6 +100,7 @@ add_library(p3p3ds_core
     core/src/hle/sascore.cpp
     core/src/hle/mpeg.cpp
     core/src/hle/utils.cpp
+    core/src/hle/utility.cpp
     core/src/hle/ctrl.cpp
     core/src/input.cpp
     core/src/ge/software_renderer.cpp
@@ -148,6 +149,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # Decoder Compatibility Verification Tool
+add_executable(mnemonic_histogram experiments/p3p-analysis/mnemonic_histogram.cpp)
+target_include_directories(mnemonic_histogram PRIVATE recomp/PSPRecomp/include)
+target_link_libraries(mnemonic_histogram PRIVATE psprecomp_core)
+
 add_executable(verify_p3p_decoder
     experiments/p3p-analysis/verify_decoder.cpp
 )
@@ -317,5 +322,8 @@ add_test(NAME p3p_pcm_mixer COMMAND test_pcm_mixer)
 add_executable(test_input tests/test_input.cpp)
 target_link_libraries(test_input PRIVATE p3p3ds_core)
 add_test(NAME p3p_input COMMAND test_input)
+add_executable(p3p_autotest platform/pc/autotest.cpp)
+target_link_libraries(p3p_autotest PRIVATE p3p3ds_core)
+add_test(NAME p3p_autotest_baseline COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_autotests.py" --exe $<TARGET_FILE:p3p_autotest>)
 add_test(NAME p3p_skills_mirror COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/sync_agent_skills.py" --check)
 set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

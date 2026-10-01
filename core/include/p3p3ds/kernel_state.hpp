@@ -16,10 +16,21 @@
 #include <cstdint>
 #include <memory>
 #include <map>
+#include <optional>
+#include <string>
 
 namespace p3p3ds {
 
 namespace hle {
+// Console settings returned by sceUtilityGetSystemParam* (IDs and value
+// encodings: psp/pspsdk/src/utility/psputility_sysparam.h). Defaults are the
+// reference console of pspautotests utility/systemparam.expected.
+struct SystemParams {
+    std::string nickname{"shadow"};
+    std::int32_t adhoc_channel{0}, wlan_powersave{0}, date_format{2}, time_format{0}, timezone_minutes{60},
+                 daylight_savings{0}, language{1}, button_swap{1}, parental_level{9};
+    [[nodiscard]] std::optional<std::int32_t> int_param(std::int32_t id) const noexcept;
+};
 // Host-provided controller state (PSP button bits, analog 0..255, 128 = centre).
 struct HostInput {
     std::uint32_t buttons{0};
@@ -118,6 +129,7 @@ public:
     hle::ModuleManager &modules() noexcept { return modules_; }
     hle::SasState &sas() noexcept { return sas_; }
     hle::MpegState &mpeg() noexcept { return mpeg_; }
+    hle::SystemParams &system_params() noexcept { return system_params_; }
     hle::HostInput &input() noexcept { return input_; }
     hle::IoManager &io() noexcept { return io_; }
     const hle::IoManager &io() const noexcept { return io_; }
@@ -130,6 +142,7 @@ private:
     hle::ModuleManager modules_;
     hle::SasState sas_;
     hle::MpegState mpeg_;
+    hle::SystemParams system_params_;
     hle::HostInput input_;
     bool interrupts_enabled_{true};
     hle::AudioState audio_;

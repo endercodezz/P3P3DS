@@ -324,12 +324,13 @@ void register_iofilemgr_module(psprecomp::Runtime &runtime, KernelState &kernel)
         if (f == nullptr || !f->directory) { ctx.set_gpr(2, SCE_ERROR_KERNEL_BAD_FILE_DESCRIPTOR); return; }
         ctx.set_gpr(2, u(io.close(fd)));
     });
-    reg(0x42EC03ACu, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) { // sceIoWrite
+    reg(0x42EC03ACu, [&io](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) { // sceIoWrite
         const auto fd = ctx.gpr[4], buffer = ctx.gpr[5], size = ctx.gpr[6];
         if ((fd == 1u || fd == 2u) && rt.memory().contains(buffer, size)) {
             std::string text(size, '\0');
             for (std::uint32_t i = 0; i < size; ++i) text[i] = static_cast<char>(rt.memory().load8(buffer + i));
-            std::cout << "[PSP STDOUT] " << text << (text.ends_with('\n') ? "" : "\n");
+            if (io.console_sink) io.console_sink(fd, text);
+            else std::cout << "[PSP STDOUT] " << text << (text.ends_with('\n') ? "" : "\n");
             ctx.set_gpr(2, size);
             return;
         }

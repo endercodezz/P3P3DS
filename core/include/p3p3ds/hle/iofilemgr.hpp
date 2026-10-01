@@ -3,6 +3,8 @@
 #include "p3p3ds/vfs.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <string_view>
 #include <map>
 #include <memory>
 #include <optional>
@@ -29,6 +31,8 @@ constexpr std::uint32_t SCE_ERROR_KERNEL_NO_ASYNC_OP = 0x8002032Au;
 
 class IoManager {
 public:
+    // Receives guest writes to fd 1/2 (stdout/stderr); unset: printed with a prefix.
+    std::function<void(std::uint32_t fd, std::string_view text)> console_sink;
     static constexpr int kFirstFd = 3;
     static constexpr int kMaxFds = 64;
     // [INFERRED] deterministic UMD timing: fixed command latency plus bytes at

@@ -26,6 +26,7 @@ void register_all_hle_modules(psprecomp::Runtime &runtime, KernelState &kernel) 
     register_modulemgr_module(runtime, kernel);
     register_sascore_module(runtime, kernel);
     register_mpeg_module(runtime, kernel);
+    register_utility_module(runtime, kernel);
     register_utils_module(runtime, kernel);
     register_ctrl_module(runtime, kernel);
 

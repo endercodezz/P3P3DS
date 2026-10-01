@@ -1,0 +1,50 @@
+# pspautotests on the P3P3DS interpreter (tools/run_autotests.py --update).
+# program	mismatching_lines	expected_lines	stop
+cpu/cpu_alu/cpu_alu.prx	0	83	exit
+cpu/cpu_alu/cpu_branch.prx	1	9	exit
+cpu/cpu_alu/cpu_branch2.prx	0	274	exit
+cpu/cpu_alu/cpu_div.prx	4	56	exit
+cpu/crash/crash_bad_execaddr.prx	0	0	stop:Interpreter left guest memory at 0x000000AC
+cpu/crash/crash_read_f32.prx	0	0	stop:Runtime exception: Guest memory access outside PSP RAM/EDRAM at 0x000000AC
+cpu/crash/crash_read_u32.prx	0	0	stop:Runtime exception: Guest memory access outside PSP RAM/EDRAM at 0x000000AC
+cpu/crash/crash_write_f32.prx	0	0	stop:Runtime exception: Guest memory access outside PSP RAM/EDRAM at 0x000000AC
+cpu/crash/crash_write_u32.prx	0	0	stop:Runtime exception: Guest memory access outside PSP RAM/EDRAM at 0x000000AC
+cpu/exec/exec_addr.prx	3	3	stop:Missing HLE import UtilsForKernel::0xC2DF770E
+cpu/fpu/fcr.prx	38	38	stop:Unsupported Allegrex instruction 0x44420000 at 0x08800328: unsupported CFC1 control register
+cpu/fpu/fpu.prx	3	2026	exit
+cpu/fpu/fpu_branch.prx	12	25	exit
+cpu/fpu/fpu_branch_hazard.prx	8	20	exit
+cpu/fpu/fpu_nan.prx	4	6	exit
+cpu/fpu/rounding.prx	18	336	exit
+cpu/fpu/roundmode.prx	63	308	exit
+cpu/icache/icache.prx	2	2	stop:Missing HLE import UtilsForKernel::0xC2DF770E
+cpu/lsu/cacheop.prx	4	11	exit
+cpu/lsu/llsc.prx	17	17	stop:Unsupported Allegrex instruction 0xE0620000 at 0x08800690: unknown not lowered yet
+cpu/lsu/lsu.prx	0	59	exit
+cpu/vfpu/callout.prx	3	5	exit
+cpu/vfpu/colors.prx	4	5	stop:Unsupported Allegrex instruction 0xD480000C at 0x08800460: vfpu not lowered yet
+cpu/vfpu/convert.prx	107	108	stop:Unsupported Allegrex instruction 0xD480000C at 0x08801850: vfpu not lowered yet
+cpu/vfpu/convert_scaled.prx	1	128	exit
+cpu/vfpu/exact.prx	367	371	exit
+cpu/vfpu/gum.prx	43	45	stop:Missing HLE import sceRtc::0x3F7AD767
+cpu/vfpu/matrix.prx	0	50	exit
+cpu/vfpu/minmax.prx	1	17	exit
+cpu/vfpu/minmax_tie.prx	0	60	exit
+cpu/vfpu/minmax_zero.prx	5	12	exit
+cpu/vfpu/overlap.prx	44	62	stop:Unsupported Allegrex instruction 0x67040080 at 0x08800B5C: vfpu1 not lowered yet
+cpu/vfpu/overlap_vcrsp.prx	3	5	exit
+cpu/vfpu/prefix_branch.prx	1	10	exit
+cpu/vfpu/prefix_consume.prx	65	84	stop:Unsupported Allegrex instruction 0xD0438480 at 0x08801B94: vfpu4 not lowered yet
+cpu/vfpu/prefix_ctrl.prx	8	39	exit
+cpu/vfpu/prefix_sat.prx	174	196	exit
+cpu/vfpu/prefix_unpack.prx	12	34	exit
+cpu/vfpu/prefixes.prx	3	26	exit
+cpu/vfpu/specials.prx	251	262	stop:Unsupported Allegrex instruction 0xD0408480 at 0x08800964: vfpu4 not lowered yet
+cpu/vfpu/vavg.prx	24	24	exit
+cpu/vfpu/vbranch.prx	4	93	exit
+cpu/vfpu/vbranch_hazard.prx	3	6	exit
+cpu/vfpu/vector.prx	3962	5329	stop:Unsupported Allegrex instruction 0xD0438480 at 0x08802074: vfpu4 not lowered yet
+cpu/vfpu/vregs.prx	47	47	stop:Missing HLE import UtilsForUser::sceKernelIcacheInvalidateRange
+cpu/vfpu/vrnd.prx	121	122	stop:Unsupported Allegrex instruction 0xD0200000 at 0x08800398: vfpu4 not lowered yet
+cpu/vfpu/vrot.prx	356	409	exit
+utility/systemparam/systemparam.prx	0	23	exit
