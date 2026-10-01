@@ -5,6 +5,9 @@
 #include "psprecomp/runtime.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <vector>
 #include <limits>
 #include <map>
 #include <optional>
@@ -103,6 +106,15 @@ struct CallbackFrame {
     std::optional<std::int32_t> woken;    // wake result delivered while running callbacks
 };
 
+// HLE service that calls back into guest code (e.g. the sceMpeg ringbuffer
+// read callback) and continues once it returns. The guest function runs on
+// the calling thread and may block like any guest code.
+using GuestCallContinuation = std::function<void(psprecomp::Runtime &, psprecomp::AllegrexContext &, std::uint32_t)>;
+struct GuestCallFrame {
+    psprecomp::AllegrexContext resume{};
+    GuestCallContinuation then;
+};
+
 struct ThreadControlBlock {
     std::int32_t uid{0};
     std::string name;
@@ -125,6 +137,7 @@ struct ThreadControlBlock {
     WaitInfo wait;
     std::optional<CallbackFrame> callback;
     bool callback_pending_run{};          // scheduled to run callbacks from a CB wait
+    std::vector<GuestCallFrame> guest_calls;
     psprecomp::AllegrexContext context{};
 };
 
@@ -176,6 +189,7 @@ class ThreadManager {
 public:
     static constexpr std::uint32_t kThreadReturnSentinel = 0x00000020u;
     static constexpr std::uint32_t kCallbackReturnSentinel = 0x00000024u;
+    static constexpr std::uint32_t kGuestCallReturnSentinel = 0x0000002Cu;
     static constexpr std::uint32_t kThreadAttrNoFillStack = 0x00100000u;
     // [INFERRED] Fixed virtual cost of one HLE call so guest polling loops on
     // sceKernelGetSystemTime* terminate deterministically.
@@ -254,6 +268,13 @@ public:
     // Returns true if a callback frame was started (ctx now executes it).
     bool check_callbacks(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx);
     void callback_returned(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx);
+    // Runs guest `function(args...)` on the current thread with `gp`, then
+    // restores `resume` and calls `then(rt, ctx, $v0)`, which sets the
+    // service result (or chains another guest call).
+    void call_guest(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx, const psprecomp::AllegrexContext &resume,
+                    std::uint32_t function, std::initializer_list<std::uint32_t> args, std::uint32_t gp,
+                    GuestCallContinuation then);
+    void guest_call_returned(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx);
 
     // ---- Thread services ----------------------------------------------------
     std::int32_t delete_thread(std::int32_t uid);

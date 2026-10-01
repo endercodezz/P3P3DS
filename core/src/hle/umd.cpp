@@ -54,6 +54,17 @@ void register_umd_module(psprecomp::Runtime &runtime, KernelState &kernel) {
             if (result == 0u && kernel.umd().registered_callback() != 0)
                 (void)kernel.threads().notify_callback(rt, kernel.umd().registered_callback(), 0x32u);
         });
+    // sceUmdGetDriveStat: pspautotests umd/wait/wait.expected reports 0x32
+    // (uOFW mediaman.h MEDIA_IN|READY|READABLE) for an activated disc.
+    // [INFERRED] 0x12 (MEDIA_IN|READY) before activation, 0x01 (MEDIA_OUT)
+    // without a disc; the deactivated callback argument there is 0x12.
+    runtime.register_hle("sceUmdUser", 0x6B4A146Cu,
+        [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            const auto &umd = kernel.umd();
+            const std::uint32_t stat = !umd.medium_present() ? 0x01u : umd.activation_requested() ? 0x32u : 0x12u;
+            ctx.set_gpr(2, stat);
+            rt.event("umd_get_drive_stat", {{"result",stat}});
+        });
     // uOFW mediaman_user.h / PSPSDK pspumd.h: zero absent, nonzero present.
     runtime.register_hle("sceUmdUser", 0x46EBB729u,
         [&kernel](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {

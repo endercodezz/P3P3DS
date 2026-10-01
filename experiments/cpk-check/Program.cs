@@ -81,6 +81,26 @@ static class Program
     {
         if (args.Length < 2) { Console.Error.WriteLine("usage: CpkCheck <umd.iso> <io-trace.csv> [prefix=hostdir ...]"); return 2; }
         using var iso = File.OpenRead(args[0]);
+        if (args[1] == "--list")
+        {
+            // CpkCheck <iso> --list <iso path of .cpk> [<name substring> <extract dir>]
+            var loc = FindIso(iso, args[2]) ?? throw new InvalidOperationException("not on UMD: " + args[2]);
+            var cpk = CriFsLib.Instance.CreateCpkReader(new SubStream(iso, loc.lba * Sector, loc.size), false);
+            foreach (var file in cpk.GetFiles())
+            {
+                var key = $"{file.Directory}/{file.FileName}";
+                if (args.Length > 3 && !key.Contains(args[3], StringComparison.OrdinalIgnoreCase)) continue;
+                Console.WriteLine($"{key} offset=0x{file.FileOffset:X} size=0x{file.FileSize:X} extract=0x{file.ExtractSize:X}");
+                if (args.Length > 4)
+                {
+                    using var data = cpk.ExtractFile(file);
+                    var outPath = Path.Combine(args[4], file.FileName);
+                    Directory.CreateDirectory(args[4]);
+                    File.WriteAllBytes(outPath, data.Span.ToArray());
+                }
+            }
+            return 0;
+        }
         var hostMaps = args.Skip(2).Select(a => a.Split('=', 2)).ToArray();
         var readers = new Dictionary<string, (ICpkReaderHolder holder, CpkFile[] files, long headerEnd)>();
         int total = 0, header = 0, matched = 0, mismatched = 0, unclassified = 0, skipped = 0;

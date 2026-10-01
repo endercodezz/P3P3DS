@@ -38,6 +38,11 @@ void callback_return_trampoline(psprecomp::Runtime &runtime, psprecomp::Allegrex
     else runtime.stop("Callback return without active kernel state");
 }
 
+void guest_call_return_trampoline(psprecomp::Runtime &runtime, psprecomp::AllegrexContext &ctx) {
+    if (g_active_kernel != nullptr) g_active_kernel->threads().guest_call_returned(runtime, ctx);
+    else runtime.stop("Guest call return without active kernel state");
+}
+
 std::uint32_t u(std::int32_t value) { return static_cast<std::uint32_t>(value); }
 
 } // namespace
@@ -651,6 +656,33 @@ void ThreadManager::callback_returned(psprecomp::Runtime &rt, psprecomp::Allegre
     dispatch_next(rt, ctx);
 }
 
+void ThreadManager::call_guest(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx,
+                               const psprecomp::AllegrexContext &resume, std::uint32_t function,
+                               std::initializer_list<std::uint32_t> args, std::uint32_t gp, GuestCallContinuation then) {
+    auto *cur = current_thread();
+    if (cur == nullptr) { rt.stop("Guest call without a current thread"); return; }
+    cur->guest_calls.push_back(GuestCallFrame{resume, std::move(then)});
+    ctx = resume;
+    std::uint32_t reg = 4u;
+    for (auto v : args) ctx.set_gpr(reg++, v);
+    ctx.set_gpr(28, gp);
+    ctx.set_gpr(31, kGuestCallReturnSentinel);
+    ctx.set_gpr(29, (resume.gpr[29] - 64u) & ~15u); // below the caller's frame
+    ctx.pc = function;
+    rt.event("guest_call", {{"target", function}, {"thread", u(cur->uid)}});
+}
+
+void ThreadManager::guest_call_returned(psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+    auto *cur = current_thread();
+    if (cur == nullptr || cur->guest_calls.empty()) { rt.stop("Guest call return outside a guest call frame"); return; }
+    auto frame = std::move(cur->guest_calls.back());
+    cur->guest_calls.pop_back();
+    const auto result = ctx.gpr[2];
+    ctx = frame.resume;
+    rt.event("guest_call_return", {{"result", result}, {"thread", u(cur->uid)}});
+    frame.then(rt, ctx, result);
+}
+
 // ---------------------------------------------------------------------------
 // Thread services
 // ---------------------------------------------------------------------------
@@ -1171,6 +1203,7 @@ void register_thread_trampolines(psprecomp::Runtime &runtime, KernelState &kerne
     g_active_kernel = &kernel;
     runtime.register_function(ThreadManager::kThreadReturnSentinel, &thread_return_trampoline, "thread_return_trampoline");
     runtime.register_function(ThreadManager::kCallbackReturnSentinel, &callback_return_trampoline, "callback_return_trampoline");
+    runtime.register_function(ThreadManager::kGuestCallReturnSentinel, &guest_call_return_trampoline, "guest_call_return_trampoline");
 }
 
 } // namespace p3p3ds::hle

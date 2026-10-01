@@ -1,7 +1,10 @@
-// UtilsForUser: data-cache maintenance and libc time on the virtual clock.
+// UtilsForUser (data-cache maintenance, libc time on the virtual clock),
+// sceSuspendForUser power tick and sceDmac memcpy.
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/kernel_state.hpp"
 #include "psprecomp/runtime.hpp"
+
+#include <vector>
 
 namespace p3p3ds::hle {
 
@@ -36,6 +39,28 @@ void register_utils_module(psprecomp::Runtime &runtime, KernelState &kernel) {
         if (ctx.gpr[5] != 0u && rt.memory().contains(ctx.gpr[5], 8u)) { rt.memory().store32(ctx.gpr[5], 0u); rt.memory().store32(ctx.gpr[5] + 4u, 0u); }
         ctx.set_gpr(2, 0u);
     });
+    // sceSuspendForUser::sceKernelPowerTick: references/uofw/src/kd/sysmem/suspend.c
+    // forwards to the power handler's tick (idle-timer reset) or returns 0.
+    // [INFERRED] the handler's tick also returns 0; there is no idle timer here.
+    runtime.register_hle("sceSuspendForUser", 0x090CCB3Fu, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+        ctx.set_gpr(2, 0u);
+    });
+    // sceDmac Memcpy/TryMemcpy: errors from pspautotests dmac/dmactest.expected
+    // (0 length 0x80000104 before NULL 0x80000103). The copy completes
+    // synchronously [INFERRED]: no DMA channel contention is modelled, so the
+    // concurrent TryMemcpy busy result (0x80000021) never occurs.
+    for (const auto nid : {0x617F3FE6u, 0xD97F94D8u}) {
+        runtime.register_hle("sceDmac", nid, [](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) {
+            const auto dst = ctx.gpr[4], src = ctx.gpr[5], size = ctx.gpr[6];
+            auto &m = rt.memory();
+            if (size == 0u) { ctx.set_gpr(2, 0x80000104u); return; }
+            if (dst == 0u || src == 0u || !m.contains(dst, size) || !m.contains(src, size)) { ctx.set_gpr(2, 0x80000103u); return; }
+            std::vector<std::uint8_t> bytes(size);
+            m.copy_out(src, bytes);
+            m.copy_in(dst, bytes);
+            ctx.set_gpr(2, 0u);
+        });
+    }
 }
 
 } // namespace p3p3ds::hle

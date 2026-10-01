@@ -5,6 +5,7 @@
 #include "p3p3ds/hle/ge.hpp"
 #include "p3p3ds/hle/iofilemgr.hpp"
 #include "p3p3ds/hle/modulemgr.hpp"
+#include "p3p3ds/hle/mpeg.hpp"
 #include "p3p3ds/hle/sascore.hpp"
 #include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
@@ -103,6 +104,7 @@ public:
     const hle::UmdState &umd() const noexcept { return umd_; }
     hle::ModuleManager &modules() noexcept { return modules_; }
     hle::SasState &sas() noexcept { return sas_; }
+    hle::MpegState &mpeg() noexcept { return mpeg_; }
     hle::HostInput &input() noexcept { return input_; }
     hle::IoManager &io() noexcept { return io_; }
     const hle::IoManager &io() const noexcept { return io_; }
@@ -114,6 +116,7 @@ private:
     hle::IoManager io_;
     hle::ModuleManager modules_;
     hle::SasState sas_;
+    hle::MpegState mpeg_;
     hle::HostInput input_;
     bool interrupts_enabled_{true};
     hle::AudioState audio_;

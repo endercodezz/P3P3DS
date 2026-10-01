@@ -91,6 +91,7 @@ add_library(p3p3ds_core
     core/src/hle/iofilemgr.cpp
     core/src/hle/modulemgr.cpp
     core/src/hle/sascore.cpp
+    core/src/hle/mpeg.cpp
     core/src/hle/utils.cpp
     core/src/hle/ctrl.cpp
     core/src/ge/software_renderer.cpp
@@ -295,4 +296,12 @@ add_test(NAME p3p_sascore COMMAND test_sascore)
 add_executable(test_ge_renderer tests/test_ge_renderer.cpp)
 target_link_libraries(test_ge_renderer PRIVATE p3p3ds_core)
 add_test(NAME p3p_ge_renderer COMMAND test_ge_renderer)
+add_executable(test_mpeg tests/test_mpeg.cpp)
+target_link_libraries(test_mpeg PRIVATE p3p3ds_core)
+target_compile_definitions(test_mpeg PRIVATE P3P_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME p3p_mpeg COMMAND test_mpeg)
+set_tests_properties(p3p_mpeg PROPERTIES SKIP_RETURN_CODE 77)
+add_executable(test_misc_hle tests/test_misc_hle.cpp)
+target_link_libraries(test_misc_hle PRIVATE p3p3ds_core)
+add_test(NAME p3p_misc_hle COMMAND test_misc_hle)
 set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

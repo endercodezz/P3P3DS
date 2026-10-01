@@ -71,18 +71,18 @@ Phase 4: Nintendo 3DS Backend Integration
     - Implemented `ThreadManForUser::0x446D8DE6` (`sceKernelCreateThread`) and `ThreadManForUser::0xF475845D` (`sceKernelStartThread`) `[COMPLETED]`.
     - Initialized guest thread context and stack for `user_main` (`0x0880421C`), performed cooperative context switch, and executed guest instructions to next blocker at `0x08B4E6A0` (`sub_08B4E6A0`) with $ra=`0x08804268` `[COMPLETED]`.
 
-11. **Step 11: Implement Virtual File System (VFS) with Modding Support**
+11. **Step 11: Implement Virtual File System (VFS) with Modding Support** `[COMPLETED]` (see `docs/CURRENT_STATE.md`; ULUS-10512 has `umd0.cpk`/`umd1.cpk`, not `data.cpk`)
     - Implement `IoFileMgrForUser` (`sceIoOpen`, `sceIoRead`, `sceIoLseek`, `sceIoClose`).
     - Integrate multi-tier fallback pipeline:
       `SD:/p3p3ds/mods/bind/` -> `mod.cpk` -> `mod1.cpk` -> `data.cpk`.
     - Verify with `CriFsV2Lib` that P3P loads its initial archives without error.
 
-12. **Step 12: Implement Display & Frame Timing**
+12. **Step 12: Implement Display & Frame Timing** `[COMPLETED]` except the window: frames are dumped as BMP (`--frames-dir`); SDL3 is not available offline
     - Implement `sceDisplay` (`sceDisplaySetMode`, `sceDisplaySetFrameBuf`, `sceDisplayWaitVblankStart`).
     - Connect guest framebuffer in VRAM (`0x04000000`) to an SDL3/OpenGL debug window on PC.
     - Confirm the initial Atlus boot screen / legal disclaimer renders.
 
-13. **Step 13: Implement Controller Input & Event Flags**
+13. **Step 13: Implement Controller Input & Event Flags** — HLE done; host input mapping open (the title screen waits for a button)
     - Hook `sceCtrl` (`sceCtrlReadBufferPositive`, `sceCtrlPeekBufferPositive`).
     - Map PC gamepad/keyboard to PSP buttons.
     - Implement semaphores and event flags needed for game state transitions.
@@ -107,6 +107,14 @@ Phase 4: Nintendo 3DS Backend Integration
     - Verify in-game execution on Citra emulator and New 3DS hardware.
 
 ---
+
+### Movie and audio decoding plan (sceMpeg / ATRAC3plus)
+
+Interface in place: `core/include/p3p3ds/hle/mpeg.hpp` `MpegDecoder` receives each demultiplexed AU (`decode_video` writes a picture into guest memory, `decode_audio` writes 2048 stereo S16 samples). `BlankMpegDecoder` (black / silence) is the default. Container behaviour is verified against `pspautotests/tests/video/mpeg/basic.expected`. P3P's only movie is `USRDIR/sound/pmsf/P3OPMV_P3P.pmsf` (`_P3PB` variant): H.264 2,997 AUs at 29.97 fps, ATRAC3plus 2,156 frames of 752 bytes.
+
+1. PC: an H.264 Baseline/Main decoder + ATRAC3plus decoder behind `MpegDecoder`. Candidates must be license-compatible and vendored offline (none present in the workspace); PPSSPP uses FFmpeg — reference only, no code copy. Verify: decoded frame hashes against a reference decode of the same AUs; audio PCM against a reference decoder.
+2. 3DS: the New 3DS has an MVD hardware H.264 service (`mvd:STD` in libctru) [UNVERIFIED for this stream profile]; ATRAC3plus needs a software decoder on ARM11 [UNVERIFIED cost]. Measure before choosing; an alternative is offline transcoding of the user's movie to a 3DS-native format at install time.
+3. The game's own `sceAtrac3plus` use for BGM (not yet reached) shares the ATRAC3plus decoder.
 
 ## 2. Future Technical Considerations (Post-Milestone)
 

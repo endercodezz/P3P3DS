@@ -93,7 +93,9 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     callback_ctx.gpr[6]=end_pc;
     callback_ctx.gpr[31]=0x20;
     callback_ctx.pc=callback.finish;
-    unsigned budget=32;
+    // Interrupt-context handler: it cannot block, so it runs to completion in
+    // isolation. The cap only guards against a runaway handler.
+    unsigned budget=1000000;
     while (callback_ctx.pc!=0x20 && !rt.stopped() && budget--) {
         const auto pc=callback_ctx.pc;
         if (!rt.invoke_isolated_aot(pc,callback_ctx)) {

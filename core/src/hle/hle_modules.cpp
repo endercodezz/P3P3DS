@@ -4,6 +4,7 @@
 #include "p3p3ds/hle/iofilemgr.hpp"
 #include "p3p3ds/hle/modulemgr.hpp"
 #include "p3p3ds/hle/sascore.hpp"
+#include "p3p3ds/hle/mpeg.hpp"
 #include "p3p3ds/hle/ge.hpp"
 #include "p3p3ds/hle/sysmem.hpp"
 #include "p3p3ds/hle/threadman.hpp"
@@ -24,6 +25,7 @@ void register_all_hle_modules(psprecomp::Runtime &runtime, KernelState &kernel) 
     register_iofilemgr_module(runtime, kernel);
     register_modulemgr_module(runtime, kernel);
     register_sascore_module(runtime, kernel);
+    register_mpeg_module(runtime, kernel);
     register_utils_module(runtime, kernel);
     register_ctrl_module(runtime, kernel);
 
