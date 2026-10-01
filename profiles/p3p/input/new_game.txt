@@ -1,0 +1,4 @@
+# Title -> main menu -> NEW GAME.
+7965 START 6     # leave "PRESS ANY BUTTON"
+8300 UP 6        # cursor LOAD GAME -> NEW GAME
+8400 CROSS 6     # confirm

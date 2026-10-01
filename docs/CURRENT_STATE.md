@@ -2,6 +2,11 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host; no 3DS hardware result is claimed.
 
+## New Game start (2026-10-01)
+
+- [VERIFIED] `profiles/p3p/input/new_game.txt` (START at vblank 7965, UP at 8300, CROSS at 8400; CROSS confirms in this release): the game checks `title/sex_select.bin` and `scheduler/scheduler_04.bf` through the mod chain and shows the protagonist selection scene with the dialog "> Welcome to the world of P3P." (frames 3810-6941, `.tmp/ng1/`), then waits for input. 40M dispatches, 300 s virtual, no blocker.
+- Also: LICENSE (MIT) added; `.agents/skills/` mirrors `.claude/skills/` (`tools/sync_agent_skills.py`, CTest `p3p_skills_mirror`); CLAUDE.md/AGENTS.md section 9 no longer names `data.cpk`, and both gained section 18 (project skills). 23/23 CTest.
+
 ## Host input and leaving the title screen (2026-10-01)
 
 - [VERIFIED] `core/include/p3p3ds/input.hpp` / `core/src/input.cpp`: `InputSource` sampled by sceCtrl with the virtual vblank count (`HostInput::refresh`), and `InputScript`, a vblank-keyed button/stick script (`<vblank> <BUTTONS> [hold]`, `<vblank> stick x y`). Button bits from `psp/pspsdk/src/ctrl/pspctrl.h` = `references/uofw/include/ctrl.h`. Runner: `--input <file>`; `--gamepad` polls XInput pad 0 live (`platform/pc/host_input.hpp`, mapping A/B/X/Y = Cross/Circle/Square/Triangle) — live polling is [UNVERIFIED]: no pad was attached and the run is not paced to wall time. Keyboard: a default key map exists as data only (no window to receive keys). `ctrl_buttons` events trace each change.

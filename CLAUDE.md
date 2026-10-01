@@ -137,15 +137,15 @@ Every functional change must include a verifiable test method:
 Generic modding support and arbitrary localization packages are first-class architectural requirements:
 - Asset modifications must not require recompiling the runtime executable.
 - The runtime must remain language-neutral: no specific translation or language may be hardcoded into the core engine.
-- Implement the verified fallback resolution chain:
+- Implement the verified fallback resolution chain. On PSP it is provided by the community CWCheat "Mod Support" patch (`p3p/p3p-patches/ULUS10512.ini`, applied by the recompiler) and served by the VFS; ULUS-10512 has no `data.cpk` (`docs/VERIFICATION.md`):
   ```text
-  sdmc:/p3p3ds/mods/bind/<relative_path>
+  sdmc:/p3p3ds/mods/bind/<relative_path>     (ms0:/PSP/P3P/bind/)
     ↓
   sdmc:/p3p3ds/mods/mod.cpk
     ↓
-  sdmc:/p3p3ds/mods/mod1.cpk
+  sdmc:/p3p3ds/mods/mod1.cpk ... mod3.cpk
     ↓
-  sdmc:/p3p3ds/data/data.cpk (original game archive)
+  disc0:/PSP_GAME/USRDIR/umd0.cpk, umd1.cpk  (original game archives)
   ```
 - Support arbitrary community mod packages and fan translations equally (e.g. Russian, German, French, Spanish, custom balancing, UI overhauls).
 - Inspect whether community patches require binary hook addresses (e.g. CWCheat patches or EBOOT hooks) and implement them cleanly in the profile loader.
@@ -293,3 +293,12 @@ git log -2 --oneline
 
 Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
 
+---
+
+## 18. Project Skills
+
+Reusable workflows live in `.claude/skills/<name>/SKILL.md` (with helper scripts under `scripts/`); `.agents/skills/` is a byte-identical mirror for other coding agents.
+- Edit skills only in `.claude/skills/`, then run `python tools/sync_agent_skills.py`. CTest `p3p_skills_mirror` (`--check`) fails while the mirror differs.
+- Main workflows: `p3p-run-triage` (build, run, classify the stop, inspect frames/audio, prove determinism), `p3p3ds-commit` (Sections 14-17 commit procedure and host editing pitfalls), `psp-hle-runtime`, `psp-static-recomp`, `p3p3ds-research-verification`, `psp-emulator-debugging`, `p3p-modding-vfs`, `n3ds-platform`.
+- When the same manual procedure is repeated across tasks, capture it as a skill (or extend one) instead of re-deriving it.
+- Report where produced artifacts (frame dumps, WAV, traces) are stored, with exact paths.
