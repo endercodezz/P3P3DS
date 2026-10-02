@@ -47,6 +47,7 @@ void register_utility_module(psprecomp::Runtime &runtime, KernelState &kernel) {
             rt.memory().store8(ctx.gpr[5] + static_cast<std::uint32_t>(i), i < nick.size() ? static_cast<std::uint8_t>(nick[i]) : 0u);
         ctx.set_gpr(2, 0u);
     });
+    register_savedata_module(runtime, kernel);
 }
 
 } // namespace p3p3ds::hle

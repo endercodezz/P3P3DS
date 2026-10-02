@@ -4,6 +4,7 @@
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/common.hpp"
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <vector>
 namespace p3p3ds::hle {
@@ -275,5 +276,24 @@ void register_ge_module(psprecomp::Runtime &runtime, KernelState &kernel) {
     runtime.register_hle("sceGe_user",0x03444EB4u,[&kernel](auto &r,auto &c){c.set_gpr(2,kernel.ge().sync(r,c.gpr[4],c.gpr[5]));});
     runtime.register_hle("sceGe_user",0xB287BD61u,[&kernel](auto &r,auto &c){c.set_gpr(2,kernel.ge().sync(r,0,c.gpr[4],true));});
     for(auto nid:{0xB448EC0Du,0x4C06E472u}) runtime.register_hle("sceGe_user",nid,[](auto &r,auto &){r.stop("GE break/continue requires implementation");});
+    // sceGeGetCmd(cmd) / sceGeGetMtx(id, out): uOFW src/kd/ge/ge.c (sceGeGetCmd,
+    // sceGeGetMtx); out-of-range index -> SCE_ERROR_INVALID_INDEX (0x80000102).
+    // P3P reads them for the battle-transition effect (first Shadow, New 3DS).
+    // [INFERRED] the command register holds the whole word (opcode << 24 | argument).
+    runtime.register_hle("sceGe_user",0xDC93CFEFu,[&kernel](auto &,auto &c){
+        const auto cmd=c.gpr[4];
+        if(cmd>=0xFFu) { c.set_gpr(2,0x80000102u); return; }
+        c.set_gpr(2,(cmd<<24)|(kernel.ge().registers().reg[cmd]&0xFFFFFFu));
+    });
+    runtime.register_hle("sceGe_user",0x57C8945Bu,[&kernel](auto &r,auto &c){
+        const auto id=static_cast<std::int32_t>(c.gpr[4]); const auto out=c.gpr[5];
+        if(id<0 || id>=12) { c.set_gpr(2,0x80000102u); return; }
+        const auto &g=kernel.ge().registers();
+        const float *m=id==10?g.proj.data():id==11?g.tgen.data():id==8?g.world.data():id==9?g.view.data():&g.bone[static_cast<std::size_t>(id)*12u];
+        const unsigned n=id==10?16u:12u;
+        if(!r.memory().contains(out,n*4u)) { c.set_gpr(2,0x80000023u); return; }
+        for(unsigned i=0;i<n;++i) { std::uint32_t bits; std::memcpy(&bits,&m[i],4); r.memory().store32(out+i*4u,bits>>8); }
+        c.set_gpr(2,0u);
+    });
 }
 } // namespace p3p3ds::hle

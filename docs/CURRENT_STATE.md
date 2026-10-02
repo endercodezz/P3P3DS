@@ -2,6 +2,14 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Real New 3DS, savedata, pacing (2026-10-02)
+
+- [VERIFIED] Maintainer's New 3DS (hardware), build f6c9611: 40 minutes of play (2,381 s guest in 2,734 s wall, 87 % of real time) from the title through NEW GAME into the Dark Hour; the APPLICATION region is 126,976 KiB, the heap 71,220 KiB with 60,284 KiB in use. No sound. Time split: AOT + dispatch 55 %, HLE 42 % (GE rendering 10 %). Stop at the first Shadow: missing `sceGe_user::0xDC93CFEF` (`sceGeGetCmd`, battle transition effect).
+- [VERIFIED] `sceGeGetCmd` / `sceGeGetMtx` from uOFW `src/kd/ge/ge.c`. [UNVERIFIED] on hardware past that point.
+- [VERIFIED] `sceUtilitySavedata` (`core/src/hle/savedata.cpp`): P3P's LOAD GAME uses mode 4 (LISTLOAD) with gameName ULUS10512, saveNameList DATA00.., P3PSAVE.BIN (0x159B4 bytes) and a key. Implemented: status sequence of the pspautotests transcripts, AUTO/LOAD/SAVE, LISTLOAD/LISTSAVE/LISTDELETE through a host dialog (3DS: bottom-screen menu; PC: `--savedata latest|cancel|N`), delete, SIZES; saves under `ms0:/PSP/SAVEDATA/<game><slot>/` with the data file unencrypted plus PARAM.SFO and icons. PC: LOAD GAME with no saves returns to the main menu (result 0x80110307). `tests/test_savedata.cpp` covers a save/load round trip, cancel, no data, SIZES. [UNVERIFIED] an in-game save and load on the 3DS; saves are not exchangeable with PSP/PPSSPP (no encryption).
+- [VERIFIED] 3DS runner: real-time pacing (the guest clock no longer runs ahead: 60 vblanks/s in Azahar instead of up to 95); the fps line now counts game frames (framebuffer changes, 31.7/s on the title screen) next to vblanks/s.
+- Old 3DS: not feasible as designed: about 112 MB of application memory are needed (44 MB code, 32 MB PSP RAM), Old 3DS offers 64 MB (96 MB in its largest mode), and its CPU runs at 268 MHz without L2 cache.
+
 ## P3P3DS Builder: ISO -> .3dsx on the user's PC (2026-10-02)
 
 - [VERIFIED] `platform/pc/builder/` (`P3P3DS-Builder.exe` + `sdk/`): Windows wizard with progress, time estimate and Persona 3 trivia; decrypts EBOOT.BIN in C++ (same SHA-256 as `tools/prepare_game.py`), generates and compiles the 237 units with the user's devkitARM, links prebuilt runtime objects, packages the `.3dsx`, optionally copies it and the ISO to the SD card. Clean build from the release package: 263 s (12 jobs); the result reaches the title screen in Azahar. Release package: `make_release.py`, 2.3 MB zip without game data. Details: `docs/3DS_PLATFORM.md` 8.5-8.6. 26/26 CTest (new: `p3p_psp_eboot`).

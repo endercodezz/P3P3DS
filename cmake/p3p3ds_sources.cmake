@@ -11,6 +11,7 @@ set(P3P3DS_CORE_SOURCES
     core/src/hle/mpeg.cpp
     core/src/hle/utils.cpp
     core/src/hle/utility.cpp
+    core/src/hle/savedata.cpp
     core/src/hle/ctrl.cpp
     core/src/input.cpp
     core/src/ge/geometry.cpp

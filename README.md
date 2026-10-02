@@ -6,7 +6,7 @@
 
 ## Status: NOT PLAYABLE (New 3DS: title screen and main menu at ~90 % speed; PC: first school day)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On **New 3DS** the `.3dsx` build renders on the PICA200 GPU and reaches the title screen and the main menu at about **90 % of full speed (45 fps)** in the Azahar emulator, with no sound; NEW GAME and the scenes after it run as well. The opening movie is skipped automatically (no video decoder yet), and LOAD GAME / saving are not implemented yet (the game stops there).
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME into the first Dark Hour at about **87 % of full speed** over 40 minutes of play, rendered by the PICA200 GPU, with **no sound yet**. Saving and loading now go through a save/load menu on the bottom screen (new, not yet tested on hardware). The opening movie is skipped automatically (no video decoder yet).
 
 On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8.3 and 8.5):
 
@@ -54,7 +54,8 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] New Nintendo 3DS homebrew build (`.3dsx`) that boots (1–2 fps)
 - [x] PICA200 (citro3d) renderer: logos, title screen, main menu
 - [x] P3P3DS Builder: ISO -> `.3dsx` on the user's PC (Windows wizard)
-- [ ] Savedata (LOAD GAME / saving), lighting, movie decoding
+- [x] Runs on a real New 3DS (about 87 % speed, 40 minutes of play)
+- [ ] Savedata on hardware (implemented, bottom-screen menu; to be tested), sound (ndsp), lighting, movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
 
@@ -105,7 +106,9 @@ The top screen shows the game, the bottom screen authorship and a live debug rep
 | L / R, START, SELECT | L / R, START, SELECT |
 | START + SELECT | quit P3P3DS |
 
-What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at roughly 90 % of full speed in the Azahar emulator; **no sound**; the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); **loading or saving a game stops the runner** (savedata is not implemented yet); 3D scenes have no lighting yet.
+What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at about 87 % of full speed on a New 3DS (the runner never runs faster than real time); **no sound**; the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); saves are chosen in a menu on the bottom screen (D-Pad, B confirm, A back) and stored in `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` - they are not compatible with PSP or PPSSPP saves; 3D scenes have no lighting yet.
+
+**Old 3DS / 2DS** cannot run P3P3DS: it needs about 112 MB of application memory and the New 3DS CPU speed, while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache.
 
 Memory [UNVERIFIED on hardware]: the runner needs about 112 MB of application memory (44 MB of code, 32 MB of PSP RAM, the runtime and GPU buffers). If the bottom screen reports that it ran out of memory, the Homebrew Launcher was started with a smaller memory mode than the game needs.
 

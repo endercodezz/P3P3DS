@@ -89,7 +89,11 @@ constexpr const char *kBase = "sdmc:/p3p3ds";
 struct Stats {
     u64 start_ms{}, last_report_ms{}, last_fps_ms{};
     std::uint64_t frames{}, frames_at_last_fps{};
-    double fps{};
+    // Game frames: changes of the displayed PSP framebuffer (the game swaps
+    // buffers once per finished frame); vblanks run at 60/s at full speed.
+    std::uint64_t game_frames{}, game_frames_at_last_fps{};
+    std::uint32_t last_topaddr{};
+    double fps{}, vblank_rate{};
     std::uint32_t buttons{};
     std::string status{"booting"};
     std::string iso;
@@ -131,6 +135,72 @@ public:
 };
 
 p3p3ds::n3ds::GpuRenderer *g_gpu = nullptr;
+
+// Save/load list dialogs of sceUtilitySavedata (the PSP draws them as system
+// UI): shown on the bottom screen. D-Pad chooses, B confirms (Cross), A goes
+// back (Circle); saving over an existing slot asks again. The game receives
+// no buttons while the menu is open, nor until every button is released.
+struct SaveMenu {
+    bool active{}, confirm{}, dirty{}, suppress{};
+    int cursor{};
+};
+
+void draw_save_menu(const p3p3ds::hle::SavedataDialog &d, const SaveMenu &menu) {
+    using Kind = p3p3ds::hle::SavedataDialog::Kind;
+    std::string out = "\x1b[1;1H\x1b[2J";
+    out += d.kind == Kind::Load ? "  LOAD GAME\n" : d.kind == Kind::Save ? "  SAVE GAME\n" : "  DELETE SAVE\n";
+    out += "  ----------------------------------\n";
+    const int n = static_cast<int>(d.slots.size()), rows = 18;
+    const int top = std::clamp(menu.cursor - rows / 2, 0, std::max(0, n - rows));
+    for (int i = top; i < std::min(n, top + rows); ++i) {
+        const auto &s = d.slots[static_cast<std::size_t>(i)];
+        std::string line = (i == menu.cursor ? "> " : "  ") + s.name + "  " + (s.exists ? s.savedata_title : std::string("- empty -"));
+        if (line.size() > 39) line.resize(39);
+        out += line + "\n";
+    }
+    for (int i = std::min(n, top + rows) - top; i < rows; ++i) out += "\n";
+    out += "  ----------------------------------\n";
+    const auto &sel = d.slots[static_cast<std::size_t>(menu.cursor)];
+    std::string detail = sel.exists ? sel.detail : std::string();
+    for (auto &c : detail) if (c == '\n' || c == '\r') c = ' ';
+    out += "  " + detail.substr(0, 37) + "\n  " + (detail.size() > 37 ? detail.substr(37, 37) : std::string()) + "\n\n";
+    if (menu.confirm) out += "  Overwrite this save?  B: yes  A: no\n";
+    else out += "  D-Pad: choose  B: confirm  A: back\n";
+    std::fputs(out.c_str(), stdout);
+}
+
+// Handles one vblank of the menu. Returns true while it owns the input.
+bool update_save_menu(p3p3ds::hle::SavedataUtility &sd, SaveMenu &menu) {
+    const auto *d = sd.pending_dialog();
+    if (d == nullptr) {
+        if (menu.active) menu.active = false;
+        return false;
+    }
+    const int n = static_cast<int>(d->slots.size());
+    if (!menu.active) {
+        menu = SaveMenu{};
+        menu.active = menu.dirty = menu.suppress = true;
+        int best = -1; // start on the newest existing save
+        for (int i = 0; i < n; ++i)
+            if (d->slots[static_cast<std::size_t>(i)].exists &&
+                (best < 0 || d->slots[static_cast<std::size_t>(i)].modified > d->slots[static_cast<std::size_t>(best)].modified)) best = i;
+        menu.cursor = best < 0 ? 0 : best;
+    }
+    const u32 repeat = hidKeysDownRepeat(), pressed = hidKeysDown();
+    if (!menu.confirm && (repeat & KEY_DUP)) { menu.cursor = (menu.cursor + n - 1) % n; menu.dirty = true; }
+    if (!menu.confirm && (repeat & KEY_DDOWN)) { menu.cursor = (menu.cursor + 1) % n; menu.dirty = true; }
+    if (pressed & KEY_B) {
+        const bool overwrite = d->kind != p3p3ds::hle::SavedataDialog::Kind::Load && d->slots[static_cast<std::size_t>(menu.cursor)].exists;
+        if (overwrite && !menu.confirm) { menu.confirm = true; menu.dirty = true; }
+        else { sd.resolve(menu.cursor); menu.active = false; return true; }
+    }
+    if (pressed & KEY_A) {
+        if (menu.confirm) { menu.confirm = false; menu.dirty = true; }
+        else { sd.resolve(-1); menu.active = false; return true; }
+    }
+    if (menu.dirty) { draw_save_menu(*d, menu); menu.dirty = false; }
+    return true;
+}
 std::uint64_t g_skip_presses = 0;
 
 void write_bmp(const char *path, const std::vector<std::uint8_t> &rgb, std::uint32_t w, std::uint32_t h) {
@@ -200,7 +270,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "build %s\n"
         "\n"
         "status : %s\n"
-        "fps    : %.1f (presented frames/s)\n"
+        "fps    : %.1f game frames/s (%.0f vblank/s)\n"
         "speed  : %.0f%% of real time\n"
         "guest  : %.1f s   wall: %.1f s\n"
         "frames : %llu   vblank: %llu\n"
@@ -211,7 +281,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "stop   : %s\n"
         "%s"
         "\nSTART+SELECT: quit\n",
-        kAuthor, P3P3DS_BUILD_ID, s.status.c_str(), s.fps, wall > 0 ? 100.0 * guest / wall : 0.0, guest, wall,
+        kAuthor, P3P3DS_BUILD_ID, s.status.c_str(), s.fps, s.vblank_rate, wall > 0 ? 100.0 * guest / wall : 0.0, guest, wall,
         static_cast<unsigned long long>(s.frames), static_cast<unsigned long long>(k.threads().vblank_count()),
         static_cast<unsigned long>(s.buttons),
         static_cast<unsigned long>(osGetMemRegionFree(MEMREGION_APPLICATION) / 1024u),
@@ -325,6 +395,7 @@ int main() {
         std::filesystem::create_directories(std::string(kBase) + "/ms0", ec);
         std::filesystem::create_directories(std::string(kBase) + "/mods", ec);
         kernel.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/ms0"), true);
+        kernel.savedata().root = std::string(kBase) + "/ms0/PSP/SAVEDATA";
         kernel.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods"));
         kernel.threads().init_root_thread("root", entry, sp, module->gp);
         std::set<std::uint32_t> stubs;
@@ -360,6 +431,14 @@ int main() {
         // on_vblank fires once per guest vblank wait, several times per virtual
         // vblank (5,808 calls for 1,854 vblanks in Azahar): present once per vblank.
         std::uint64_t last_presented_vblank = ~0ull;
+        SaveMenu save_menu;
+        // Real-time pacing: the guest clock may not run ahead of the wall clock
+        // (in Azahar the title screen reached 95 vblanks/s). When the guest
+        // falls behind, the reference moves instead of catching up in a burst.
+        const double ticks_per_us = static_cast<double>(SYSCLOCK_ARM11) / 1e6;
+        double wall_minus_guest_us = 0.0;
+        bool pacing_started = false;
+        hidSetRepeatParameters(20, 6);
         kernel.display().on_vblank = [&](const p3p3ds::hle::DisplayFramebufInfo &fb) {
             const auto vblank = kernel.threads().vblank_count();
             if (vblank == last_presented_vblank) return;
@@ -380,10 +459,25 @@ int main() {
                     stats.movie_vblanks = 0;
                 }
             }
+            if (update_save_menu(kernel.savedata(), save_menu)) {
+                hid->pad = {};
+                save_menu.suppress = true;
+            } else if (save_menu.suppress) {
+                if (hidKeysHeld() == 0) save_menu.suppress = false;
+                else hid->pad = {};
+            }
             stats.buttons = hid->pad.buttons;
             if ((hidKeysHeld() & (KEY_START | KEY_SELECT)) == (KEY_START | KEY_SELECT)) {
                 rt.stop("Quit by user (START+SELECT)");
                 throw psprecomp::FrontierHalt{};
+            }
+            {
+                const double guest_us = static_cast<double>(kernel.threads().now());
+                const double wall_us = static_cast<double>(svcGetSystemTick() - stats.run_start_ticks) / ticks_per_us;
+                if (!pacing_started || save_menu.active) { wall_minus_guest_us = wall_us - guest_us; pacing_started = true; }
+                const double ahead_us = guest_us + wall_minus_guest_us - wall_us;
+                if (ahead_us > 1000.0) svcSleepThread(static_cast<s64>(ahead_us * 1000.0));
+                else if (ahead_us < -50000.0) wall_minus_guest_us = wall_us - guest_us; // behind: do not race later
             }
             const u64 present_start = svcGetSystemTick();
             g_gpu->present(rt.memory(), fb);
@@ -397,12 +491,16 @@ int main() {
                 }
             }
             ++stats.frames;
+            if (fb.active && fb.topaddr != stats.last_topaddr) { ++stats.game_frames; stats.last_topaddr = fb.topaddr; }
             const u64 now = osGetTime();
             if (now - stats.last_fps_ms >= 1000u) {
-                stats.fps = static_cast<double>(stats.frames - stats.frames_at_last_fps) * 1000.0 / static_cast<double>(now - stats.last_fps_ms);
+                const double seconds = static_cast<double>(now - stats.last_fps_ms) / 1000.0;
+                stats.fps = static_cast<double>(stats.game_frames - stats.game_frames_at_last_fps) / seconds;
+                stats.vblank_rate = static_cast<double>(stats.frames - stats.frames_at_last_fps) / seconds;
+                stats.game_frames_at_last_fps = stats.game_frames;
                 stats.frames_at_last_fps = stats.frames;
                 stats.last_fps_ms = now;
-                show(report_text(stats, rt, kernel));
+                if (!save_menu.active) show(report_text(stats, rt, kernel));
             }
             if (now - stats.last_report_ms >= 5000u) {
                 write_report(report_text(stats, rt, kernel));

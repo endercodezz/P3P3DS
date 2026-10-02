@@ -1,6 +1,7 @@
 #pragma once
 
 #include "p3p3ds/hle/display.hpp"
+#include "p3p3ds/hle/savedata.hpp"
 #include "p3p3ds/hle/audio.hpp"
 #include "p3p3ds/hle/ge.hpp"
 #include "p3p3ds/hle/iofilemgr.hpp"
@@ -130,6 +131,7 @@ public:
     hle::SasState &sas() noexcept { return sas_; }
     hle::MpegState &mpeg() noexcept { return mpeg_; }
     hle::SystemParams &system_params() noexcept { return system_params_; }
+    hle::SavedataUtility &savedata() noexcept { return savedata_; }
     hle::HostInput &input() noexcept { return input_; }
     hle::IoManager &io() noexcept { return io_; }
     const hle::IoManager &io() const noexcept { return io_; }
@@ -143,6 +145,7 @@ private:
     hle::SasState sas_;
     hle::MpegState mpeg_;
     hle::SystemParams system_params_;
+    hle::SavedataUtility savedata_;
     hle::HostInput input_;
     bool interrupts_enabled_{true};
     hle::AudioState audio_;

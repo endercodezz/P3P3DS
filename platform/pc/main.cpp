@@ -24,6 +24,7 @@ int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
             ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path;
+        std::string savedata_policy="latest";
         std::uint64_t frame_every=30;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
@@ -48,6 +49,7 @@ int main(int argc,char **argv) {
             else if(a=="--input") input_path=value();
             else if(a=="--gamepad") gamepad=true;
             else if(a=="--profile") profile=true;
+            else if(a=="--savedata") savedata_policy=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
@@ -60,7 +62,8 @@ int main(int argc,char **argv) {
                          <<"--wav <file> (mix all sceAudio output on the virtual clock into a 44.1 kHz stereo WAV)\n"
                          <<"--input <file> (vblank-keyed button script, see core/include/p3p3ds/input.hpp)\n"
                          <<"--gamepad (poll XInput pad 0 live; not paced to wall time)\n"
-                         <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n";return 0;
+                         <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n"
+                         <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
         const auto elf=psprecomp::Elf32Image::from_file(elf_path);
@@ -98,6 +101,18 @@ int main(int argc,char **argv) {
             // ms0:/PSP/P3P/{bind/,mod.cpk,mod1-3.cpk}, mapped onto --mods.
             std::filesystem::create_directories(ms0_path);
             kernel.io().mount("ms0:",std::make_shared<p3p3ds::vfs::HostFileSystem>(ms0_path),true);
+            // Saves: ms0:/PSP/SAVEDATA. The list dialogs have no window here, so
+            // --savedata decides: "latest" loads the newest save and saves over the
+            // newest one (or the first slot), "cancel" closes the dialog, N picks slot N.
+            kernel.savedata().root=ms0_path/"PSP"/"SAVEDATA";
+            kernel.savedata().auto_choice=[savedata_policy](const p3p3ds::hle::SavedataDialog &d) {
+                if(savedata_policy=="cancel") return -1;
+                if(savedata_policy!="latest") return std::stoi(savedata_policy);
+                int best=-1;
+                for(int i=0;i<static_cast<int>(d.slots.size());++i)
+                    if(d.slots[i].exists && (best<0 || d.slots[i].modified>d.slots[best].modified)) best=i;
+                return best>=0 ? best : (d.kind==p3p3ds::hle::SavedataDialog::Kind::Save ? 0 : -1);
+            };
             if(!mods_path.empty()) {
                 kernel.io().alias("ms0:/PSP/P3P",std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path));
                 std::cout<<"Mods: ms0:/PSP/P3P -> "<<mods_path.string()<<"\n";
