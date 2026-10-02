@@ -145,6 +145,31 @@ struct SaveMenu {
     int cursor{};
 };
 
+// PARAM.SFO texts are UTF-8 (P3P writes the hero's name in full-width
+// letters); the bottom-screen console is ASCII. Full-width forms map to ASCII,
+// the ideographic space to a space, anything else to '?'.
+std::string console_text(const std::string &utf8) {
+    std::string out;
+    for (std::size_t i = 0; i < utf8.size();) {
+        const auto c = static_cast<unsigned char>(utf8[i]);
+        std::uint32_t cp = c;
+        std::size_t len = 1;
+        if (c >= 0xF0) { cp = c & 0x07u; len = 4; }
+        else if (c >= 0xE0) { cp = c & 0x0Fu; len = 3; }
+        else if (c >= 0xC0) { cp = c & 0x1Fu; len = 2; }
+        for (std::size_t k = 1; k < len && i + k < utf8.size(); ++k) cp = (cp << 6) | (static_cast<unsigned char>(utf8[i + k]) & 0x3Fu);
+        i += len;
+        if (cp == '\n' || cp == '\r') out += ' ';
+        else if (cp >= 0x20 && cp < 0x7F) out += static_cast<char>(cp);
+        else if (cp >= 0xFF01 && cp <= 0xFF5E) out += static_cast<char>(cp - 0xFEE0);
+        else if (cp == 0x3000) out += ' ';
+        else if (cp == 0x2640) out += 'F'; // female / male signs in P3P's save details
+        else if (cp == 0x2642) out += 'M';
+        else if (cp >= 0x80) out += '?';
+    }
+    return out;
+}
+
 void draw_save_menu(const p3p3ds::hle::SavedataDialog &d, const SaveMenu &menu) {
     using Kind = p3p3ds::hle::SavedataDialog::Kind;
     std::string out = "\x1b[1;1H\x1b[2J";
@@ -154,15 +179,19 @@ void draw_save_menu(const p3p3ds::hle::SavedataDialog &d, const SaveMenu &menu) 
     const int top = std::clamp(menu.cursor - rows / 2, 0, std::max(0, n - rows));
     for (int i = top; i < std::min(n, top + rows); ++i) {
         const auto &s = d.slots[static_cast<std::size_t>(i)];
-        std::string line = (i == menu.cursor ? "> " : "  ") + s.name + "  " + (s.exists ? s.savedata_title : std::string("- empty -"));
+        // Slots by number (P3P names them DATA00..DATA0f, DATA10..); the save's
+        // detail line (date, place, level) tells the saves apart.
+        char number[8];
+        std::snprintf(number, sizeof number, "%02d", i + 1);
+        std::string line = (i == menu.cursor ? "> " : "  ") + std::string(number) + "  " +
+                           (s.exists ? console_text(s.detail.empty() ? s.savedata_title : s.detail) : std::string("- empty -"));
         if (line.size() > 39) line.resize(39);
         out += line + "\n";
     }
     for (int i = std::min(n, top + rows) - top; i < rows; ++i) out += "\n";
     out += "  ----------------------------------\n";
     const auto &sel = d.slots[static_cast<std::size_t>(menu.cursor)];
-    std::string detail = sel.exists ? sel.detail : std::string();
-    for (auto &c : detail) if (c == '\n' || c == '\r') c = ' ';
+    const std::string detail = sel.exists ? console_text(sel.detail) : std::string();
     out += "  " + detail.substr(0, 37) + "\n  " + (detail.size() > 37 ? detail.substr(37, 37) : std::string()) + "\n\n";
     if (menu.confirm) out += "  Overwrite this save?  B: yes  A: no\n";
     else out += "  D-Pad: choose  B: confirm  A: back\n";

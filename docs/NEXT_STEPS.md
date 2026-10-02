@@ -10,15 +10,15 @@ Updated 2026-10-02. What is done and measured lives in [`CURRENT_STATE.md`](CURR
 
 ## 1. Saves (priority 1)
 
-Implemented (`core/src/hle/savedata.cpp`), checked by a unit round trip and by LOAD GAME without saves on PC. Still open:
+Working in the maintainer's Azahar session (save at the dorm desk, load from the title and in game). Still open:
 
-1. **In-game save and load on PC.** Re-record `profiles/p3p/input/first_day.txt` with the post-ctrl-fix timings and extend it to the first save point; check that P3P's save calls succeed (modes, files under `ms0:/PSP/SAVEDATA/ULUS10512DATAxx/`), then LOAD GAME restores the same scene. Verify: frames before saving and after loading, deterministic replay.
-2. **Hardware check** by the maintainer: bottom-screen menu, save, quit, load.
+1. **Hardware check** on the New 2DS XL with the numbered save menu.
+2. A deterministic PC test of an in-game save: the scripted route reaches the faculty office on 4/7 (`.tmp` work, not yet in `profiles/p3p/input/`); the first save point is the dorm desk that evening. Use `--render-from` to keep iterations short.
 3. Later: compatibility with PSP/PPSSPP saves (the data file is encrypted on the PSP with the key P3P passes; ours is stored plain).
 
 ## 2. Stable 100 % speed (priority 2)
 
-Hardware split (87 % speed): AOT + dispatch 55 %, HLE 42 % (GE rendering 10 %).
+Hardware split (87 % speed, build f6c9611): AOT + dispatch 55 %, HLE 42 % (GE rendering 10 %). Azahar (build bfa6474, after the sceCtrl fix raised menus and scenes from 20 to 30 frames/s): 56 % average, 6.5 game fps on the Dark Hour rooftop, HLE 60 % (rendering 16 %). First get a hardware report of the current build.
 
 1. **Do not wait for the GPU every frame**: double-buffer vertices/command lists so the CPU builds frame N+1 while the PICA200 draws frame N. Verify: `present` share and speed in the bottom-screen report.
 2. **Cheap path for the hottest HLE calls** (interrupt suspend/resume about 11,600 calls/s each in menus): no `std::function`, no scheduler hook. Verify: HLE share, CTest, deterministic replay.

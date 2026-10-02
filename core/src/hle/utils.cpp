@@ -45,6 +45,20 @@ void register_utils_module(psprecomp::Runtime &runtime, KernelState &kernel) {
     runtime.register_hle("sceSuspendForUser", 0x090CCB3Fu, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
         ctx.set_gpr(2, 0u);
     });
+    // scePowerSetClockFrequency(pll, cpu, bus) and its 3.50 variant
+    // (0xEBD177D6, named scePowerSetClockFrequency350 in
+    // recomp/PSP-recompilation-project/src/rt/nid_names.h). pspautotests
+    // power/freq.expected: frequencies below 19 fail with 0x800001FE, 19..333
+    // succeed. P3P calls the variant when a battle starts. CPU clock is not
+    // modelled (the virtual clock does not count cycles), so nothing else changes.
+    // [INFERRED] the variant validates like the original.
+    for (const auto nid : {0x737486F2u, 0xEBD177D6u}) {
+        runtime.register_hle("scePower", nid, [](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) {
+            const auto pll = static_cast<std::int32_t>(ctx.gpr[4]), cpu = static_cast<std::int32_t>(ctx.gpr[5]);
+            const bool ok = pll >= 19 && pll <= 333 && cpu >= 1 && cpu <= pll;
+            ctx.set_gpr(2, ok ? 0u : 0x800001FEu);
+        });
+    }
     // sceDmac Memcpy/TryMemcpy: errors from pspautotests dmac/dmactest.expected
     // (0 length 0x80000104 before NULL 0x80000103). The copy completes
     // synchronously [INFERRED]: no DMA channel contention is modelled, so the

@@ -54,6 +54,9 @@ public:
     std::uint32_t writer_pc() const { return writer_pc_; }
     void report() const;
     void set_renderer(std::unique_ptr<ge::GeRenderer> renderer) { renderer_ = std::move(renderer); }
+    // Debug fast-forward (PC runner --render-from): display lists still run
+    // (state, vertex pointers, callbacks), but no pixels are produced.
+    bool skip_rasterization{};
     // Per-PRIM census of the GE state the game uses (feature -> draw count),
     // to prioritise renderer work by observed workload.
     const std::map<std::string, std::uint64_t> &feature_counts() const { return features_; }

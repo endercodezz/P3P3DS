@@ -175,7 +175,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         if(type==7) { rt.stop("GE PRIM type 7 unsupported"); return; }
         count_features(type);
         const ProfileScope timer(host_profile().render_ns, host_profile().render_calls);
-        renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
+        if(!skip_rasterization) renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
         const auto layout=ge::vertex_layout(regs_.reg[0x12]);
         if(layout.index_format) state_.index+=count*(layout.index_format==1?1u:2u);
         else state_.vertex+=count*layout.size;
@@ -225,7 +225,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         char key[48];
         std::snprintf(key,sizeof key,"transfer_%s_to_%s",(src&0x0F000000u)==0x04000000u?"edram":"ram",(dst&0x0F000000u)==0x04000000u?"edram":"ram");
         ++features_[key];
-        const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); renderer_->transfer(mem,regs_); break;
+        const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); if(!skip_rasterization) renderer_->transfer(mem,regs_); break;
     }
     default: break;
     }

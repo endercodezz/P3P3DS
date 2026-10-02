@@ -25,7 +25,7 @@ int main(int argc,char **argv) {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
             ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path;
         std::string savedata_policy="latest";
-        std::uint64_t frame_every=30;
+        std::uint64_t frame_every=30, render_from=0;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
         std::optional<std::uint32_t> expected;
@@ -51,6 +51,7 @@ int main(int argc,char **argv) {
             else if(a=="--profile") profile=true;
             else if(a=="--savedata") savedata_policy=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
+            else if(a=="--render-from") render_from=std::stoull(value()); // debug fast-forward: no pixels before that vblank
             else if(a=="--verbose" || a=="-v") {}
             else if(a=="--help" || a=="-h") {
                 std::cout<<"--verify-bootstrap (stable checkpoint; --verify-milestone alias)\n"
@@ -169,7 +170,9 @@ int main(int argc,char **argv) {
         // time, so a window of HLE calls late in a run is kept (timing analysis).
         const char *trace_from=std::getenv("P3P_TRACE_FROM_US");
         bool trace_reset=false;
+        kernel.ge().skip_rasterization=render_from>0;
         rt.event_observer=[&] {
+            if(kernel.ge().skip_rasterization && kernel.threads().vblank_count()>=render_from) kernel.ge().skip_rasterization=false;
             if(trace_from && !trace_reset && kernel.threads().now()>=std::stoull(trace_from)) {
                 rt.event_type_counts["hle_hit"]=0; trace_reset=true;
                 rt.event("trace_window_start",{{"time_us",kernel.threads().now()}});
