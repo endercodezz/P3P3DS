@@ -2,6 +2,12 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Hardware run of build 472599b: about 30 fps, crash at the first Shadow fixed (2026-10-03)
+
+- [VERIFIED] Maintainer, New 2DS XL: saves work; mostly a steady 30 game frames/s, outside battle sometimes down to 20, at the first Shadow down to 15. Report after 1,250 s: 88 % of real time; run average aot 44 %, hle 14 %, ge 21 % (texture hashing 3.3 %, conversion 0.6 %, GPU wait 7.4 %), present 0 %, idle (pacing sleep) 19 %, ui 2.2 %; 32,966 presents skipped as unchanged. Last 10 s before the crash (the Shadow): speed 33 %, ge 49 %.
+- [VERIFIED] Crash: Luma exception screen, `svcBreak` from `GPUCMD_AddInternal` (libctru gpu.c:33, command buffer full) called by `C3D_DrawArrays` (addresses resolved with arm-none-eabi-addr2line on the build's ELF). Cause: since unchanged presents are skipped, a frame stays open across vblanks, and the flush rule (every 1,500th draw counted since start) did not bound one frame. Now the frame is submitted when `C3D_GetCmdBufUsage()` exceeds 75 %. [UNVERIFIED] on hardware past the Shadow.
+- [INFERRED] The GE share at the Shadow is not hashing or texture conversion; the report now also counts CPU-written framebuffers re-uploaded to GPU targets (`cpu->rtt`) and frame flushes, to locate it.
+
 ## Speed work 1: host costs outside the game code (2026-10-02)
 
 Measured on the PC with a host build configured like the 3DS one (`-DP3P_PRODUCTION_RUNTIME=ON`, build directory `build/prod`, AOT flags of the 3DS build) and the new statistical profiler (`--sample <file> [--sample-from <vblank>]`, report with `tools/profile_symbols.py`). Same scripted route (title to the faculty office, 89.4 M dispatches, no rasterization) before and after; the run ends at the same guest PC.

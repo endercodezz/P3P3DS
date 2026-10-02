@@ -266,17 +266,19 @@ void write_bmp(const char *path, const std::vector<std::uint8_t> &rgb, std::uint
 std::string gpu_text() {
     if (g_gpu == nullptr) return {};
     const auto &g = g_gpu->gpu_stats();
-    char buf[256];
+    char buf[384];
     std::snprintf(buf, sizeof buf,
         "gpu    : draws %llu tris %llu skip %llu\n"
         "         tex %lu up %llu hit %llu rtt %llu\n"
         "         present gpu %llu cpu %llu same %llu\n"
+        "         cpu->rtt %llu flushes %llu\n"
         "movie  : skip presses %llu\n",
         static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
         static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
         static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
         static_cast<unsigned long long>(g.target_textures), static_cast<unsigned long long>(g.gpu_presents),
         static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g.skipped_presents),
+        static_cast<unsigned long long>(g.cpu_to_target), static_cast<unsigned long long>(g.frame_flushes),
         static_cast<unsigned long long>(g_skip_presses));
     return buf;
 }

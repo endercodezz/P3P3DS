@@ -19,7 +19,11 @@ constexpr std::uint32_t kTargetSize = 512;          // PSP framebuffers: stride 
 constexpr std::uint32_t kMaxTargets = 4;            // 1 MiB of VRAM each
 constexpr std::uint32_t kVertexBytes = 1u << 20;    // per GPU frame
 constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded textures
-constexpr std::uint32_t kMaxDrawsPerFrame = 1500;   // command buffer headroom
+// Submit the queued frame when the citro3d command buffer (C3D_Init(0x80000))
+// is this full: GPUCMD_Add panics (svcBreak) on overflow. One draw adds a few
+// KiB at most. Measured on hardware: a frame left open across vblanks (no new
+// picture to present) overflowed at the first Shadow with a draw-count rule.
+constexpr float kCmdBufFlushUsage = 0.75f;
 // Orientation, measured in Azahar with test bars drawn both by the GPU and by
 // CPU tiling: a texture's memory rows run bottom-up (memory row k is sampled
 // at t = (h - 1 - k) / h), and NDC y growing with PSP y puts PSP row y where
@@ -494,7 +498,7 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const std::uint32_t stride = r24(regs, 0x9D) & 0x7FCu;
     if (stride == 0u) return;
     begin_frame();
-    if (draw_stats_.prims % kMaxDrawsPerFrame == 0u) flush_frame();
+    if (C3D_GetCmdBufUsage() > kCmdBufFlushUsage) flush_frame();
     Target *target = target_for(color_address, r24(regs, 0xD2) & 3u, true);
     if (target == nullptr) { ++gpu_stats_.skipped_prims; return; }
     if (bound_ != target || bound_screen_) bind_target(*target);
