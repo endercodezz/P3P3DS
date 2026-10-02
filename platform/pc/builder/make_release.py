@@ -53,7 +53,7 @@ How to use
 The resulting p3p3ds.3dsx contains code made from your copy of the game:
 keep it to yourself, do not share it.
 
-State of the port: see README.md on GitHub (no sound yet, no saving yet).
+State of the port: see README.md on GitHub (saves work, no sound yet).
 
 P3P3DS by enderlit aka endercodezz - MIT License (see LICENSE.txt).
 Persona 3 Portable is (c) ATLUS. This project is not affiliated with ATLUS or SEGA.
