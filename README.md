@@ -26,7 +26,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 | Boot | ThreadMan, SysMem, IoFileMgr (UMD ISO + memory stick + the community mod chain), ModuleMgr, UMD, Display services drive the game through CRI middleware startup |
 | First rendered frames | ATLUS and CRIWARE logos drawn by the GE display-list executor + software renderer |
 | Opening movie | 100 s PSMF movie demultiplexed by `sceMpeg` (on the pspautotests sample movie, container behaviour matches PSP hardware output line for line); picture and movie audio are placeholders (black / silence) |
-| Title screen | "PRESS ANY BUTTON" at frame 3600 (~133 s virtual time), title music recorded to WAV |
+| Title screen | "PRESS ANY BUTTON" from vblank 6627 (~110 s virtual time), menus at 30 frames/s, title music recorded to WAV |
 | Main menu and New Game | START opens NEW GAME / LOAD GAME / CONFIG / DATA INSTALL; NEW GAME loads the protagonist selection scene ("Welcome to the world of P3P.") |
 | First game day | Dark Hour dorm lobby (3D), name entry, Mitsuru introduction, own room with the navigation cursor, next morning with Yukari, school main lobby; 38 virtual minutes without a blocker |
 | Stability | 38,314 frames (24 min virtual) of the attract loop without a blocker; runs with the same input script are bit-for-bit deterministic |

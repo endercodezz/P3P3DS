@@ -61,8 +61,9 @@ int main() {
     pad = p3p3ds::pc::map_xinput(g);
     CHECK(pad.buttons == button::RTrigger && pad.analog_x == 128 && pad.analog_y == 255);
 
-    // sceCtrlReadBufferPositive through the HLE: blocks to the next vblank,
-    // then reports the script state for that vblank.
+    // sceCtrlReadBufferPositive through the HLE: blocks to the next sample
+    // (taken just after each vblank start, see core/src/hle/ctrl.cpp), then
+    // reports the script state for that frame. The read at time 0 gets frame 0.
     {
         psprecomp::Runtime rt;
         p3p3ds::KernelState k;
@@ -85,10 +86,10 @@ int main() {
             seen.push_back(rt.memory().load32(kData + 4u));
         }
         CHECK(seen.size() == 4u);
-        CHECK(seen[0] == button::Start);   // vblank 1
-        CHECK(seen[1] == 0u);              // vblank 2 (hold of 1 released)
-        CHECK(seen[2] == button::Cross);   // vblank 3
-        CHECK(seen[3] == button::Cross);   // vblank 4
+        CHECK(seen[0] == 0u);              // frame 0
+        CHECK(seen[1] == button::Start);   // frame 1
+        CHECK(seen[2] == 0u);              // frame 2 (hold of 1 released)
+        CHECK(seen[3] == button::Cross);   // frame 3
     }
     std::cout << (failures ? "FAILED" : "PASS") << " (" << failures << " failures)\n";
     return failures ? 1 : 0;

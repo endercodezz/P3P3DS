@@ -60,8 +60,18 @@ void register_ctrl_module(psprecomp::Runtime &runtime, KernelState &kernel) {
         const auto uid = tm.current_thread_id();
         const auto pending = input.pending_reads.find(uid);
         if (pending == input.pending_reads.end() || tm.now() < pending->second) {
-            // Wait for the next sampling update (vblank) and retry at the stub.
-            const auto deadline = tm.next_vblank_time();
+            // Wait for the next sampling update and retry at the stub. Samples are
+            // taken shortly after vblank start, not at it: in
+            // references/pspautotests/tests/ctrl/vblank.expected a vblank interrupt
+            // handler still peeks the previous frame's sample, while each blocking
+            // read returns outside the vblank interval 10-15 lines (~0.7-0.95 ms)
+            // into the frame. A thread woken at vblank start therefore gets the
+            // new sample within a millisecond, not one frame later (P3P's main
+            // menu loop: WaitVblankStartMultiCB(2) then ReadBufferPositive).
+            constexpr std::uint64_t kSampleOffsetUs = 700u; // [INFERRED] within the measured window
+            const auto now = tm.now(), period = ThreadManager::kVblankPeriodUs;
+            const auto next_index = now < kSampleOffsetUs ? 0u : (now - kSampleOffsetUs) / period + 1u;
+            const auto deadline = next_index * period + kSampleOffsetUs;
             input.pending_reads[uid] = deadline;
             WaitInfo wait{WaitType::Vblank, 0, deadline};
             wait.retry = true;

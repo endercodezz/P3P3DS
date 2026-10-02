@@ -1,3 +1,4 @@
 # Leave the title screen: tap START while "PRESS ANY BUTTON" is shown.
-# Title frame 3600 is at virtual 132.88 s = vblank 7965 (16,683 us period).
-7965 START 6
+# Since the sceCtrl sampling fix (2026-10-02) the title appears at vblank 6627
+# (110.5 s virtual) and accepts input after its intro; vblank 7900 works.
+7900 START 6

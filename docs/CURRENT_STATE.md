@@ -2,6 +2,10 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## sceCtrl sampling time: menus at 30 fps (2026-10-02)
+
+- [VERIFIED] The main menu ran at 20 game frames/s in virtual time (15.8/s in Azahar): P3P's loop is WaitVblankStartMultiCB(2) then sceCtrlReadBufferPositive, and the read waited for the next vblank. Hardware samples a little after vblank start (references/pspautotests/tests/ctrl/vblank.expected: an interrupt handler still sees the previous sample, blocking reads return 10-15 lines into the frame); reads now wait for vblank + 700 us ([INFERRED] point in that window). Main menu: 30 frames/s virtual. The title now appears at vblank 6627 (110.5 s) instead of 7965 (133 s); `title_start.txt` and `new_game.txt` were retimed and NEW GAME reaches "Welcome to the world of P3P."; `first_day.txt` must be re-recorded. 27/27 CTest (`test_input` expectations follow the new sampling).
+
 ## Real New 3DS, savedata, pacing (2026-10-02)
 
 - [VERIFIED] Maintainer's New 3DS (hardware), build f6c9611: 40 minutes of play (2,381 s guest in 2,734 s wall, 87 % of real time) from the title through NEW GAME into the Dark Hour; the APPLICATION region is 126,976 KiB, the heap 71,220 KiB with 60,284 KiB in use. No sound. Time split: AOT + dispatch 55 %, HLE 42 % (GE rendering 10 %). Stop at the first Shadow: missing `sceGe_user::0xDC93CFEF` (`sceGeGetCmd`, battle transition effect).

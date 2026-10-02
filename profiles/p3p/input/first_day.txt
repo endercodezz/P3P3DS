@@ -1,4 +1,7 @@
 # P3P first day, deterministic (vblank-keyed; 16,683 us per vblank on the virtual clock).
+# [UNVERIFIED] Recorded before the sceCtrl sampling fix (2026-10-02), which made the
+# game reach the title earlier and run menus at 30 fps: the timings below no longer
+# match and must be re-recorded (new_game.txt has the new start).
 # Title -> NEW GAME -> name entry -> first night (go to bed) -> school lobby, then
 # cursor movement in the lobby for > 5 virtual minutes. Frames referenced in docs/CURRENT_STATE.md.
 7965 START 6        # leave "PRESS ANY BUTTON"

@@ -165,7 +165,15 @@ int main(int argc,char **argv) {
             if(!combined->empty()) kernel.input().source=combined;
         }
         kernel.audio().set_sink([&mixer](unsigned,std::uint64_t start,const std::vector<std::int16_t> &stereo) {mixer.add(start,stereo);});
+        // P3P_TRACE_FROM_US=<guest us>: restart the hle_hit event budget at that
+        // time, so a window of HLE calls late in a run is kept (timing analysis).
+        const char *trace_from=std::getenv("P3P_TRACE_FROM_US");
+        bool trace_reset=false;
         rt.event_observer=[&] {
+            if(trace_from && !trace_reset && kernel.threads().now()>=std::stoull(trace_from)) {
+                rt.event_type_counts["hle_hit"]=0; trace_reset=true;
+                rt.event("trace_window_start",{{"time_us",kernel.threads().now()}});
+            }
             if(!rt.events.empty() && rt.events.back().type=="guest_transfer")
                 kernel.threads().invalidate_thread_entry();
             if(!rt.events.empty() && rt.events.back().type=="guest_enter") {
@@ -222,6 +230,7 @@ int main(int argc,char **argv) {
                 wall/1e9,h.hle_ns/1e9,pct(h.hle_ns),static_cast<unsigned long long>(h.hle_calls),p.render_ns/1e9,pct(p.render_ns),
                 static_cast<unsigned long long>(p.render_calls),p.interpreter_ns/1e9,pct(p.interpreter_ns),static_cast<unsigned long long>(p.interpreter_entries));
         }
+        if(std::getenv("PSPRECOMP_HLE_HISTOGRAM")) rt.report_hle_histogram(80); // per-NID call counts
         p3p3ds::install_interpreter_fallback(nullptr);
         rt.event("interpreter_summary",{{"entries",interpreter.entries()},{"distinct_pcs",interpreter.entry_pcs().size()},
             {"instructions",interpreter.executed()}});
