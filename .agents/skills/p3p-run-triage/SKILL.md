@@ -63,6 +63,10 @@ bash .claude/skills/p3p-run-triage/scripts/replay_check.sh 20000000
 
 Must print `REPLAY IDENTICAL`. Record the event-dump SHA-256 in `docs/CURRENT_STATE.md`. A change that should not alter guest behaviour must reproduce the previous SHA exactly; an intended change gets a new SHA with the reason.
 
+## 5a. Where host time goes (speed work)
+
+Profile the shipped configuration, not the diagnostic one: configure `build/prod` with `-DP3P_PRODUCTION_RUNTIME=ON "-DP3P_AOT_OPT=-Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2"` (no events, no census, like the 3DS build), build `p3p_pc_bootstrap`, then run a scripted route with `--render-from 9999999 --sample .tmp/prof/s.txt --sample-from <vblank>` and map it with `python tools/profile_symbols.py build/prod/p3p_pc_bootstrap.exe .tmp/prof/s.txt 40 --nm <mingw nm.exe>`. Compare host time of the same route (`[SAMPLE WINDOW]` line, whole-run wall time) before and after, and check the run ends at the same guest PC. Sample counts are not a time measure (Windows may ignore the 1 ms timer request). On the 3DS, the bottom-screen report splits the last 10 s into aot / hle / ge / present / idle.
+
 ## 6. Guest data hygiene
 
 Copies of game files (movies, CPK extracts) go only to `.tmp/` and are deleted when no longer needed; never stage them. `experiments/cpk-check` lists/extracts CPK contents: `build/cpk-check/CpkCheck.exe <iso> --list PSP_GAME/USRDIR/umd0.cpk [substring] [outdir]` (build it offline with `DOTNET_CLI_HOME=$PWD/.cache/dotnet NUGET_PACKAGES=$PWD/.cache/nuget dotnet build -c Release -o ../../build/cpk-check`).

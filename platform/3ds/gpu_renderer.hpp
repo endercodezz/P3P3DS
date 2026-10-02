@@ -24,6 +24,10 @@ namespace p3p3ds::n3ds {
 struct GpuStats {
     std::uint64_t draws{}, triangles{}, skipped_prims{}, texture_uploads{}, texture_hits{}, texture_bytes{};
     std::uint64_t target_textures{}, cpu_presents{}, gpu_presents{}, cpu_to_target{}, frame_flushes{};
+    std::uint64_t skipped_presents{}; // nothing new to show: no GPU frame, no buffer swap
+    // CPU time (ARM11 system ticks) spent hashing texture data, converting
+    // textures to PICA layout, and waiting in C3D_FrameBegin for the GPU.
+    std::uint64_t hash_ticks{}, upload_ticks{}, wait_ticks{};
     std::uint32_t textures{}, targets{};
 };
 
@@ -109,6 +113,11 @@ private:
     std::uint64_t fallback_seq_{~0ull};
     std::uint64_t fallback_frame_{}; // GPU frame that last sampled fallback_
     bool last_present_cpu_{};
+    // What the top screen shows: source texture and its version (gpu_seq of
+    // a target, or fallback_seq_ for a CPU picture).
+    const C3D_Tex *shown_{};
+    std::uint64_t shown_seq_{~0ull};
+    void end_frame();
 };
 
 } // namespace p3p3ds::n3ds

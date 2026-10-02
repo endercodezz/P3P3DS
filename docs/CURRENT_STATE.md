@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Speed work 1: host costs outside the game code (2026-10-02)
+
+Measured on the PC with a host build configured like the 3DS one (`-DP3P_PRODUCTION_RUNTIME=ON`, build directory `build/prod`, AOT flags of the 3DS build) and the new statistical profiler (`--sample <file> [--sample-from <vblank>]`, report with `tools/profile_symbols.py`). Same scripted route (title to the faculty office, 89.4 M dispatches, no rasterization) before and after; the run ends at the same guest PC.
+
+- [VERIFIED] Host time of the route: 24.0 s before, 11.2 s after. Before, 29 % of the samples in gameplay were in the Windows heap (ntdll/ucrtbase): call sites of `Runtime::event` built a `std::map` and strings for every HLE call (`hle_hit`) even with diagnostics compiled out, and the GE census did a dozen string-keyed map updates and an `snprintf` per draw. Now `event` is an inline guard over a stack array, the census is off in the production runtime, `sceSasCore` mixing uses the inline memory accessors, the per-syscall deadline scan is skipped until the earliest deadline, and the GE command loop looks its list up once per list instead of once per command.
+- [VERIFIED] Memory leak: every display list ever enqueued stayed in `GeManager::lists_` (17,084 lists on this route). Now the 64 most recent completed lists are kept. [INFERRED] over the 40-minute hardware session this was on the order of 15 MB of heap.
+- 3DS renderer: `C3D_FrameEnd(0)` flushed the data cache over the whole 12 MiB linear heap at each call (3ds/citro3d/source/renderqueue.c); now only this frame's vertices are flushed and the command list with `GX_CMDLIST_FLUSH`. A present that would show the same picture again is skipped (queued draws stay in the open frame). [UNVERIFIED] effect on hardware.
+- 3DS report: time split over the last 10 s and the run average (aot, hle, ge, present, idle = pacing sleep, ui), and in GE: texture hashing, texture conversion, GPU wait. Earlier reports counted pacing sleep and presentation inside "hle".
+
 ## Maintainer session in Azahar: saves work, Dark Hour stop, speed (2026-10-02)
 
 - [VERIFIED] In-game saving works: two saves made at the dorm (slots DATA00 and DATA01, "4/7 (Tu) Evening Dorm" and "4/9 (Th) Evening Dorm"), each with P3PSAVE.BIN (88,500 bytes), PARAM.SFO, ICON0.PNG and PIC1.PNG; the maintainer reports saving and loading as working. The bottom-screen menu showed P3P's internal slot names (DATA0a, DATA10, ...) and mojibake: SAVEDATA_DETAIL is UTF-8 with the hero's name in full-width letters and a gender sign. Now: slots numbered 01, 02, ..., the detail line shown in the list, full-width forms converted to ASCII.

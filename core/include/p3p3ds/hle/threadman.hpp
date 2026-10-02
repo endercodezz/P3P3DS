@@ -358,6 +358,10 @@ private:
     std::int32_t current_thread_id_{0};
     std::uint32_t next_stack_top_{0x09FF0000u};
     std::uint64_t now_us_{0};
+    // No waiting thread has a deadline before this time, so the per-syscall
+    // deadline scan can be skipped. Lowered whenever a thread starts waiting;
+    // recomputed by each scan.
+    std::uint64_t earliest_deadline_{0};
     std::uint64_t idle_advances_{0};
     std::map<std::int32_t, ThreadControlBlock> threads_;
     std::map<std::int32_t, CallbackObject> callbacks_;

@@ -1134,7 +1134,13 @@ void Runtime::run(std::uint32_t entry, std::uint64_t max_dispatches) {
     }
 }
 
-void Runtime::event(std::string type, std::map<std::string, std::uint64_t> fields, std::string detail) {
+// P3P3DS: see Runtime::event in runtime.hpp.
+void Runtime::record_event(std::string_view type, EventFields fields, std::string_view detail) {
+    std::map<std::string, std::uint64_t> map;
+    for (const auto &[name, value] : fields) map.emplace(std::string(name), value);
+    event_map(std::string(type), std::move(map), std::string(detail));
+}
+void Runtime::event_map(std::string type, std::map<std::string, std::uint64_t> fields, std::string detail) {
     if (!frontier_diagnostics) return;
     // P3P3DS: per-type caps for continuous runs (see runtime.hpp).
     const auto count = ++event_type_counts[type];
@@ -1228,7 +1234,7 @@ void Runtime::invoke_native_fast_path(std::uint32_t address, AllegrexContext &ct
 
 void Runtime::invoke_import_cached(std::uint32_t slot, std::string_view library,
                                    std::uint32_t nid, AllegrexContext &ctx) {
-    event("hle_hit", {{"nid", nid}, {"stub", ctx.pc}}, std::string(library));
+    event("hle_hit", {{"nid", nid}, {"stub", ctx.pc}}, library);
     if (hle_histogram_enabled_) ++hle_histogram_[hle_key(library, nid)];
 
     const HleFunction *bound = slot < import_bindings_.size() ? import_bindings_[slot] : nullptr;

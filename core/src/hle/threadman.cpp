@@ -417,9 +417,15 @@ void ThreadManager::dispatch_next(psprecomp::Runtime &rt, psprecomp::AllegrexCon
 }
 
 void ThreadManager::expire_deadlines(psprecomp::Runtime &rt) {
+    if (now_us_ < earliest_deadline_) return; // runs after every HLE call
     std::vector<std::int32_t> due;
-    for (const auto &[uid, t] : threads_)
-        if (t.status == InternalThreadState::Waiting && t.wait.deadline <= now_us_) due.push_back(uid);
+    std::uint64_t earliest = kNoDeadline;
+    for (const auto &[uid, t] : threads_) {
+        if (t.status != InternalThreadState::Waiting) continue;
+        if (t.wait.deadline <= now_us_) due.push_back(uid);
+        else earliest = std::min(earliest, t.wait.deadline);
+    }
+    earliest_deadline_ = earliest;
     for (const auto uid : due) {
         auto &t = threads_.at(uid);
         const bool timed_out = t.wait.type != WaitType::Delay && t.wait.type != WaitType::Vblank &&
@@ -506,6 +512,7 @@ void ThreadManager::block_current(psprecomp::Runtime &rt, psprecomp::AllegrexCon
     cur->context = resume;
     cur->wait = wait;
     cur->status = InternalThreadState::Waiting;
+    earliest_deadline_ = std::min(earliest_deadline_, wait.deadline);
     rt.event("thread_wait", {{"uid", u(cur->uid)}, {"type", static_cast<std::uint32_t>(wait.type)},
         {"object", u(wait.object)}, {"deadline", wait.deadline}, {"time", now_us_}});
     if (wait.callbacks && has_pending_callbacks(cur->uid)) {
@@ -649,6 +656,7 @@ void ThreadManager::callback_returned(psprecomp::Runtime &rt, psprecomp::Allegre
     // Back into the interrupted CB wait.
     cur->context = frame.resume;
     cur->status = InternalThreadState::Waiting;
+    earliest_deadline_ = std::min(earliest_deadline_, cur->wait.deadline);
     if (cur->wait.deadline <= now_us_) {
         finish_wait(rt, *cur, cur->wait.type == WaitType::Delay ? 0 : SCE_KERNEL_ERROR_WAIT_TIMEOUT);
     }

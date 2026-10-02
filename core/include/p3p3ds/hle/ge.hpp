@@ -47,7 +47,10 @@ public:
     std::int32_t unset_callback(int);
     const GeListInfo *find(int id) const;
     const GeListInfo &last_list() const { return lists_.rbegin()->second; }
-    std::uint64_t enqueue_count() const { return lists_.size(); }
+    std::uint64_t enqueue_count() const { return enqueued_; }
+    // Completed lists kept for sceGeListSync/status queries; older ones are
+    // dropped (the PSP recycles its display-list IDs). [INFERRED] 64 slots.
+    static constexpr std::size_t kKeptLists = 64;
     const GeState &state() const { return state_; }
     const std::map<int,GeListInfo> &lists() const { return lists_; }
     bool writer_observed() const { return writer_observed_; }
@@ -58,7 +61,13 @@ public:
     // (state, vertex pointers, callbacks), but no pixels are produced.
     bool skip_rasterization{};
     // Per-PRIM census of the GE state the game uses (feature -> draw count),
-    // to prioritise renderer work by observed workload.
+    // to prioritise renderer work by observed workload. A dozen string-keyed
+    // map updates per draw: off in the production runtime (3DS).
+#if defined(PSPRECOMP_NO_FRONTIER_DIAGNOSTICS)
+    bool census{false};
+#else
+    bool census{true};
+#endif
     const std::map<std::string, std::uint64_t> &feature_counts() const { return features_; }
     ge::GeRenderer &renderer() { return *renderer_; }
     const ge::GeRegisters &registers() const { return regs_; }
@@ -73,6 +82,7 @@ private:
     std::map<int,GeCallback> callbacks_;
     std::deque<int> queue_;
     int next_id_{1}, next_callback_{0};
+    std::uint64_t enqueued_{};
     bool writer_observed_{};
     std::uint32_t writer_pc_{};
     void deliver_finish_callback(psprecomp::Runtime &, const GeListInfo &, std::uint32_t end_pc);

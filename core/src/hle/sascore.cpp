@@ -98,13 +98,13 @@ std::int16_t next_sample(SasVoice &v, psprecomp::GuestMemory &memory) {
         if (v.block_index >= 28u) {
             if (v.ended || v.read_offset + 16u > v.size) { v.ended = true; return 0; }
             const std::uint32_t at = v.address + v.read_offset;
-            const auto header = memory.load8(at);
-            const auto flags = memory.load8(at + 1u);
+            const auto header = memory.aot_load8(at);
+            const auto flags = memory.aot_load8(at + 1u);
             const std::int32_t shift = header & 0xF;
             const auto filter = std::min<std::uint32_t>(header >> 4, 4u);
             if ((flags & 4u) != 0u) v.loop_start = v.read_offset;
             for (std::uint32_t i = 0; i < 28u; ++i) {
-                const auto byte = memory.load8(at + 2u + i / 2u);
+                const auto byte = memory.aot_load8(at + 2u + i / 2u);
                 std::int32_t nibble = (i & 1u) ? (byte >> 4) : (byte & 0xF);
                 nibble = static_cast<std::int16_t>(nibble << 12) >> shift;
                 std::int32_t s = nibble + ((v.s1 * kVagFilter[filter][0] + v.s2 * kVagFilter[filter][1]) >> 6);
@@ -158,10 +158,10 @@ void SasState::mix(SasCore &core, psprecomp::GuestMemory &memory, std::uint32_t 
     for (std::uint32_t i = 0; i < core.grain * 2u; ++i) {
         std::int32_t value = acc[i];
         if (with_mix) {
-            const auto existing = static_cast<std::int16_t>(memory.load16(out + 2u * i));
+            const auto existing = static_cast<std::int16_t>(memory.aot_load16(out + 2u * i));
             value += (existing * ((i & 1u) ? mix_right : mix_left)) >> 12;
         }
-        memory.store16(out + 2u * i, static_cast<std::uint16_t>(std::clamp<std::int32_t>(value, -32768, 32767)));
+        memory.aot_store16(out + 2u * i, static_cast<std::uint16_t>(std::clamp<std::int32_t>(value, -32768, 32767)));
     }
 }
 

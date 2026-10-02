@@ -20,6 +20,7 @@ Working in the maintainer's Azahar session (save at the dorm desk, load from the
 
 Hardware split (87 % speed, build f6c9611): AOT + dispatch 55 %, HLE 42 % (GE rendering 10 %). Azahar (build bfa6474, after the sceCtrl fix raised menus and scenes from 20 to 30 frames/s): 56 % average, 6.5 game fps on the Dark Hour rooftop, HLE 60 % (rendering 16 %). First get a hardware report of the current build.
 
+0. **Hardware report of the speed-work build** (bottom-screen split over the last 10 s: aot / hle / ge / present / idle, texture hash, GPU wait) in the dorm, school and Dark Hour; it decides between the steps below. Host-side costs outside the game code were halved on the PC (`CURRENT_STATE.md`).
 1. **Do not wait for the GPU every frame**: double-buffer vertices/command lists so the CPU builds frame N+1 while the PICA200 draws frame N. Verify: `present` share and speed in the bottom-screen report.
 2. **Cheap path for the hottest HLE calls** (interrupt suspend/resume about 11,600 calls/s each in menus): no `std::function`, no scheduler hook. Verify: HLE share, CTest, deterministic replay.
 3. **Profile hot guest functions on ARM** and compile those units with full optimization (profile-guided split of `-Os` / `-O2`). Verify: speed on hardware.

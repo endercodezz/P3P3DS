@@ -10,6 +10,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 endif()
 
+# Runtime configured like the 3DS build (platform/3ds/CMakeLists.txt): no
+# frontier diagnostics, events or transfer records. For host profiling of the
+# shipped configuration (runner --sample) in a separate build directory; the
+# tests that inspect events need the default OFF.
+option(P3P_PRODUCTION_RUNTIME "Host runtime without diagnostics, as on 3DS" OFF)
+if(P3P_PRODUCTION_RUNTIME)
+    add_compile_definitions(PSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 PSPRECOMP_NO_FRONTIER_DIAGNOSTICS=1
+                            PSPRECOMP_CHAIN_NOINLINE=1)
+    set(P3P_AOT_TRANSFER_RECORDS OFF CACHE BOOL "" FORCE)
+    set(PSPRECOMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+endif()
+
 # Configure PSPRecomp
 option(PSPRECOMP_BUILD_TESTS "Build PSPRecomp upstream tests" ON)
 option(PSPRECOMP_BUILD_PROFILE_TESTS "Build PSPRecomp profile tests" OFF)
@@ -71,7 +83,8 @@ if(P3P_AOT_MODE STREQUAL "AUTO")
     add_library(p3p_aot STATIC ${P3P_AUTO_SOURCES})
     target_include_directories(p3p_aot PRIVATE recomp/PSPRecomp/include "${P3P_AUTO_DIR}")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(p3p_aot PRIVATE ${P3P_AOT_OPT})
+        separate_arguments(_p3p_aot_opt NATIVE_COMMAND "${P3P_AOT_OPT}")
+        target_compile_options(p3p_aot PRIVATE ${_p3p_aot_opt})
     endif()
     target_link_libraries(p3p_aot PUBLIC psprecomp_core)
     set(P3P_AOT_LINK p3p_aot)
@@ -123,6 +136,9 @@ target_link_libraries(p3p_pc_bootstrap PRIVATE
     p3p3ds_core
     psprecomp_core
 )
+if(WIN32)
+    target_link_libraries(p3p_pc_bootstrap PRIVATE winmm psapi) # --sample: 1 ms timer, module list
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(p3p_pc_bootstrap PRIVATE -Wall -Wextra)

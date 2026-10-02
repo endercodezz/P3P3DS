@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <initializer_list> // P3P3DS: Runtime::event fields
+#include <utility>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -105,7 +107,15 @@ public:
     std::map<std::string, std::uint64_t> event_type_limits;
     std::map<std::string, std::uint64_t> event_type_counts;
     std::uint64_t event_budget{50000u};
-    void event(std::string type, std::map<std::string, std::uint64_t> fields = {}, std::string detail = {});
+    // P3P3DS: inline guard. Fields are a stack array of (name, value) and
+    // strings are views, so a call site builds no map or string (no heap
+    // allocation) unless diagnostics are on; every HLE call reports hle_hit.
+    using EventFields = std::initializer_list<std::pair<std::string_view, std::uint64_t>>;
+    void event(std::string_view type, EventFields fields = {}, std::string_view detail = {}) {
+        if (frontier_diagnostics) record_event(type, fields, detail);
+    }
+    void record_event(std::string_view type, EventFields fields, std::string_view detail);
+    void event_map(std::string type, std::map<std::string, std::uint64_t> fields, std::string detail = {});
     void record_transfer(std::uint32_t pc, std::uint32_t word, std::uint32_t target) {
         if (frontier_diagnostics) record_transfer_impl(pc, word, target);
     }

@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <deque>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -97,15 +98,25 @@ struct Stats {
     std::uint32_t buttons{};
     std::string status{"booting"};
     std::string iso;
-    // Wall-time split (ARM11 system ticks): presentation is timed here, HLE
-    // (includes GE rendering) and rendering by the shared profilers.
-    u64 run_start_ticks{}, present_ticks{};
+    // Wall-time split (ARM11 system ticks): presentation, pacing sleep (idle)
+    // and the bottom-screen/SD report (ui) are timed here, HLE (includes GE
+    // rendering and everything of the vblank wait) and rendering by the
+    // shared profilers.
+    u64 run_start_ticks{}, present_ticks{}, idle_ticks{}, ui_ticks{};
     std::uint64_t dump_every{};
     bool skip_movies{true};
     std::uint64_t movie_vblanks{}, movie_frames_seen{};
 };
 
 double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM11; }
+
+// Cumulative time counters, sampled once per second; the report shows the
+// split over the last 10 s next to the run average, so slow places show up.
+struct TimeSample {
+    u64 wall{}, present{}, idle{}, ui{}, hash{}, upload{}, wait{};
+    double guest_us{}, hle_ns{}, render_ns{};
+};
+std::deque<TimeSample> g_samples;
 
 // 3DS buttons -> PSP buttons by position (PSP: Cross bottom, Circle right,
 // Square left, Triangle top).
@@ -259,32 +270,65 @@ std::string gpu_text() {
     std::snprintf(buf, sizeof buf,
         "gpu    : draws %llu tris %llu skip %llu\n"
         "         tex %lu up %llu hit %llu rtt %llu\n"
-        "         present gpu %llu cpu %llu\n"
+        "         present gpu %llu cpu %llu same %llu\n"
         "movie  : skip presses %llu\n",
         static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
         static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
         static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
         static_cast<unsigned long long>(g.target_textures), static_cast<unsigned long long>(g.gpu_presents),
-        static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g_skip_presses));
+        static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g.skipped_presents),
+        static_cast<unsigned long long>(g_skip_presses));
+    return buf;
+}
+
+TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
+    TimeSample t;
+    t.wall = svcGetSystemTick() - s.run_start_ticks;
+    t.present = s.present_ticks;
+    t.idle = s.idle_ticks;
+    t.ui = s.ui_ticks;
+    if (g_gpu != nullptr) {
+        const auto &g = g_gpu->gpu_stats();
+        t.hash = g.hash_ticks;
+        t.upload = g.upload_ticks;
+        t.wait = g.wait_ticks;
+    }
+    t.guest_us = static_cast<double>(guest_us);
+    t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns);
+    t.render_ns = static_cast<double>(p3p3ds::host_profile().render_ns);
+    return t;
+}
+
+// One line per split: AOT (translated game code and dispatch), HLE (kernel
+// and services, without what is listed separately), GE (display lists and
+// the PICA200 backend), present, idle (pacing sleep: the game was ahead of
+// real time), ui (report), then what GE time went to.
+std::string split_text(const char *label, const TimeSample &a, const TimeSample &b) {
+    const double wall = ticks_to_s(b.wall - a.wall);
+    if (wall <= 0) return {};
+    const double hle = (b.hle_ns - a.hle_ns) / 1e9, ge = (b.render_ns - a.render_ns) / 1e9;
+    const double present = ticks_to_s(b.present - a.present), idle = ticks_to_s(b.idle - a.idle), ui = ticks_to_s(b.ui - a.ui);
+    const double hle_rest = hle - ge - present - idle - ui; // all of these run inside HLE calls
+    auto pct = [wall](double v) { return 100.0 * v / wall; };
+    char buf[320];
+    std::snprintf(buf, sizeof buf,
+        "%s: speed %3.0f%%  (%% of time)\n"
+        " aot %2.0f hle %2.0f ge %2.0f pres %2.0f idle %2.0f\n"
+        " ge: hash %.1f tex %.1f wait %.1f ui %.1f\n",
+        label, 100.0 * (b.guest_us - a.guest_us) / 1e6 / wall, pct(wall - hle), pct(hle_rest), pct(ge), pct(present), pct(idle),
+        pct(ticks_to_s(b.hash - a.hash)), pct(ticks_to_s(b.upload - a.upload)), pct(ticks_to_s(b.wait - a.wait)), pct(ui));
     return buf;
 }
 
 std::string profile_text(const Stats &s) {
-    if (s.run_start_ticks == 0) return {};
-    const double run = ticks_to_s(svcGetSystemTick() - s.run_start_ticks);
-    if (run <= 0) return {};
-    const auto &h = psprecomp::runtime_profile();
-    const auto &p = p3p3ds::host_profile();
-    const double hle = static_cast<double>(h.hle_ns) / 1e9, render = static_cast<double>(p.render_ns) / 1e9;
-    const double present = ticks_to_s(s.present_ticks), interp = static_cast<double>(p.interpreter_ns) / 1e9;
-    char buf[256];
-    std::snprintf(buf, sizeof buf,
-        "time   : hle %.0f%% (render %.0f%%)\n"
-        "         present %.0f%% interp %.1f%%\n"
-        "         aot+dispatch %.0f%%  calls %llu\n",
-        100 * hle / run, 100 * render / run, 100 * present / run, 100 * interp / run,
-        100 * (run - hle - present - interp) / run, static_cast<unsigned long long>(h.hle_calls));
-    return buf + gpu_text();
+    if (s.run_start_ticks == 0 || g_samples.empty()) return {};
+    const TimeSample start{}; // the run started with every counter at zero
+    std::string text = split_text("last 10s", g_samples.front(), g_samples.back());
+    text += split_text("run avg ", start, g_samples.back());
+    char buf[96];
+    std::snprintf(buf, sizeof buf, "hle    : %llu calls  interp %.1f%%\n", static_cast<unsigned long long>(psprecomp::runtime_profile().hle_calls),
+                  100.0 * static_cast<double>(p3p3ds::host_profile().interpreter_ns) / 1e9 / ticks_to_s(g_samples.back().wall));
+    return text + buf + gpu_text();
 }
 
 std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::KernelState &k) {
@@ -505,7 +549,11 @@ int main() {
                 const double wall_us = static_cast<double>(svcGetSystemTick() - stats.run_start_ticks) / ticks_per_us;
                 if (!pacing_started || save_menu.active) { wall_minus_guest_us = wall_us - guest_us; pacing_started = true; }
                 const double ahead_us = guest_us + wall_minus_guest_us - wall_us;
-                if (ahead_us > 1000.0) svcSleepThread(static_cast<s64>(ahead_us * 1000.0));
+                if (ahead_us > 1000.0) {
+                    const u64 sleep_start = svcGetSystemTick();
+                    svcSleepThread(static_cast<s64>(ahead_us * 1000.0));
+                    stats.idle_ticks += svcGetSystemTick() - sleep_start;
+                }
                 else if (ahead_us < -50000.0) wall_minus_guest_us = wall_us - guest_us; // behind: do not race later
             }
             const u64 present_start = svcGetSystemTick();
@@ -529,11 +577,15 @@ int main() {
                 stats.game_frames_at_last_fps = stats.game_frames;
                 stats.frames_at_last_fps = stats.frames;
                 stats.last_fps_ms = now;
+                g_samples.push_back(time_sample(stats, kernel.threads().now()));
+                if (g_samples.size() > 11u) g_samples.pop_front();
+                const u64 ui_start = svcGetSystemTick();
                 if (!save_menu.active) show(report_text(stats, rt, kernel));
-            }
-            if (now - stats.last_report_ms >= 5000u) {
-                write_report(report_text(stats, rt, kernel));
-                stats.last_report_ms = now;
+                if (now - stats.last_report_ms >= 5000u) {
+                    write_report(report_text(stats, rt, kernel));
+                    stats.last_report_ms = now;
+                }
+                stats.ui_ticks += svcGetSystemTick() - ui_start;
             }
         };
         stage = "run";

@@ -46,13 +46,16 @@ std::int32_t GeManager::enqueue_list(psprecomp::Runtime &rt, std::uint32_t start
             if (stack_count && ((stack&3) || !rt.memory().contains(stack,stack_count*32u))) return invalid_pointer;
         }
     }
+    // Drop the oldest completed lists (none is referenced here).
+    while (lists_.size() >= kKeptLists && lists_.begin()->second.status==GeStatus::Completed) lists_.erase(lists_.begin());
     const int id=next_id_++;
+    ++enqueued_;
     GeListInfo list; list.id=id; list.list_address=start; list.pc=start&0x0FFFFFFF;
     list.stall_address=stall&0x0FFFFFFF; list.callback_id=cb; list.opt_param=opt;
     list.context_address=context; list.stack_count=stack_count; list.stack_address=stack;
     lists_.emplace(id,list); head ? queue_.push_front(id) : queue_.push_back(id);
     rt.event("ge_enqueue", {{"list",static_cast<unsigned>(id)}, {"start",start}, {"stall",stall}, {"callback",static_cast<std::uint32_t>(cb)}});
-    std::cout << "[GE ENQUEUE] id=" << id << " start=" << psprecomp::hex32(start)
+    if (rt.frontier_diagnostics) std::cout << "[GE ENQUEUE] id=" << id << " start=" << psprecomp::hex32(start)
               << " stall=" << psprecomp::hex32(stall) << " cb=" << cb
               << " context=" << psprecomp::hex32(context) << " stacks=" << stack_count
               << " stack=" << psprecomp::hex32(stack) << (head?" head":"") << "\n";
@@ -111,7 +114,7 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     rt.memory().copy_in(callback_stack_base,saved_stack);
     if (!rt.stopped() && callback_ctx.pc!=0x20) rt.stop("GE finish callback dispatch budget exceeded");
     if (!rt.stopped()) rt.event("ge_callback_complete", {{"list",l.id}, {"target",callback.finish}});
-    if (!rt.stopped()) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
+    if (!rt.stopped() && rt.frontier_diagnostics) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
                                  << " token=" << l.finish_token << " end=" << psprecomp::hex32(end_pc) << "\n";
 }
 // Enable bits and modes: PSPSDK pspge.h / pspgu.h command list.
@@ -173,7 +176,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
     case 0x04: { // PRIM
         const auto count=arg&0xFFFF, type=(arg>>16)&7;
         if(type==7) { rt.stop("GE PRIM type 7 unsupported"); return; }
-        count_features(type);
+        if(census) count_features(type);
         const ProfileScope timer(host_profile().render_ns, host_profile().render_calls);
         if(!skip_rasterization) renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
         const auto layout=ge::vertex_layout(regs_.reg[0x12]);
@@ -222,9 +225,11 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
     }
     case 0xEA: {
         const auto src=(regs_.reg[0xB2]&0xFFFFF0u)|((regs_.reg[0xB3]>>16)&0xFFu)<<24, dst=(regs_.reg[0xB4]&0xFFFFF0u)|((regs_.reg[0xB5]>>16)&0xFFu)<<24;
-        char key[48];
-        std::snprintf(key,sizeof key,"transfer_%s_to_%s",(src&0x0F000000u)==0x04000000u?"edram":"ram",(dst&0x0F000000u)==0x04000000u?"edram":"ram");
-        ++features_[key];
+        if(census) {
+            char key[48];
+            std::snprintf(key,sizeof key,"transfer_%s_to_%s",(src&0x0F000000u)==0x04000000u?"edram":"ram",(dst&0x0F000000u)==0x04000000u?"edram":"ram");
+            ++features_[key];
+        }
         const ProfileScope timer(host_profile().render_ns, host_profile().render_calls); if(!skip_rasterization) renderer_->transfer(mem,regs_); break;
     }
     default: break;
@@ -234,26 +239,33 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
 
 void GeManager::pump(psprecomp::Runtime &rt) {
     std::uint64_t budget=4u<<20;
+    auto &mem=rt.memory();
     while(!queue_.empty() && !rt.stopped()) {
-        auto &l=lists_.at(queue_.front());
+        const int id=queue_.front();
+        auto &l=lists_.at(id);
         if(l.status==GeStatus::Paused) return;
-        if(l.pc==l.stall_address && l.stall_address) { l.status=GeStatus::Stalled; return; }
-        l.status=GeStatus::Running;
-        if(!budget--) {rt.stop("GE command budget exceeded");return;}
-        if((l.pc&3) || !rt.memory().contains(l.pc,4)) {rt.stop("GE invalid command fetch at "+psprecomp::hex32(l.pc));return;}
-        const auto word=rt.memory().load32(l.pc), op=word>>24;
-        ++l.commands;
-        if(op==0x0C) { // END (after FINISH: completion; after SIGNAL: continue)
-            l.pc+=4;
-            if(l.previous==0x0E) { l.previous=op; continue; }
-            ++l.completions; l.status=GeStatus::Completed;
-            queue_.pop_front();
-            rt.event("ge_finish", {{"list",l.id},{"ge_pc",l.pc},{"commands",l.commands},{"completions",l.completions}});
-            if(l.previous==0x0F) deliver_finish_callback(rt,l,l.pc);
-            continue;
+        // Commands of the list at the head of the queue (one map lookup per
+        // list, not per command).
+        while(true) {
+            if(l.pc==l.stall_address && l.stall_address) { l.status=GeStatus::Stalled; return; }
+            l.status=GeStatus::Running;
+            if(!budget--) {rt.stop("GE command budget exceeded");return;}
+            if((l.pc&3) || !mem.contains(l.pc,4)) {rt.stop("GE invalid command fetch at "+psprecomp::hex32(l.pc));return;}
+            const auto word=mem.aot_load32(l.pc), op=word>>24;
+            ++l.commands;
+            if(op==0x0C) { // END (after FINISH: completion; after SIGNAL: continue)
+                l.pc+=4;
+                if(l.previous==0x0E) { l.previous=op; continue; }
+                ++l.completions; l.status=GeStatus::Completed;
+                queue_.pop_front();
+                rt.event("ge_finish", {{"list",l.id},{"ge_pc",l.pc},{"commands",l.commands},{"completions",l.completions}});
+                if(l.previous==0x0F) deliver_finish_callback(rt,l,l.pc);
+                break;
+            }
+            execute(rt,l,word);
+            l.previous=op;
+            if(rt.stopped() || queue_.empty() || queue_.front()!=id) break;
         }
-        execute(rt,l,word);
-        l.previous=op;
     }
 }
 

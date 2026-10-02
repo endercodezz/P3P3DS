@@ -129,7 +129,7 @@ GpuRenderer::GpuRenderer() {
 }
 
 GpuRenderer::~GpuRenderer() {
-    if (in_frame_) C3D_FrameEnd(0);
+    if (in_frame_) end_frame();
     for (auto &[key, t] : textures_) C3D_TexDelete(&t.tex);
     for (auto &t : deferred_free_) C3D_TexDelete(&t);
     for (auto &t : targets_) { C3D_RenderTargetDelete(t.rt); C3D_TexDelete(&t.tex); }
@@ -144,7 +144,9 @@ GpuRenderer::~GpuRenderer() {
 
 void GpuRenderer::begin_frame() {
     if (in_frame_) return;
+    const u64 start = svcGetSystemTick();
     C3D_FrameBegin(0); // waits until the GPU finished the previous frame
+    gpu_stats_.wait_ticks += svcGetSystemTick() - start;
     in_frame_ = true;
     vbuf_used_ = 0;
     bound_ = nullptr;
@@ -153,12 +155,21 @@ void GpuRenderer::begin_frame() {
     deferred_free_.clear();
 }
 
+// C3D_FrameEnd(0) flushes the data cache over the whole 12 MiB linear heap on
+// every call (3ds/citro3d/source/renderqueue.c). Textures are flushed when
+// they are written (C3D_TexFlush), so only this frame's vertices need it;
+// GX_CMDLIST_FLUSH makes citro3d flush just the command list.
+void GpuRenderer::end_frame() {
+    if (vbuf_used_ != 0u) GSPGPU_FlushDataCache(vbuf_, vbuf_used_ * sizeof(Vertex));
+    C3D_FrameEnd(GX_CMDLIST_FLUSH);
+    in_frame_ = false;
+}
+
 void GpuRenderer::flush_frame() {
     // Submit what is queued and start over with an empty vertex buffer and
     // command list (no presentation: the top target is only drawn in present()).
     Target *keep = bound_;
-    C3D_FrameEnd(0);
-    in_frame_ = false;
+    end_frame();
     ++gpu_stats_.frame_flushes;
     begin_frame();
     if (keep) bind_target(*keep);
@@ -305,7 +316,9 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
     if (it != textures_.end() && it->second.checked_frame == frame_) {
         ++gpu_stats_.texture_hits;
     } else {
+        const u64 hash_start = svcGetSystemTick();
         const std::uint64_t hash = ge::texture_hash(memory, regs, info);
+        gpu_stats_.hash_ticks += svcGetSystemTick() - hash_start;
         if (it != textures_.end() && it->second.hash == hash) {
             it->second.checked_frame = frame_;
             ++gpu_stats_.texture_hits;
@@ -325,6 +338,7 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
                 evict_textures(kTextureBudget); // free everything not used by this frame and retry
                 if (!C3D_TexInit(&entry.tex, static_cast<u16>(tw), static_cast<u16>(th), fmt)) return nullptr;
             }
+            const u64 upload_start = svcGetSystemTick();
             ge::decode_texture(memory, regs, info, rgba_);
             for (std::uint32_t y = 0; y < th; ++y)
                 for (std::uint32_t x = 0; x < tw; ++x) {
@@ -334,6 +348,7 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
                     else static_cast<std::uint16_t *>(entry.tex.data)[at] = to_16(c, fmt);
                 }
             C3D_TexFlush(&entry.tex);
+            gpu_stats_.upload_ticks += svcGetSystemTick() - upload_start;
             entry.hash = hash;
             entry.width = tw;
             entry.height = th;
@@ -582,29 +597,47 @@ void GpuRenderer::transfer(psprecomp::GuestMemory &memory, const ge::GeRegisters
 }
 
 void GpuRenderer::present(psprecomp::GuestMemory &memory, const hle::DisplayFramebufInfo &fb) {
-    begin_frame();
+    // The picture to show and its version. When the screen already shows it,
+    // nothing is submitted: draws of the frame being built stay queued until
+    // the game displays it (the game runs at 30 frames/s or less, presents
+    // come every vblank).
     C3D_Tex *source = nullptr;
-    last_present_cpu_ = false;
+    std::uint64_t source_seq = 0;
+    Target *t = nullptr;
+    std::uint32_t address = 0, format = 0;
+    bool cpu = false;
     if (fb.active && fb.topaddr != 0u) {
-        const auto address = psprecomp::GuestMemory::canonical(fb.topaddr);
-        const auto format = static_cast<std::uint32_t>(fb.pixelformat);
-        Target *t = target_for(address, format, false);
+        address = psprecomp::GuestMemory::canonical(fb.topaddr);
+        format = static_cast<std::uint32_t>(fb.pixelformat);
+        t = target_for(address, format, false);
         if (t != nullptr && t->gpu_seq > t->cpu_seq) {
             source = &t->tex;
-            ++gpu_stats_.gpu_presents;
+            source_seq = t->gpu_seq;
         } else {
-            // Movie frames and other CPU-written pictures: convert only when changed.
-            const std::uint64_t version = t != nullptr ? t->cpu_seq : ++seq_;
-            if (fallback_address_ != address || fallback_seq_ != version) {
-                upload_guest_framebuffer(memory, address, static_cast<std::uint32_t>(fb.bufferwidth), format);
-                fallback_address_ = address;
-                fallback_seq_ = version;
-            }
+            cpu = true;
             source = &fallback_;
-            last_present_cpu_ = true;
-            ++gpu_stats_.cpu_presents;
         }
     }
+    if (!cpu && source == shown_ && source_seq == shown_seq_) {
+        ++gpu_stats_.skipped_presents;
+        return;
+    }
+    begin_frame();
+    last_present_cpu_ = cpu;
+    if (cpu) {
+        // Movie frames and other CPU-written pictures: convert only when changed.
+        const std::uint64_t version = t != nullptr ? t->cpu_seq : ++seq_;
+        if (fallback_address_ != address || fallback_seq_ != version) {
+            upload_guest_framebuffer(memory, address, static_cast<std::uint32_t>(fb.bufferwidth), format);
+            fallback_address_ = address;
+            fallback_seq_ = version;
+        }
+        ++gpu_stats_.cpu_presents;
+    } else if (source != nullptr) {
+        ++gpu_stats_.gpu_presents;
+    }
+    shown_ = source;
+    shown_seq_ = source_seq;
     C3D_FrameDrawOn(top_);
     bound_ = nullptr;
     bound_screen_ = true;
@@ -612,8 +645,7 @@ void GpuRenderer::present(psprecomp::GuestMemory &memory, const hle::DisplayFram
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, loc_projection_, &proj);
     if (source == nullptr) C3D_RenderTargetClear(top_, C3D_CLEAR_ALL, 0x000000FFu, 0);
     else blit(*source, 480.0f, 272.0f, true);
-    C3D_FrameEnd(0);
-    in_frame_ = false;
+    end_frame();
     ++frame_;
 }
 

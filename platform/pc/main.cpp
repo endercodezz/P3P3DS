@@ -8,6 +8,7 @@
 #include "pcm_mixer.hpp"
 #include "host_input.hpp"
 #include "p3p3ds/profile.hpp"
+#include "sampler.hpp"
 
 #include <chrono>
 #include "p3p3ds/vram_activity.hpp"
@@ -23,9 +24,9 @@ namespace psprecomp {void register_generated_functions(Runtime &); void apply_ge
 int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
-            ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path;
+            ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path, sample_path;
         std::string savedata_policy="latest";
-        std::uint64_t frame_every=30, render_from=0;
+        std::uint64_t frame_every=30, render_from=0, sample_from=0;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
         std::optional<std::uint32_t> expected;
@@ -49,6 +50,8 @@ int main(int argc,char **argv) {
             else if(a=="--input") input_path=value();
             else if(a=="--gamepad") gamepad=true;
             else if(a=="--profile") profile=true;
+            else if(a=="--sample") sample_path=value();
+            else if(a=="--sample-from") sample_from=std::stoull(value());
             else if(a=="--savedata") savedata_policy=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--render-from") render_from=std::stoull(value()); // debug fast-forward: no pixels before that vblank
@@ -64,6 +67,8 @@ int main(int argc,char **argv) {
                          <<"--input <file> (vblank-keyed button script, see core/include/p3p3ds/input.hpp)\n"
                          <<"--gamepad (poll XInput pad 0 live; not paced to wall time)\n"
                          <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n"
+                         <<"--sample <file> (statistical profile: instruction pointer every ~1 ms; tools/profile_symbols.py)\n"
+                         <<"--sample-from <vblank> (start sampling at that vblank)\n"
                          <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
@@ -135,7 +140,9 @@ int main(int argc,char **argv) {
         // the first entry at each PC is logged as an interpreter_enter event.
         p3p3ds::Interpreter interpreter;
         if(interpreter_enabled) p3p3ds::install_interpreter_fallback(&interpreter);
+#if !defined(PSPRECOMP_NO_FRONTIER_DIAGNOSTICS) // production runtime (P3P_PRODUCTION_RUNTIME): no events
         rt.frontier_diagnostics=true;
+#endif
         // Continuous runs: keep the first occurrences of high-frequency events
         // (all are counted and reported in the event dump) and a larger budget.
         rt.event_budget=400000;
@@ -216,13 +223,32 @@ int main(int argc,char **argv) {
         psprecomp::runtime_profile().enabled=profile;
         p3p3ds::host_profile().enabled=profile;
         const auto run_start=std::chrono::steady_clock::now();
-        try {rt.run(entry,budget);}
+        // Host time of the sampled window (from --sample-from to the end of the run).
+        auto window_start=run_start; std::uint64_t window_vblank=0;
+        try {
+            p3p3ds::pc::Sampler sampler(sample_path.string(),sample_from==0);
+            // Per guest vblank (also without diagnostic events): --render-from and --sample-from.
+            kernel.display().on_vblank=[&](const p3p3ds::hle::DisplayFramebufInfo &) {
+                const auto vblank=kernel.threads().vblank_count();
+                if(kernel.ge().skip_rasterization && vblank>=render_from) kernel.ge().skip_rasterization=false;
+                if(sample_from && vblank>=sample_from && !sampler.active) {
+                    sampler.active=true; window_start=std::chrono::steady_clock::now(); window_vblank=vblank;
+                }
+            };
+            rt.run(entry,budget);
+        }
         catch(const psprecomp::FrontierHalt &) {}
         catch(const psprecomp::Error &e) {
             const std::string reason=e.what();
             rt.stop((reason.find("memory")!=std::string::npos?"Memory fault: ":"Runtime exception: ")+reason);
         }
         rt.event_observer={};
+        if(!sample_path.empty()) {
+            const double wall=std::chrono::duration<double>(std::chrono::steady_clock::now()-window_start).count();
+            const auto vblanks=kernel.threads().vblank_count()-window_vblank;
+            std::printf("[SAMPLE WINDOW] vblank %llu..%llu: %.2f s host, %.1f vblanks/s\n",static_cast<unsigned long long>(window_vblank),
+                static_cast<unsigned long long>(kernel.threads().vblank_count()),wall,wall>0?vblanks/wall:0.0);
+        }
         if(profile) {
             const auto wall=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-run_start).count());
             const auto &h=psprecomp::runtime_profile(); const auto &p=p3p3ds::host_profile();
@@ -244,7 +270,7 @@ int main(int argc,char **argv) {
                  <<" peak="<<mixer.peak()<<" late="<<mixer.late_frames()<<" clipped="<<mixer.clipped()<<"\n";
         {
             std::map<std::string,std::uint64_t> ge_features(kernel.ge().feature_counts().begin(),kernel.ge().feature_counts().end());
-            rt.event("ge_feature_summary",std::move(ge_features));
+            rt.event_map("ge_feature_summary",std::move(ge_features));
         }
         rt.event("vram_activity_summary",{{"unclassified_resource",activity.resource},{"bound_texture_resource",activity.texture},
             {"color",activity.color},{"depth",activity.depth},{"suppressed",activity.suppressed}});
