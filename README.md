@@ -66,7 +66,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 There is **no ready-made download of the game**: the `.3dsx` contains code generated from the game's executable (and the decrypted executable itself), so it must never be shared. Instead, the **P3P3DS Builder** turns your own copy of the game into `p3p3ds.3dsx` on your PC.
 
 You need:
-- a **New 3DS / New 3DS XL / New 2DS XL** with custom firmware and the Homebrew Launcher (Old 3DS models are not supported);
+- a **New 3DS / New 3DS XL / New 2DS XL** with custom firmware and the Homebrew Launcher (Old 3DS models are not supported yet);
 - your own *Persona 3 Portable* `ULUS-10512` ISO;
 - Windows 10/11 and [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the **3DS Development** component (official installer; the builder uses its ARM compiler and 3DS libraries).
 
@@ -108,7 +108,7 @@ The top screen shows the game, the bottom screen authorship and a live debug rep
 
 What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at about 87 % of full speed on a New 3DS (the runner never runs faster than real time); **no sound**; the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); saves are chosen in a menu on the bottom screen (D-Pad, B confirm, A back) and stored in `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` - they are not compatible with PSP or PPSSPP saves; 3D scenes have no lighting yet.
 
-**Old 3DS / 2DS** cannot run P3P3DS: it needs about 112 MB of application memory and the New 3DS CPU speed, while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache.
+**Old 3DS / 2DS** cannot run P3P3DS yet. Support is planned, but not soon: today it needs about 112 MB of application memory and the New 3DS CPU speed, while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache, so it needs a different approach rather than tuning (see [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md)).
 
 Memory [UNVERIFIED on hardware]: the runner needs about 112 MB of application memory (44 MB of code, 32 MB of PSP RAM, the runtime and GPU buffers). If the bottom screen reports that it ran out of memory, the Homebrew Launcher was started with a smaller memory mode than the game needs.
 
@@ -172,7 +172,7 @@ Decrypted P3P Executable (Allegrex MIPS ELF) + community CWCheat patches
 
 ## New 3DS Target Constraints
 
-This project targets the **New Nintendo 3DS / New 3DS XL / New 2DS XL** exclusively (Old 3DS / 2DS is intentionally unsupported):
+This project targets the **New Nintendo 3DS / New 3DS XL / New 2DS XL** exclusively (Old 3DS / 2DS is not supported yet; planned for much later):
 - **CPU:** Quad-core ARM11 MPCore @ 804 MHz with L2 cache enabled via `osSetSpeedupEnable(true)` (vs 268 MHz on Old 3DS).
 - **RAM:** 256 MB FCRAM (vs 128 MB on Old 3DS). The `.3dsx` currently holds 44 MB of recompiled code plus the 32 MB guest RAM and the runtime; a `.cia` can request a larger memory mode.
 - **Worker Core:** Core 2 is available for multithreaded worker tasks (display list processing, audio mixing, or file streaming).
