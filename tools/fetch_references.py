@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Clone the upstream reference repositories into references/, psp/, 3ds/ and p3p/.
+"""Clone the upstream reference repositories (research sources, not P3P3DS code).
 
-These directories are not part of the P3P3DS repository (.gitignore): they are
-other projects' sources, read for research and partly used by tests
+They are not part of the P3P3DS repository (.gitignore): references/, psp/,
+3ds/, the other recompilers in recomp/ (only recomp/PSPRecomp, which the build
+uses, stays tracked), the asset tools in tools/ and the P3P mod menu in p3p/.
+They are other projects' sources, read for research and partly used by tests
 (references/pspautotests: tests/test_mpeg.cpp, tests/test_sascore.cpp,
 tools/run_autotests.py; those skip when it is absent). The build does not
 need them: the 3DS libraries come from devkitPro.
@@ -44,6 +46,17 @@ REPOS = {
     "3ds/picasso": "https://github.com/devkitPro/picasso",
     "3ds/nihstro": "https://github.com/neobrain/nihstro",
     "p3p/Persona-3-Portable-Mod-Menu": "https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu",
+    "recomp/Yakumo": "https://github.com/TeamGDB/Yakumo",
+    "recomp/N64Recomp": "https://github.com/N64Recomp/N64Recomp",
+    "recomp/PSP-recompilation-project": "https://github.com/sal063/PSP-recompilation-project",
+    "recomp/psprecomp-sp00nz": "https://github.com/sp00nznet/psprecomp",
+    "recomp/psprecomp-wizardengineer": "https://github.com/wizardengineer/psprecomp",
+    "tools/Atlus-Script-Tools": "https://github.com/tge-was-taken/Atlus-Script-Tools",
+    "tools/AemulusModManager": "https://github.com/TekkaGB/AemulusModManager",
+    "tools/Amicitia": "https://github.com/tge-was-taken/Amicitia",
+    "tools/AtlusFileSystemLibrary": "https://github.com/tge-was-taken/AtlusFileSystemLibrary",
+    "tools/CriFsV2Lib": "https://github.com/Sewer56/CriFsV2Lib",
+    "tools/CriPakTools": "https://github.com/esperknight/CriPakTools",
 }
 
 

@@ -1,6 +1,0 @@
-{
-  "Name": "Catherine",
-  "ShortName": "cat",
-  "FlowScriptModulesPath": "Catherine/FlowScriptModules.json",
-  "MessageScriptLibraryPath": "Catherine/MessageScriptLibrary.json"
-}

@@ -1,3 +1,0 @@
-[workspace]
-members = ["crates/psp-parser", "crates/psp-cli", "crates/psp-ir", "crates/psp-decoder", "crates/psp-optimizer", "crates/psp-emitter"]
-resolver = "2"

@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "AtlusScriptLibrary": {
-      "commandName": "Project",
-      "commandLineArgs": "-Decompile -InFormat V4RE \"D:\\Users\\smart\\Downloads\\BF_BtlPlayerAi.bf\""
-    }
-  }
-}

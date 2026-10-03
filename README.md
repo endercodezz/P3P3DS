@@ -221,11 +221,11 @@ P3P3DS/
 │   ├── pc/              # PC development runner (frame dumps, WAV output, event traces)
 │   └── 3ds/             # New 3DS runner (.3dsx), built with devkitARM
 ├── profiles/p3p/        # P3P profile: AOT layout, patches, addresses, game inputs (local only)
-├── recomp/              # Recompilation engines and tools (PSPRecomp, Yakumo, N64Recomp)
+├── recomp/PSPRecomp/    # Static recompilation framework the build uses (other recompilers: not in git)
 ├── references/          # (not in git) reference emulators and hardware autotests (PPSSPP, pspautotests, uOFW)
 ├── psp/                 # (not in git) PSP SDK, VFPU documentation, Ghidra definitions
 ├── tests/               # CTest suites (HLE contracts, renderer, differential AOT/interpreter)
-└── tools/               # Build helpers and asset tools (CriFsV2Lib, AtlusScriptTools, Amicitia)
+└── tools/               # Build and analysis scripts (asset tools such as CriFsV2Lib: not in git)
 ```
 
 ---
@@ -347,7 +347,7 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 
 ## License
 
-The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party projects vendored in this repository (`recomp/`, `p3p/p3p-patches`, `tools/`) keep their own licenses. The research sources in `references/`, `psp/`, `3ds/` and `p3p/Persona-3-Portable-Mod-Menu` are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
+The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party code in this repository is only what the build uses: `recomp/PSPRecomp` (MIT) and `p3p/p3p-patches` (community CWCheat list); both keep their own licenses. The research sources (`references/`, `psp/`, `3ds/`, the other recompilers in `recomp/`, the asset tools in `tools/`, the P3P mod menu) are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
 
 ---
 

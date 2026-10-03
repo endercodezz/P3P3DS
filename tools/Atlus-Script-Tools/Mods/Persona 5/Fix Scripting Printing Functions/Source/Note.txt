@@ -1,1 +1,0 @@
-Can be compiled with the PS3 SDK 475, with VS2010

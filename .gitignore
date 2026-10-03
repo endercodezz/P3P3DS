@@ -110,3 +110,8 @@ profiles/p3p/input/local/
 /3ds/
 # p3p/p3p-patches stays tracked: the build reads its ULUS10512.ini (CWCheat patches)
 /p3p/Persona-3-Portable-Mod-Menu/
+# Other recompilers and asset tools (research; tools/fetch_references.py).
+# recomp/PSPRecomp and the scripts in tools/ are P3P3DS build inputs and stay.
+/recomp/*
+!/recomp/PSPRecomp/
+/tools/*/

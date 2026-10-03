@@ -1,5 +1,0 @@
-[package]
-name = "psp-ir"
-version = "0.1.0"
-edition = "2021"
-# No external dependencies — pure type definitions

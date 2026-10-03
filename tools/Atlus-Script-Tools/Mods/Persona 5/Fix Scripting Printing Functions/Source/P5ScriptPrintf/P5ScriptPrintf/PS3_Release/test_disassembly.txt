@@ -1,9 +1,0 @@
-Disassembly of section .text:
-
-test():
-0x00000000: 4E800020 blr                           08
-
-test2():
-0x00000004: 4E800020 blr                           08 PIPE
-
-
