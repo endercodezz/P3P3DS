@@ -4,9 +4,9 @@
 
 ---
 
-## Status: NOT PLAYABLE YET (New 3DS: first days at about 30 fps, saves work, no sound; stops at the first Shadow)
+## Status: NOT PLAYABLE YET (New 3DS: first days at about 30 fps, saves work, no sound; battles render black)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle (first Shadow) crashed in builds 0.2.3 and 0.2.4; the fix in 0.2.5 is not yet confirmed on hardware. The opening movie is skipped automatically (no video decoder yet).
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). Since 0.2.5 the first battle starts, but it renders almost entirely black (only the gun and the Shadow are visible: no lighting or skinning yet) at 5-10 fps. The opening movie is skipped automatically (no video decoder yet).
 
 On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8.3 and 8.5):
 
@@ -16,7 +16,7 @@ On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8
 | Boot | logos, title screen and main menu, drawn by the PICA200; logo positions pixel-identical to the PC renderer; the opening movie is skipped (no video decoder yet) |
 | Speed | about 30 game frames/s in the dorm and at school (drops to 25), 15 at the first Shadow; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps) |
 | Saves | save and load at the dorm desk and from LOAD GAME, menu on the bottom screen |
-| First battle | crash at the first Shadow (GPU command buffer overflow) fixed in 0.2.5, to be confirmed on hardware |
+| First battle | starts since 0.2.5 (crash at the first Shadow fixed); scene black except the gun and the Shadow (no lighting/skinning yet), 5-10 fps |
 | Memory | 59 MB of a 79 MB heap in use during the opening |
 | Screens | top: the game; bottom: authorship and debug data (fps, speed, where the time went over the last 10 s, memory), also saved to `sdmc:/p3p3ds/report.txt` |
 
@@ -58,7 +58,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] P3P3DS Builder: ISO -> `.3dsx` on the user's PC (Windows wizard)
 - [x] Runs on a real New 3DS (about 30 fps in the first days)
 - [x] Savedata on hardware (bottom-screen menu)
-- [ ] First battle on hardware, stable full speed, sound (ndsp), lighting, movie decoding
+- [ ] Battles rendered correctly (lighting, skinning) and at full speed, sound (ndsp), movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
 
@@ -109,7 +109,7 @@ The top screen shows the game, the bottom screen authorship and a live debug rep
 | L / R, START, SELECT | L / R, START, SELECT |
 | START + SELECT | quit P3P3DS |
 
-What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at about 30 fps on a New 3DS (the runner never runs faster than real time); **no sound**; battles from the first Shadow on are not confirmed yet; the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); saves are chosen in a menu on the bottom screen (D-Pad, B confirm, A back) and stored in `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` - they are not compatible with PSP or PPSSPP saves; 3D scenes have no lighting yet.
+What to expect today: logos, title screen, main menu, NEW GAME and the following scenes, rendered by the GPU at about 30 fps on a New 3DS (the runner never runs faster than real time); **no sound**; battles start but render almost black (no lighting or skinning yet); the opening movie is skipped automatically (no video decoder yet; an empty `sdmc:/p3p3ds/play_movies.txt` disables the skip); saves are chosen in a menu on the bottom screen (D-Pad, B confirm, A back) and stored in `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` - they are not compatible with PSP or PPSSPP saves; 3D scenes have no lighting yet.
 
 **Old 3DS / 2DS** cannot run P3P3DS yet. Support is planned, but not soon: today it needs about 112 MB of application memory and the New 3DS CPU speed, while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache, so it needs a different approach rather than tuning (see [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md)).
 

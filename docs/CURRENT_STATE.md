@@ -2,6 +2,17 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Hardware run of build 06818ae (0.2.5): first battle reached, scene black (2026-10-03)
+
+Maintainer, New 2DS XL, 602 s wall, quit with START+SELECT during the first battle.
+
+- [VERIFIED] The first Shadow no longer crashes: the battle starts and runs. The command-buffer fix (live fill from `GPUCMD_GetBuffer`) holds: 2,706 frame flushes, no panic.
+- [VERIFIED] Picture in battle (maintainer's description): everything is black except the protagonist's gun (Evoker) and the Shadow; the party members are black silhouettes; of Orpheus only his instrument (lyre) is visible. The scene reads as "a floating gun on a black background".
+- [VERIFIED] Speed in battle: 5-10 game frames/s. Report: last 10 s speed 21 %, split aot 28 %, hle 9 %, ge 49 %, present 0 %, idle 6 %; in GE texture hashing 0.6 %, conversion 0.1 %, GPU wait 3.7 %; ui 8.2 %. Run average 49 % of real time (aot 32, hle 11, ge 36, idle 11, ui 8.6). 5.9 M draws in 602 s (build 472599b: 4.7 M in 1,250 s), 23.6 M triangles, 294 textures cached, cpu->rtt 4.
+- [INFERRED] Black models: the vertex path (`core/src/ge/geometry.cpp`, `decode_screen_vertices`) implements neither lighting (GE enable 0x17) nor skinning (bone weights; the layout's `weights` field is decoded but positions are not blended with the bone matrices) nor morphing. A lit vertex without its own colour takes the material ambient colour (registers 0x55/0x58), which for lit materials is typically dark, and the texture is modulated by it: black. The gun and the Shadow are probably drawn unlit or with vertex colours. Skinned party models would additionally sit in bind/bone space. The first-day census counted 12,684 lit draws; battles light almost everything. To verify on the PC runner: census of a battle (lighting, skinning, morph counts) and frames of the software renderer, which shares this vertex path.
+- [INFERRED] GE at 49 % in battle is CPU vertex work: all transform (and later lighting/skinning) runs on the ARM11 per vertex; hashing, uploads and GPU wait are small. Moving transform, lighting and skinning to the PICA200 vertex shader is the matching fix.
+- [VERIFIED] ui 8 %: redrawing the bottom-screen report once per second (libctru console) plus the SD report every 5 s costs 8 % of the time; to be reduced.
+
 ## Hardware run of build 472599b: about 30 fps, crash at the first Shadow fixed (2026-10-03)
 
 - [VERIFIED] Maintainer, New 2DS XL: saves work; mostly a steady 30 game frames/s, outside battle sometimes down to 20, at the first Shadow down to 15. Report after 1,250 s: 88 % of real time; run average aot 44 %, hle 14 %, ge 21 % (texture hashing 3.3 %, conversion 0.6 %, GPU wait 7.4 %), present 0 %, idle (pacing sleep) 19 %, ui 2.2 %; 32,966 presents skipped as unchanged. Last 10 s before the crash (the Shadow): speed 33 %, ge 49 %.
