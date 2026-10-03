@@ -22,8 +22,17 @@ constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded
 // Submit the queued frame when the citro3d command buffer (C3D_Init(0x80000))
 // is this full: GPUCMD_Add panics (svcBreak) on overflow. One draw adds a few
 // KiB at most. Measured on hardware: a frame left open across vblanks (no new
-// picture to present) overflowed at the first Shadow with a draw-count rule.
+// picture to present) overflowed at the first Shadow with a draw-count rule,
+// and again with C3D_GetCmdBufUsage(), which is only updated when a frame is
+// submitted (3ds/citro3d/source/base.c). The live fill comes from libctru.
 constexpr float kCmdBufFlushUsage = 0.75f;
+
+float command_buffer_fill() {
+    u32 *buffer = nullptr;
+    u32 size = 0, offset = 0;
+    GPUCMD_GetBuffer(&buffer, &size, &offset);
+    return size != 0u ? static_cast<float>(offset) / static_cast<float>(size) : 0.0f;
+}
 // Orientation, measured in Azahar with test bars drawn both by the GPU and by
 // CPU tiling: a texture's memory rows run bottom-up (memory row k is sampled
 // at t = (h - 1 - k) / h), and NDC y growing with PSP y puts PSP row y where
@@ -498,7 +507,7 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const std::uint32_t stride = r24(regs, 0x9D) & 0x7FCu;
     if (stride == 0u) return;
     begin_frame();
-    if (C3D_GetCmdBufUsage() > kCmdBufFlushUsage) flush_frame();
+    if (command_buffer_fill() > kCmdBufFlushUsage) flush_frame();
     Target *target = target_for(color_address, r24(regs, 0xD2) & 3u, true);
     if (target == nullptr) { ++gpu_stats_.skipped_prims; return; }
     if (bound_ != target || bound_screen_) bind_target(*target);
