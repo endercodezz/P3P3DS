@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clone the upstream reference repositories into references/, psp/ and 3ds/.
+"""Clone the upstream reference repositories into references/, psp/, 3ds/ and p3p/.
 
 These directories are not part of the P3P3DS repository (.gitignore): they are
 other projects' sources, read for research and partly used by tests
@@ -43,6 +43,7 @@ REPOS = {
     "3ds/3ds-examples": "https://github.com/devkitPro/3ds-examples",
     "3ds/picasso": "https://github.com/devkitPro/picasso",
     "3ds/nihstro": "https://github.com/neobrain/nihstro",
+    "p3p/Persona-3-Portable-Mod-Menu": "https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu",
 }
 
 

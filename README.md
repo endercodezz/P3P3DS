@@ -347,7 +347,7 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 
 ## License
 
-The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party projects vendored in this repository (`recomp/`, `p3p/`, `tools/`) keep their own licenses. The research sources in `references/`, `psp/` and `3ds/` are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
+The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party projects vendored in this repository (`recomp/`, `p3p/p3p-patches`, `tools/`) keep their own licenses. The research sources in `references/`, `psp/`, `3ds/` and `p3p/Persona-3-Portable-Mod-Menu` are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
 
 ---
 

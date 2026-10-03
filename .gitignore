@@ -108,3 +108,5 @@ profiles/p3p/input/local/
 /references/
 /psp/
 /3ds/
+# p3p/p3p-patches stays tracked: the build reads its ULUS10512.ini (CWCheat patches)
+/p3p/Persona-3-Portable-Mod-Menu/
