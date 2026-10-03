@@ -53,7 +53,6 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] Main menu and New Game start
 - [x] Name entry, introduction and first controllable section (scripted input)
 - [ ] Complete renderer (filtering, lines, lighting/skinning as the game needs) and movie decoding
-- [x] New Nintendo 3DS homebrew build (`.3dsx`) that boots (1–2 fps)
 - [x] PICA200 (citro3d) renderer: logos, title screen, main menu
 - [x] P3P3DS Builder: ISO -> `.3dsx` on the user's PC (Windows wizard)
 - [x] Runs on a real New 3DS (about 30 fps in the first days)
