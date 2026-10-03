@@ -51,6 +51,14 @@ python .claude/skills/p3p-run-triage/scripts/frames_to_png.py .tmp/frames       
 python .claude/skills/p3p-run-triage/scripts/frames_to_png.py .tmp/frames 3600     # → frame_03600.png
 ```
 
+Many frames at once (needs `--dump-events`; labels each frame with its vblank, picks 24 evenly):
+
+```bash
+python .claude/skills/p3p-run-triage/scripts/contact_sheet.py .tmp/frames .tmp/run.json .tmp/sheet.png [first_vblank] [last_vblank]
+```
+
+Finding an in-game route (menus, map cursor) is iterative: change the input script, rerun, look at the sheet. `scripts/try_route.sh <name> <input> <max dispatches> <from vblank> <frame every> [ms0] [savedata]` does one iteration into `.tmp/route/<name>.png` (rasterization only from shortly before `<from vblank>`). Routes that need the maintainer's own save go to `profiles/p3p/input/local/` (git-ignored: saves are game data). Field cursor: hold a direction 5+ vblanks (2-vblank taps do not move it); menus often need one CROSS to dismiss the prompt before the choices appear.
+
 Then open the PNG with the Read tool. Known milestones: ATLUS logo ≈ frames 70-140, CRIWARE ≈ 150-220, opening movie (black: no H.264 decoder) until ≈ 3240, title "PRESS ANY BUTTON" ≈ 3300-3840, then the attract loop repeats.
 
 Audio: `[AUDIO] buffers= frames= nonzero= peak= late= clipped=`. `late` or `clipped` > 0 is a bug signal. Silence before ≈ 115 s is expected (movie ATRAC3plus has no decoder). Claims that audio "sounds right" stay `[UNVERIFIED]` until a human listens.

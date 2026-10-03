@@ -99,3 +99,6 @@ references/jpcsp/flash0/
 references/jpcsp/testresources/
 references/azahar/externals/open_source_archives/include/
 references/azahar/src/android/gradle/wrapper/gradle-wrapper.jar
+
+# Input routes that need a maintainer save (game data): local only
+profiles/p3p/input/local/

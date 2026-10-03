@@ -46,6 +46,8 @@ bash .claude/skills/p3p3ds-commit/scripts/postcommit_check.sh <head-before>
 | Python text mode | rewrites LF/CRLF on write | `open(p, newline='')` for text, or bytes mode |
 | Mixed CRLF/LF files (e.g. `recomp/PSPRecomp/tools/codegen_main.cpp`) | Edit tool normalizes neighbouring lines: a 6-line change shows as 70 | Re-apply on `git show HEAD:<file>` in bytes mode, using the line ending found next to the anchor (see `precommit_check.sh` EOL warning) |
 | `sed -i` | may rewrite EOLs; regex-special characters in C++ | Edit tool for multi-line or exact replacements |
+
+For scripted multi-file edits use `scripts/patch_text.py` (`patch(path, [(old, new), ...])`): it finds each block whatever its line endings and writes the replacement with the endings found there.
 | `const auto a = x >> 6, b = p[i];` | GCC: inconsistent deduction for `auto` | spell the type (`const std::uint32_t a = ..., b = ...;`) |
 | Self-referencing `std::make_shared<std::function<...>>` | GCC 16 `-Warray-bounds` false positive, leak via cycle | a named recursive helper function taking `std::shared_ptr<State>` |
 
