@@ -373,8 +373,30 @@ void write_report(const std::string &text) {
     }
 }
 
+// The bottom-screen report is overwritten in place: every one of the 30 rows
+// gets exactly 39 characters at an explicit position. Clearing the screen
+// first (\x1b[2J) made it flicker on hardware, and a full row or a newline on
+// the last row would scroll the whole console. Longer lines are cut here; the
+// SD report keeps them whole.
 void show(const std::string &text) {
-    std::printf("\x1b[1;1H\x1b[2J%s", text.c_str());
+    constexpr int kRows = 30, kColumns = 39;
+    std::string out;
+    out.reserve(kRows * (kColumns + 8));
+    std::size_t start = 0;
+    for (int row = 1; row <= kRows; ++row) {
+        std::string line;
+        if (start < text.size()) {
+            const std::size_t end = text.find('\n', start);
+            line = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            start = end == std::string::npos ? text.size() : end + 1;
+        }
+        line.resize(kColumns, ' ');
+        char position[16];
+        std::snprintf(position, sizeof position, "\x1b[%d;1H", row);
+        out += position;
+        out += line;
+    }
+    std::fputs(out.c_str(), stdout);
 }
 
 std::string find_iso() {
@@ -581,13 +603,16 @@ int main() {
                 stats.last_fps_ms = now;
                 g_samples.push_back(time_sample(stats, kernel.threads().now()));
                 if (g_samples.size() > 11u) g_samples.pop_front();
-                const u64 ui_start = svcGetSystemTick();
-                if (!save_menu.active) show(report_text(stats, rt, kernel));
+                // Report every 5 s (bottom screen and SD card): redrawing it each
+                // second cost 8 % of the time in battle on hardware.
                 if (now - stats.last_report_ms >= 5000u) {
-                    write_report(report_text(stats, rt, kernel));
+                    const u64 ui_start = svcGetSystemTick();
+                    const std::string text = report_text(stats, rt, kernel);
+                    if (!save_menu.active) show(text);
+                    write_report(text);
                     stats.last_report_ms = now;
+                    stats.ui_ticks += svcGetSystemTick() - ui_start;
                 }
-                stats.ui_ticks += svcGetSystemTick() - ui_start;
             }
         };
         stage = "run";
