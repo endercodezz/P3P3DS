@@ -102,3 +102,9 @@ references/azahar/src/android/gradle/wrapper/gradle-wrapper.jar
 
 # Input routes that need a maintainer save (game data): local only
 profiles/p3p/input/local/
+
+# Upstream reference sources (other projects): fetched with tools/fetch_references.py,
+# not redistributed here. See docs/REPOSITORIES.md and README "Upstream References & Credits".
+/references/
+/psp/
+/3ds/

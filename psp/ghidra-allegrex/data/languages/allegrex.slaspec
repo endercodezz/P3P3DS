@@ -1,6 +1,0 @@
-@include "allegrex.sinc"
-@include "allegrexInstructions.sinc"
-@include "allegrexFloat.sinc"
-@include "allegrexVfpuBase.sinc"
-@include "allegrexVfpuGenerated.sinc"
-@include "allegrexVfpu.sinc"

@@ -2,6 +2,8 @@
 
 This document contains a structured inventory of all repositories currently integrated into the **P3P3DS** research/development workspace, as well as an evaluation of evaluated and rejected candidate projects.
 
+Since 2026-10-03 the research sources under `references/`, `psp/` and `3ds/` are not tracked in git (`.gitignore`); `python tools/fetch_references.py` clones them (shallow, default branch) into the paths below. `recomp/`, `p3p/` and `tools/` stay vendored: the build uses PSPRecomp and the CWCheat patch list.
+
 ---
 
 ## 1. Active Repositories in Workspace

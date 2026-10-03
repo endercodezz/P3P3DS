@@ -1,3 +1,0 @@
-[submodule "common/ext/zstd"]
-	path = common/ext/zstd
-	url = https://github.com/facebook/zstd.git

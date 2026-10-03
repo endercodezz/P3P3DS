@@ -213,7 +213,7 @@ Modding support and fan translations are first-class architectural requirements:
 
 ```text
 P3P3DS/
-├── 3ds/                 # 3DS platform libraries (libctru, citro3d, citro2d)
+├── 3ds/                 # (not in git) 3DS library sources for reading: libctru, citro3d, picasso
 ├── core/                # Target-agnostic runtime: HLE kernel, VFS, interpreter, GE executor + software renderer
 ├── docs/                # Current state, architecture, verification registry, research notes
 ├── experiments/         # Standalone analyses (decoder audit, CPK checker, microtests)
@@ -222,8 +222,8 @@ P3P3DS/
 │   └── 3ds/             # New 3DS runner (.3dsx), built with devkitARM
 ├── profiles/p3p/        # P3P profile: AOT layout, patches, addresses, game inputs (local only)
 ├── recomp/              # Recompilation engines and tools (PSPRecomp, Yakumo, N64Recomp)
-├── references/          # Reference emulators and hardware autotests (PPSSPP, pspautotests, uOFW)
-├── psp/                 # PSP SDK headers, VFPU documentation, and Ghidra definitions
+├── references/          # (not in git) reference emulators and hardware autotests (PPSSPP, pspautotests, uOFW)
+├── psp/                 # (not in git) PSP SDK, VFPU documentation, Ghidra definitions
 ├── tests/               # CTest suites (HLE contracts, renderer, differential AOT/interpreter)
 └── tools/               # Build helpers and asset tools (CriFsV2Lib, AtlusScriptTools, Amicitia)
 ```
@@ -347,7 +347,7 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 
 ## License
 
-The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party projects vendored in this repository (`recomp/`, `references/`, `psp/`, `3ds/`, `p3p/`, `tools/`) keep their own licenses. Game data is never part of the repository.
+The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party projects vendored in this repository (`recomp/`, `p3p/`, `tools/`) keep their own licenses. The research sources in `references/`, `psp/` and `3ds/` are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
 
 ---
 
@@ -389,15 +389,41 @@ Donations are completely optional and do not provide additional access, features
 
 ## Upstream References & Credits
 
-- [PSPRecomp](https://github.com/jessicanataliagta/PSPRecomp) by Jessica Natalia — C++20 static recompilation framework.
+P3P3DS stands on many open projects. Full inventory with licences and how each is used: [`docs/REPOSITORIES.md`](docs/REPOSITORIES.md). Code is never copied from GPL emulators; they are read as behaviour references.
+
+**Static recompilation**
+
+- [PSPRecomp](https://github.com/jessicanataliagta/PSPRecomp) by Jessica Natalia — C++20 static recompilation framework (vendored in `recomp/PSPRecomp`, with small P3P3DS patches).
 - [Yakumo](https://github.com/TeamGDB/Yakumo) by TeamGDB — Static recompilation port of *Monster Hunter Portable 3rd HD Ver.*
+- [PSP-recompilation-project](https://github.com/sal063/PSP-recompilation-project) by sal063, [psprecomp](https://github.com/sp00nznet/psprecomp) by sp00nznet, [psprecomp](https://github.com/wizardengineer/psprecomp) by wizardengineer — other PSP static recompilers, design comparison.
+
+**PSP behaviour and hardware**
+
 - [PPSSPP](https://github.com/hrydgard/ppsspp) by Henrik Rydgård & contributors — PSP emulation ground truth and HLE reference.
-- [pspautotests](https://github.com/hrydgard/pspautotests) — Hardware behavioral test suite.
+- [pspautotests](https://github.com/hrydgard/pspautotests) — Hardware behavioral test suite (the HLE tests replay its expected outputs).
+- [uOFW](https://github.com/uofw/uofw) — Reverse-engineered PSP firmware modules (kernel, ThreadMan, IoFileMgr, audio).
+- [PSPSDK](https://github.com/pspdev/pspsdk), [vfpu-docs](https://github.com/pspdev/vfpu-docs), [prxtool](https://github.com/pspdev/prxtool), [psp-ghidra-scripts](https://github.com/pspdev/psp-ghidra-scripts) by pspdev — SDK headers and GE command list, VFPU documentation, PRX and NID tooling.
+- [ghidra-allegrex](https://github.com/kotcrab/ghidra-allegrex) by kotcrab — Allegrex/VFPU processor module for Ghidra.
+- [JPCSP](https://github.com/jpcsp/jpcsp) — Independent PSP emulator, second behaviour reference.
+
+**Nintendo 3DS**
+
+- [libctru](https://github.com/devkitPro/libctru), [citro3d](https://github.com/devkitPro/citro3d), [citro2d](https://github.com/devkitPro/citro2d), [3ds-examples](https://github.com/devkitPro/3ds-examples) and [picasso](https://github.com/devkitPro/picasso) by devkitPro — 3DS homebrew SDK, GPU library, samples and the PICA200 shader assembler.
+- [nihstro](https://github.com/neobrain/nihstro) by neobrain — PICA200 shader assembler/disassembler, encoding cross-check.
+- [Azahar](https://github.com/azahar-emu/azahar) — 3DS emulator used for testing builds.
 - [DaedalusX64-3DS](https://github.com/MasterFeizz/DaedalusX64-3DS) by MasterFeizz — Battle-tested Citro3D rendering and NDSP audio pipeline for MIPS on 3DS.
-- [libctru](https://github.com/devkitPro/libctru) & [citro3d](https://github.com/devkitPro/citro3d) by devkitPro — Nintendo 3DS homebrew SDK and GPU libraries.
+- [GLASS](https://github.com/kynex7510/GLASS) by kynex7510 — OpenGL ES 2 layer over the PICA200, platform research.
+
+**Persona 3 Portable and modding**
+
 - [zarroboogs](https://github.com/zarroboogs/p3p-patches) & [DniweTamp](https://github.com/DniweTamp/Persona-3-Portable-Mod-Menu) — P3P community patches and reverse engineering research.
+- [Atlus-Script-Tools](https://github.com/tge-was-taken/Atlus-Script-Tools), [Amicitia](https://github.com/tge-was-taken/Amicitia) and [AtlusFileSystemLibrary](https://github.com/tge-was-taken/AtlusFileSystemLibrary) by TGE, [AemulusModManager](https://github.com/TekkaGB/AemulusModManager) by TekkaGB, [CriFsV2Lib](https://github.com/Sewer56/CriFsV2Lib) by Sewer56, [CriPakTools](https://github.com/esperknight/CriPakTools) by esperknight — Atlus script, archive and CPK tools.
+- [Persona 3 Dual](https://github.com/p3d-project/persona-3-dual) by the p3d-project team — Nintendo dual-screen Persona UI/presentation and constrained handheld-rendering reference.
+
+**Other static recompilation and runtime references**
+
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev — Xbox 360 PPC-to-C++ static recompilation architecture/analysis reference.
 - [ReXGlue](https://github.com/rexglue/rexglue-sdk) by Tom Clay & contributors — Xbox 360 AOT runtime and Xenia-derived platform architecture reference.
 - [Xenia](https://github.com/xenia-project/xenia) by Ben Vanik & contributors — Kernel, memory, and GPU architecture reference for Xbox recomp ecosystem.
 - [N64Recomp](https://github.com/N64Recomp/N64Recomp) by Mr-Wiseguy & contributors — MIPS static recompilation, indirect calls, relocations and jump-table reference.
-- [Persona 3 Dual](https://github.com/p3d-project/persona-3-dual) by the p3d-project team — Nintendo dual-screen Persona UI/presentation and constrained handheld-rendering reference.
+- [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), [Zelda64Recomp](https://github.com/Zelda64Recomp/Zelda64Recomp) and [UnleashedRecomp](https://github.com/hedge-dev/UnleashedRecomp) — runtimes and complete recompiled games.

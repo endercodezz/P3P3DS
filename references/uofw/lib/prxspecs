@@ -1,2 +1,0 @@
-*startfile:
-crt0_prx%O%s crti%O%s crtbegin%O%s

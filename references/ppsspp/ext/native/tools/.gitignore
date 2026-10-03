@@ -1,9 +1,0 @@
-Release
-Debug
-build
-*.VC*
-Makefile
-CMakeFiles
-CMakeCache.txt
-cmake_install.cmake
-png17/

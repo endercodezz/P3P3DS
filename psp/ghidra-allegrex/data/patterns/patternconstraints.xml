@@ -1,5 +1,0 @@
-<patternconstraints>
-    <language id="Allegrex:LE:*:*">
-        <patternfile>Allegrex_patterns.xml</patternfile>
-    </language>
-</patternconstraints>

@@ -350,5 +350,6 @@ add_test(NAME p3p_input COMMAND test_input)
 add_executable(p3p_autotest platform/pc/autotest.cpp)
 target_link_libraries(p3p_autotest PRIVATE p3p3ds_core)
 add_test(NAME p3p_autotest_baseline COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_autotests.py" --exe $<TARGET_FILE:p3p_autotest>)
+set_tests_properties(p3p_autotest_baseline PROPERTIES SKIP_RETURN_CODE 77) # without references/pspautotests
 add_test(NAME p3p_skills_mirror COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/sync_agent_skills.py" --check)
 set_tests_properties(p3p_sascore PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

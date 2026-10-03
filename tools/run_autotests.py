@@ -62,8 +62,9 @@ def main():
     args = ap.parse_args()
     prxs = sorted({p for pat in args.patterns for p in glob.glob(os.path.join(TESTS, pat))})
     if not prxs:
-        print("no test programs found")
-        return 1
+        # references/ is not in the repository: tools/fetch_references.py pspautotests
+        print("SKIP: no test programs found under references/pspautotests (tools/fetch_references.py)")
+        return 77
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         results = dict(pool.map(lambda p: run(args.exe, p), prxs))
     baseline = load_baseline()

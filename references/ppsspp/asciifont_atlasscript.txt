@@ -1,2 +1,0 @@
-2048
-font UBUNTU24 assets/Roboto_Condensed-Regular.ttf UWERS 34 -2
