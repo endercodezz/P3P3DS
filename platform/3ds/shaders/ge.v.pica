@@ -1,33 +1,243 @@
 ; P3P3DS GE vertex shader (PICA200).
-; Positions arrive already in PSP screen space as homogeneous coordinates
-; (x*w, y*w, z*w, w) -- the GE transform runs on the CPU in core/src/ge --
-; and `projection` maps screen pixels to PICA clip space (depth range [-1,0]).
-; Texture coordinates arrive in texels; `uvscale` = (1/width, 1/height).
+;
+; Two kinds of vertices (platform/3ds/gpu_renderer.cpp):
+; * screen vertices, transformed on the CPU (through mode, sprites, clear
+;   mode): v0 = (x*w, y*w, z*w, w) in PSP screen pixels, `world` = identity,
+;   `screen` maps screen pixels to the clip space of a 512x512 target;
+; * model vertices of transform-mode triangles: v0 = model position (w = 1),
+;   v1 = normal, v4/v5 = 8 skinning weights. The shader does what the GE does:
+;   bone blending (`skin`), WORLD, VIEW * PROJ * viewport folded into
+;   `screen`, and vertex lighting (`light`, lights `l0`..`l3`).
+; Lighting follows core/src/ge/geometry.cpp light_vertex() (the CPU reference
+; used by the PC renderer): colour = emissive + ma * scene ambient + per light
+; att * spot * (ambient * ma + max(N.L,0)^p * diffuse * md
+; + [N.L >= 0] (N.H)^power * specular * ms), H = normalize(L + (0,0,1)).
+; Light constants prepared on the CPU: directional lights have point = 0 and
+; attenuation (1,0,0); lights without a cone have cutoff -2, exponent 0;
+; lights without specular have a zero specular colour; p = specular power for
+; powered diffuse, else 1. Colours are 0..1, alpha only in emissive (0),
+; material ambient and scene ambient.
+; Texture coordinates: uv * uvxf.xy + uvxf.zw (normalised for the PICA).
 ; Colours arrive as unsigned bytes (0..255).
 
-.fvec projection[4]
-.fvec uvscale
+.fvec screen[4]
+.fvec world[3]
+.fvec bones[24]          ; 8 bones x 3 rows (row j = component j of the 4x3 matrix)
+.fvec uvxf
+.fvec emissive, matamb, matdif, matspe, sceneamb
+.fvec matsel             ; x/y/z: ambient/diffuse/specular from the vertex colour (0/1), w: normal sign
+.fvec misc               ; x: specular power
+.fvec lpos[4]            ; position (point, spot) or direction to the light (directional)
+.fvec ldir[4]            ; spot axis, normalised
+.fvec latt[4]            ; constant, linear, quadratic attenuation
+.fvec lspot[4]           ; x exponent, y cutoff, z point flag (0 directional), w diffuse power
+.fvec lamb[4], ldif[4], lspe[4]
 
-.constf consts(0.00392156862745, 0.0, 1.0, 0.0)
+.bool skin
+.bool light
+.bool l0
+.bool l1
+.bool l2
+.bool l3
+
+.constf consts(0.00392156862745, 0.0, 1.0, 0.0000001)
 .alias  inv255 consts.xxxx
+.alias  zeros  consts.yyyy
+.alias  ones   consts.zzzz
+.alias  tiny   consts.wwww
+.constf idx(0.0, 1.0, 2.0, 3.0)
 
 .out outpos position
 .out outtc0 texcoord0
 .out outclr color
 
 .alias inpos v0
-.alias intc  v1
-.alias inclr v2
+.alias innrm v1
+.alias intc  v2
+.alias inclr v3
+.alias inw0  v4
+.alias inw1  v5
+
+; r0 position, r1 normal (model space, then skinned)
+; r2 world position (w = 1, or the CPU's w for screen vertices)
+; r3 vertex colour (0..1); r4 world normal; r5..r7 materials; r8 colour sum
+; r9 specular sum; r10..r15 scratch
 
 .proc main
-	dp4 outpos.x, projection[0], inpos
-	dp4 outpos.y, projection[1], inpos
-	dp4 outpos.z, projection[2], inpos
-	dp4 outpos.w, projection[3], inpos
+	mov r0, inpos
+	mov r1.xyz, innrm
+	mov r1.w, zeros
 
-	mul outtc0, uvscale, intc
+	ifu skin
+		call do_skin
+	.end
 
-	mul outclr, inv255, inclr
+	dp4 r2.x, world[0], r0
+	dp4 r2.y, world[1], r0
+	dp4 r2.z, world[2], r0
+	mov r2.w, r0.w
 
+	dp4 outpos.x, screen[0], r2
+	dp4 outpos.y, screen[1], r2
+	dp4 outpos.z, screen[2], r2
+	dp4 outpos.w, screen[3], r2
+
+	mul r10.xy, uvxf.xy, intc.xy
+	add r10.xy, uvxf.zw, r10.xy
+	mov r10.zw, zeros
+	mov outtc0, r10
+
+	mul r3, inv255, inclr
+	ifu light
+		call do_light
+	.end
+	max r3, zeros, r3
+	min r3, ones, r3
+	mov outclr, r3
 	end
+.end
+
+; Blended bone matrix rows in r10..r12, then position and normal.
+.proc do_skin
+	mul r10, bones[0], inw0.xxxx
+	mul r11, bones[1], inw0.xxxx
+	mul r12, bones[2], inw0.xxxx
+	mad r10, inw0.yyyy, bones[3], r10
+	mad r11, inw0.yyyy, bones[4], r11
+	mad r12, inw0.yyyy, bones[5], r12
+	mad r10, inw0.zzzz, bones[6], r10
+	mad r11, inw0.zzzz, bones[7], r11
+	mad r12, inw0.zzzz, bones[8], r12
+	mad r10, inw0.wwww, bones[9], r10
+	mad r11, inw0.wwww, bones[10], r11
+	mad r12, inw0.wwww, bones[11], r12
+	mad r10, inw1.xxxx, bones[12], r10
+	mad r11, inw1.xxxx, bones[13], r11
+	mad r12, inw1.xxxx, bones[14], r12
+	mad r10, inw1.yyyy, bones[15], r10
+	mad r11, inw1.yyyy, bones[16], r11
+	mad r12, inw1.yyyy, bones[17], r12
+	mad r10, inw1.zzzz, bones[18], r10
+	mad r11, inw1.zzzz, bones[19], r11
+	mad r12, inw1.zzzz, bones[20], r12
+	mad r10, inw1.wwww, bones[21], r10
+	mad r11, inw1.wwww, bones[22], r11
+	mad r12, inw1.wwww, bones[23], r12
+	dp4 r13.x, r10, r0
+	dp4 r13.y, r11, r0
+	dp4 r13.z, r12, r0
+	dp3 r14.x, r10, r1
+	dp3 r14.y, r11, r1
+	dp3 r14.z, r12, r1
+	mov r0.xyz, r13.xyz
+	mov r0.w, ones
+	mov r1.xyz, r14.xyz
+	mov r1.w, zeros
+.end
+
+.proc do_light
+	; world normal, flipped by NORMAL_REVERSE, normalised
+	dp3 r4.x, world[0], r1
+	dp3 r4.y, world[1], r1
+	dp3 r4.z, world[2], r1
+	mov r4.w, zeros
+	mul r4, matsel.wwww, r4
+	dp3 r10, r4, r4
+	max r10, tiny, r10
+	rsq r10, r10
+	mul r4, r4, r10
+
+	; materials: m = material + sel * (vertex colour - material)
+	add r5, -matamb, r3
+	mul r5, matsel.xxxx, r5
+	add r5, matamb, r5
+	add r6, -matdif, r3
+	mul r6, matsel.yyyy, r6
+	add r6, matdif, r6
+	add r7, -matspe, r3
+	mul r7, matsel.zzzz, r7
+	add r7, matspe, r7
+
+	; emissive + ma * scene ambient (alpha: ma.a * scene.a)
+	mul r8, sceneamb, r5
+	add r8, emissive, r8
+	mov r9, zeros
+
+	ifu l0
+		mova a0.x, idx.xxxx
+		call one_light
+	.end
+	ifu l1
+		mova a0.x, idx.yyyy
+		call one_light
+	.end
+	ifu l2
+		mova a0.x, idx.zzzz
+		call one_light
+	.end
+	ifu l3
+		mova a0.x, idx.wwww
+		call one_light
+	.end
+
+	add r3, r8, r9
+.end
+
+; Light a0.x: adds to r8 (ambient + diffuse) and r9 (specular).
+.proc one_light
+	; L = position - world position * point; d = |L|; L normalised
+	mul r10, lspot[a0.x].zzzz, r2
+	add r10, lpos[a0.x], -r10
+	mov r10.w, zeros
+	dp3 r11, r10, r10
+	max r11, tiny, r11
+	rsq r12, r11
+	mul r10, r10, r12
+	; attenuation 1 / (a + b d + c d^2), clamped to [0, 1]
+	mul r13.y, r11.x, r12.x
+	mov r13.x, ones
+	mov r13.z, r11.x
+	mov r13.w, zeros
+	dp3 r14, latt[a0.x], r13
+	max r14, tiny, r14
+	rcp r14, r14
+	min r14, ones, r14
+	; spot: cos = axis . L; factor = [cos >= cutoff] * cos^exponent
+	dp3 r15, ldir[a0.x], r10
+	mov r13, lspot[a0.x]
+	sge r11, r15, r13.yyyy
+	max r15, tiny, r15
+	lg2 r15, r15
+	mul r15, r13.xxxx, r15
+	ex2 r15, r15
+	mul r15, r11, r15
+	mul r14, r14, r15
+	; ambient: att * ambient * ma
+	mul r11, lamb[a0.x], r14
+	mad r8, r11, r5, r8
+	; diffuse: att * max(N.L, 0)^p * diffuse * md
+	dp3 r12, r4, r10
+	max r15, tiny, r12
+	lg2 r15, r15
+	mul r15, r13.wwww, r15
+	ex2 r15, r15
+	mul r15, r15, r14
+	mul r11, ldif[a0.x], r15
+	mad r8, r11, r6, r8
+	; specular (when N.L >= 0): att * (N.H)^power * specular * ms
+	sge r13, r12, zeros
+	add r10.z, ones, r10.z
+	dp3 r11, r10, r10
+	max r11, tiny, r11
+	rsq r11, r11
+	mul r10, r10, r11
+	dp3 r15, r4, r10
+	max r15, tiny, r15
+	lg2 r15, r15
+	mul r15, misc.xxxx, r15
+	ex2 r15, r15
+	mul r15, r15, r13
+	mul r15, r15, r14
+	mul r11, lspe[a0.x], r15
+	mad r9, r11, r7, r9
 .end

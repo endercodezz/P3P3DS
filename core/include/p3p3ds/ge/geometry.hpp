@@ -34,8 +34,47 @@ struct TextureInfo {
 [[nodiscard]] bool draw_is_textured(const GeRegisters &regs, const VertexLayout &layout);
 [[nodiscard]] TextureInfo texture_info(const GeRegisters &regs);
 
-// Decodes `count` vertices (indexed when VTYPE says so) and maps them to
-// screen space. `out` is resized to `count`.
+// One vertex as stored (morph targets already blended): model-space position
+// and normal (s8/s16 scaled to [-1, 1) in transform mode, raw in through
+// mode), UV (texels in through mode, else normalised), colour (the material
+// ambient colour when the vertex has none) and skinning weights.
+struct ModelVertex {
+    float pos[3]{}, normal[3]{}, uv[2]{}, weights[8]{};
+    Rgba color{255, 255, 255, 255};
+    bool has_color{};
+};
+
+// Vertex `index` of the buffer at `vertex_address`; false outside guest memory.
+bool decode_model_vertex(psprecomp::GuestMemory &memory, const GeRegisters &regs, const VertexLayout &layout,
+                         std::uint32_t vertex_address, std::uint32_t index, ModelVertex &out);
+// i-th index of an indexed draw (i itself when VTYPE has no index buffer).
+[[nodiscard]] std::uint32_t vertex_index(psprecomp::GuestMemory &memory, const VertexLayout &layout,
+                                         std::uint32_t index_address, std::uint32_t i);
+// Bone-weighted position and normal (the model ones when VTYPE has no weights).
+void skin_vertex(const GeRegisters &regs, const VertexLayout &layout, const ModelVertex &v, float pos[3], float normal[3]);
+
+// GE lighting parameters of a draw (LIGHTING_ENABLE 0x17 .. light colours 0x9A).
+struct LightingSetup {
+    struct Light {
+        bool enabled{};
+        std::uint32_t kind{};       // 0 directional, 1 point, 2 spot
+        std::uint32_t components{}; // 0 diffuse, 1 diffuse + specular, 2 powered diffuse
+        float position[3]{}, direction[3]{}, attenuation[3]{};
+        float spot_exponent{}, spot_cutoff{};
+        std::array<float, 4> ambient{}, diffuse{}, specular{};
+    };
+    bool enabled{};
+    bool vertex_ambient{}, vertex_diffuse{}, vertex_specular{}, reverse_normals{};
+    std::array<float, 4> emissive{}, material_ambient{}, material_diffuse{}, material_specular{}, scene_ambient{};
+    float specular_power{};
+    std::array<Light, 4> lights{};
+};
+[[nodiscard]] LightingSetup lighting_setup(const GeRegisters &regs, const VertexLayout &layout);
+// Lit colour of a vertex from its world-space position and normal.
+[[nodiscard]] Rgba light_vertex(const LightingSetup &s, const float pos[3], const float normal[3], const Rgba &vertex_color);
+
+// Decodes `count` vertices (indexed when VTYPE says so), skins, lights and
+// maps them to screen space. `out` is resized to `count`.
 void decode_screen_vertices(psprecomp::GuestMemory &memory, const GeRegisters &regs, std::uint32_t count,
                             std::uint32_t vertex_address, std::uint32_t index_address, std::vector<ScreenVertex> &out);
 

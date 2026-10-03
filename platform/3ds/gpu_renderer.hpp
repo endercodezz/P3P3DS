@@ -3,12 +3,16 @@
 // VRAM render targets, one per PSP framebuffer address, and the displayed
 // framebuffer is scaled to the top screen by the GPU.
 //
-// Shared with SoftwareRenderer: vertex decode/transform and texel decoding
-// (core/src/ge/geometry.cpp). Known differences (phase 1, see
-// docs/3DS_PLATFORM.md section 4.4): GPU-drawn pixels are not written back to
-// guest EDRAM (CPU readback sees stale data), points/lines are not drawn,
-// lighting/fog are not applied, render-to-texture only for a texture that
-// starts exactly at a render target, colour masks are per channel.
+// Transform-mode triangles go to the PICA200 vertex shader as model vertices
+// (shaders/ge.v.pica: skinning, world/view/projection, lighting); through
+// mode, sprites and clear mode are transformed on the CPU (screen vertices).
+// Shared with SoftwareRenderer: vertex decoding, the CPU transform/lighting
+// reference and texel decoding (core/src/ge/geometry.cpp). Known differences
+// (see docs/3DS_PLATFORM.md section 4.4): GPU-drawn pixels are not written
+// back to guest EDRAM (CPU readback sees stale data), points/lines are not
+// drawn, fog is not applied, flat shading of transformed triangles is smooth,
+// render-to-texture only for a texture that starts exactly at a render
+// target, colour masks are per channel.
 #include "p3p3ds/ge/geometry.hpp"
 #include "p3p3ds/ge/renderer.hpp"
 #include "p3p3ds/hle/display.hpp"
@@ -25,6 +29,7 @@ struct GpuStats {
     std::uint64_t draws{}, triangles{}, skipped_prims{}, texture_uploads{}, texture_hits{}, texture_bytes{};
     std::uint64_t target_textures{}, cpu_presents{}, gpu_presents{}, cpu_to_target{}, frame_flushes{};
     std::uint64_t skipped_presents{}; // nothing new to show: no GPU frame, no buffer swap
+    std::uint64_t model_draws{}, model_vertices{}; // transform-mode draws done by the vertex shader
     // CPU time (ARM11 system ticks) spent hashing texture data, converting
     // textures to PICA layout, and waiting in C3D_FrameBegin for the GPU.
     std::uint64_t hash_ticks{}, upload_ticks{}, wait_ticks{};
@@ -56,11 +61,22 @@ public:
     [[nodiscard]] bool last_present_from_cpu() const { return last_present_cpu_; }
 
 private:
+    // Screen vertex (CPU-transformed): v0 (x*w, y*w, z*w, w), v2 texels, v3 colour.
     struct Vertex {
         float x, y, z, w;
         float u, v;
         std::uint8_t r, g, b, a;
     };
+    // Model vertex for the GPU transform: v0 position, v1 normal, v2 UV,
+    // v3 colour, v4/v5 skinning weights (only in the skinned layout).
+    struct ShaderVertex {
+        float x, y, z;
+        float nx, ny, nz;
+        float u, v;
+        std::uint8_t r, g, b, a;
+        float w[8];
+    };
+    enum class Layout { Screen, Model, Skinned };
     struct Target {
         std::uint32_t address{}, format{};
         C3D_Tex tex{};
@@ -85,13 +101,35 @@ private:
     const C3D_Tex *bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v);
     void apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode);
     Vertex *alloc_vertices(std::uint32_t count);
+    void *alloc_linear(std::uint32_t bytes);
+    void use_buffer(Layout layout, const void *data);
+    void set_uniform(int loc, float x, float y, float z, float w);
+    void set_matrix(int loc, const C3D_Mtx &m);
+    void set_bool(int loc, bool value);
+    void use_screen_vertices(float scale_u, float scale_v);
+    bool draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout, ge::Prim prim,
+                    std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address, bool textured,
+                    float scale_u, float scale_v);
     void evict_textures(std::uint32_t needed);
 
     ge::DrawStats draw_stats_;
     GpuStats gpu_stats_;
     shaderProgram_s program_{};
     DVLB_s *dvlb_{};
-    int loc_projection_{-1}, loc_uvscale_{-1};
+    struct Uniforms {
+        int screen{-1}, world{-1}, bones{-1}, uvxf{-1}, emissive{-1}, matamb{-1}, matdif{-1}, matspe{-1}, sceneamb{-1};
+        int matsel{-1}, misc{-1}, lpos{-1}, ldir{-1}, latt{-1}, lspot{-1}, lamb{-1}, ldif{-1}, lspe{-1};
+        int skin{-1}, light{-1}, lights[4]{-1, -1, -1, -1};
+    } u_;
+    // Last values written per float uniform register / bool, so unchanged
+    // uniforms add no GPU commands.
+    float uniform_cache_[96][4]{};
+    bool uniform_known_[96]{};
+    int bool_cache_[16]{};
+    C3D_AttrInfo attr_[3]{};
+    Layout attr_bound_{Layout::Screen};
+    bool attr_valid_{};
+    bool cpu_vertices_{}; // sdmc:/p3p3ds/cpu_vertices.txt: every draw through the CPU transform
     C3D_RenderTarget *top_{};
     void *shared_depth_{};
     C3D_Tex fallback_{}; // CPU-converted guest framebuffer (512x512 RGBA8, linear memory)
@@ -101,8 +139,10 @@ private:
     std::unordered_map<std::uint64_t, CachedTexture> textures_;
     std::vector<C3D_Tex> deferred_free_;
     std::uint32_t texture_bytes_{};
-    Vertex *vbuf_{};
-    std::uint32_t vbuf_used_{};
+    std::uint8_t *arena_{};       // linear memory for vertices and indices of the open GPU frame
+    std::uint32_t arena_used_{};
+    std::vector<ge::ModelVertex> model_;
+    std::uint32_t last_alloc_{}; // offset of the latest allocation (unused tail can be returned)
     bool in_frame_{};
     std::uint64_t frame_{1}, seq_{};
     std::vector<ge::ScreenVertex> screen_;

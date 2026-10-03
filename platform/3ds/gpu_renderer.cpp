@@ -10,6 +10,9 @@
 #include "psprecomp/guest_memory.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdio>
 #include <cstring>
 
 namespace p3p3ds::n3ds {
@@ -17,7 +20,7 @@ namespace {
 
 constexpr std::uint32_t kTargetSize = 512;          // PSP framebuffers: stride <= 512, 272 rows
 constexpr std::uint32_t kMaxTargets = 4;            // 1 MiB of VRAM each
-constexpr std::uint32_t kVertexBytes = 1u << 20;    // per GPU frame
+constexpr std::uint32_t kVertexBytes = 1u << 20;    // vertices and indices per GPU frame
 constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded textures
 // Submit the queued frame when the citro3d command buffer (C3D_Init(0x80000))
 // is this full: GPUCMD_Add panics (svcBreak) on overflow. One draw adds a few
@@ -103,6 +106,25 @@ C3D_Mtx target_projection() {
     return m;
 }
 
+// Row-major 4x4 product a * b.
+C3D_Mtx multiply(const C3D_Mtx &a, const C3D_Mtx &b) {
+    C3D_Mtx m;
+    Mtx_Multiply(&m, &a, &b);
+    return m;
+}
+
+// Rows of a GE 4x3 matrix (four columns of three floats: x' = x*m0 + y*m3 +
+// z*m6 + m9) as a 4x4 matrix with the row (0, 0, 0, 1).
+C3D_Mtx ge_matrix43(const float *m) {
+    C3D_Mtx r;
+    Mtx_Zeros(&r);
+    for (int j = 0; j < 3; ++j) {
+        r.r[j].x = m[j]; r.r[j].y = m[3 + j]; r.r[j].z = m[6 + j]; r.r[j].w = m[9 + j];
+    }
+    r.r[3].w = 1.0f;
+    return r;
+}
+
 C3D_Mtx screen_projection() {
     // Top screen, 400x240 with y down (rotated framebuffer), z = 0.5 -> -0.5.
     C3D_Mtx m;
@@ -121,19 +143,54 @@ GpuRenderer::GpuRenderer() {
     shaderProgramInit(&program_);
     shaderProgramSetVsh(&program_, &dvlb_->DVLE[0]);
     C3D_BindProgram(&program_);
-    loc_projection_ = shaderInstanceGetUniformLocation(program_.vertexShader, "projection");
-    loc_uvscale_ = shaderInstanceGetUniformLocation(program_.vertexShader, "uvscale");
+    auto loc = [this](const char *name) { return shaderInstanceGetUniformLocation(program_.vertexShader, name); };
+    u_.screen = loc("screen"); u_.world = loc("world"); u_.bones = loc("bones"); u_.uvxf = loc("uvxf");
+    u_.emissive = loc("emissive"); u_.matamb = loc("matamb"); u_.matdif = loc("matdif"); u_.matspe = loc("matspe");
+    u_.sceneamb = loc("sceneamb"); u_.matsel = loc("matsel"); u_.misc = loc("misc");
+    u_.lpos = loc("lpos"); u_.ldir = loc("ldir"); u_.latt = loc("latt"); u_.lspot = loc("lspot");
+    u_.lamb = loc("lamb"); u_.ldif = loc("ldif"); u_.lspe = loc("lspe");
+    u_.skin = loc("skin"); u_.light = loc("light");
+    for (int i = 0; i < 4; ++i) {
+        char name[4] = {'l', static_cast<char>('0' + i), 0, 0};
+        u_.lights[i] = loc(name);
+    }
+    for (auto &b : bool_cache_) b = -1;
 
-    C3D_AttrInfo *attr = C3D_GetAttrInfo();
-    AttrInfo_Init(attr);
-    AttrInfo_AddLoader(attr, 0, GPU_FLOAT, 4);         // v0 position (x*w, y*w, z*w, w)
-    AttrInfo_AddLoader(attr, 1, GPU_FLOAT, 2);         // v1 texcoord (texels)
-    AttrInfo_AddLoader(attr, 2, GPU_UNSIGNED_BYTE, 4); // v2 colour
+    // Attribute layouts (shader inputs v0..v5). Inputs a layout lacks are
+    // fixed zero attributes; the shader only reads them when skinning or
+    // lighting is on, which only the model layouts do.
+    {
+        C3D_AttrInfo &a = attr_[0]; // screen
+        AttrInfo_Init(&a);
+        AttrInfo_AddLoader(&a, 0, GPU_FLOAT, 4);         // v0 (x*w, y*w, z*w, w)
+        AttrInfo_AddLoader(&a, 2, GPU_FLOAT, 2);         // v2 texels
+        AttrInfo_AddLoader(&a, 3, GPU_UNSIGNED_BYTE, 4); // v3 colour
+        AttrInfo_AddFixed(&a, 1);
+        AttrInfo_AddFixed(&a, 4);
+        AttrInfo_AddFixed(&a, 5);
+    }
+    for (int k = 1; k < 3; ++k) {
+        C3D_AttrInfo &a = attr_[k]; // model, skinned model
+        AttrInfo_Init(&a);
+        AttrInfo_AddLoader(&a, 0, GPU_FLOAT, 3);         // v0 position (w = 1)
+        AttrInfo_AddLoader(&a, 1, GPU_FLOAT, 3);         // v1 normal
+        AttrInfo_AddLoader(&a, 2, GPU_FLOAT, 2);         // v2 UV
+        AttrInfo_AddLoader(&a, 3, GPU_UNSIGNED_BYTE, 4); // v3 colour
+        if (k == 2) {
+            AttrInfo_AddLoader(&a, 4, GPU_FLOAT, 4);     // v4 weights 0-3
+            AttrInfo_AddLoader(&a, 5, GPU_FLOAT, 4);     // v5 weights 4-7
+        } else {
+            AttrInfo_AddFixed(&a, 4);
+            AttrInfo_AddFixed(&a, 5);
+        }
+    }
+    for (int reg : {1, 4, 5}) {
+        C3D_FVec *f = C3D_FixedAttribGetWritePtr(reg);
+        f->x = f->y = f->z = f->w = 0.0f;
+    }
 
-    vbuf_ = static_cast<Vertex *>(linearAlloc(kVertexBytes));
-    C3D_BufInfo *buf = C3D_GetBufInfo();
-    BufInfo_Init(buf);
-    BufInfo_Add(buf, vbuf_, sizeof(Vertex), 3, 0x210);
+    arena_ = static_cast<std::uint8_t *>(linearAlloc(kVertexBytes));
+    if (FILE *f = std::fopen("sdmc:/p3p3ds/cpu_vertices.txt", "r")) { cpu_vertices_ = true; std::fclose(f); }
 
     for (int i = 1; i < 6; ++i) C3D_TexEnvInit(C3D_GetTexEnv(i));
     shared_depth_ = vramAlloc(C3D_CalcDepthBufSize(kTargetSize, kTargetSize, GPU_RB_DEPTH24_STENCIL8));
@@ -148,7 +205,7 @@ GpuRenderer::~GpuRenderer() {
     for (auto &t : targets_) { C3D_RenderTargetDelete(t.rt); C3D_TexDelete(&t.tex); }
     C3D_TexDelete(&fallback_);
     if (shared_depth_) vramFree(shared_depth_);
-    linearFree(vbuf_);
+    linearFree(arena_);
     C3D_RenderTargetDelete(top_);
     shaderProgramFree(&program_);
     DVLB_Free(dvlb_);
@@ -161,7 +218,8 @@ void GpuRenderer::begin_frame() {
     C3D_FrameBegin(0); // waits until the GPU finished the previous frame
     gpu_stats_.wait_ticks += svcGetSystemTick() - start;
     in_frame_ = true;
-    vbuf_used_ = 0;
+    arena_used_ = 0;
+    last_alloc_ = 0;
     bound_ = nullptr;
     bound_screen_ = false;
     for (auto &t : deferred_free_) C3D_TexDelete(&t);
@@ -173,7 +231,7 @@ void GpuRenderer::begin_frame() {
 // they are written (C3D_TexFlush), so only this frame's vertices need it;
 // GX_CMDLIST_FLUSH makes citro3d flush just the command list.
 void GpuRenderer::end_frame() {
-    if (vbuf_used_ != 0u) GSPGPU_FlushDataCache(vbuf_, vbuf_used_ * sizeof(Vertex));
+    if (arena_used_ != 0u) GSPGPU_FlushDataCache(arena_, arena_used_);
     C3D_FrameEnd(GX_CMDLIST_FLUSH);
     in_frame_ = false;
 }
@@ -188,12 +246,66 @@ void GpuRenderer::flush_frame() {
     if (keep) bind_target(*keep);
 }
 
+// Vertices and indices of the open GPU frame (16-byte aligned); a full arena
+// submits the frame first (the GPU must finish reading it before reuse).
+void *GpuRenderer::alloc_linear(std::uint32_t bytes) {
+    bytes = (bytes + 15u) & ~15u;
+    if (bytes > kVertexBytes) return nullptr;
+    if (arena_used_ + bytes > kVertexBytes) flush_frame();
+    last_alloc_ = arena_used_;
+    void *p = arena_ + arena_used_;
+    arena_used_ += bytes;
+    return p;
+}
+
 GpuRenderer::Vertex *GpuRenderer::alloc_vertices(std::uint32_t count) {
-    if ((vbuf_used_ + count) * sizeof(Vertex) > kVertexBytes) flush_frame();
-    if (count * sizeof(Vertex) > kVertexBytes) return nullptr;
-    Vertex *v = vbuf_ + vbuf_used_;
-    vbuf_used_ += count;
-    return v;
+    return static_cast<Vertex *>(alloc_linear(count * static_cast<std::uint32_t>(sizeof(Vertex))));
+}
+
+void GpuRenderer::use_buffer(Layout layout, const void *data) {
+    const int k = static_cast<int>(layout);
+    if (!attr_valid_ || attr_bound_ != layout) {
+        C3D_SetAttrInfo(&attr_[k]);
+        attr_bound_ = layout;
+        attr_valid_ = true;
+    }
+    C3D_BufInfo buf;
+    BufInfo_Init(&buf);
+    if (layout == Layout::Screen) BufInfo_Add(&buf, data, sizeof(Vertex), 3, 0x210);
+    else if (layout == Layout::Model) BufInfo_Add(&buf, data, offsetof(ShaderVertex, w), 4, 0x3210);
+    else BufInfo_Add(&buf, data, sizeof(ShaderVertex), 6, 0x543210);
+    C3D_SetBufInfo(&buf);
+}
+
+void GpuRenderer::set_uniform(int loc, float x, float y, float z, float w) {
+    if (loc < 0 || loc >= 96) return;
+    float *c = uniform_cache_[loc];
+    if (uniform_known_[loc] && c[0] == x && c[1] == y && c[2] == z && c[3] == w) return;
+    c[0] = x; c[1] = y; c[2] = z; c[3] = w;
+    uniform_known_[loc] = true;
+    C3D_FVUnifSet(GPU_VERTEX_SHADER, loc, x, y, z, w);
+}
+
+void GpuRenderer::set_matrix(int loc, const C3D_Mtx &m) {
+    for (int i = 0; i < 4; ++i) set_uniform(loc + i, m.r[i].x, m.r[i].y, m.r[i].z, m.r[i].w);
+}
+
+void GpuRenderer::set_bool(int loc, bool value) {
+    const int id = loc - 0x68;
+    if (loc < 0 || id < 0 || id >= 16) return;
+    if (bool_cache_[id] == static_cast<int>(value)) return;
+    bool_cache_[id] = value ? 1 : 0;
+    C3D_BoolUnifSet(GPU_VERTEX_SHADER, loc, value);
+}
+
+// Screen vertices: identity world, no skinning or lighting; UVs in texels.
+void GpuRenderer::use_screen_vertices(float scale_u, float scale_v) {
+    set_uniform(u_.world + 0, 1.0f, 0.0f, 0.0f, 0.0f);
+    set_uniform(u_.world + 1, 0.0f, 1.0f, 0.0f, 0.0f);
+    set_uniform(u_.world + 2, 0.0f, 0.0f, 1.0f, 0.0f);
+    set_uniform(u_.uvxf, scale_u, scale_v, 0.0f, 0.0f);
+    set_bool(u_.skin, false);
+    set_bool(u_.light, false);
 }
 
 GpuRenderer::Target *GpuRenderer::target_for(std::uint32_t address, std::uint32_t format, bool create) {
@@ -227,8 +339,6 @@ void GpuRenderer::note_cpu_write(std::uint32_t address, std::size_t) {
 
 void GpuRenderer::bind_target(Target &t) {
     C3D_FrameDrawOn(t.rt);
-    const C3D_Mtx proj = target_projection();
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, loc_projection_, &proj);
     bound_ = &t;
     bound_screen_ = false;
 }
@@ -261,6 +371,8 @@ void GpuRenderer::upload_guest_framebuffer(psprecomp::GuestMemory &memory, std::
 void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen) {
     Vertex *v = alloc_vertices(6);
     if (v == nullptr) return;
+    set_matrix(u_.screen, to_screen ? screen_projection() : target_projection());
+    use_screen_vertices(1.0f / kTargetSize, 1.0f / kTargetSize);
     const float w = to_screen ? 400.0f : src_w, h = to_screen ? 240.0f : src_h;
     const float z = to_screen ? 0.5f : 0.0f;
     const Vertex q[4] = {{0, 0, z, 1, 0, 0, 255, 255, 255, 255}, {w, 0, z, 1, src_w, 0, 255, 255, 255, 255},
@@ -278,8 +390,8 @@ void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen
     C3D_TexSetFilter(&source, to_screen ? GPU_LINEAR : GPU_NEAREST, to_screen ? GPU_LINEAR : GPU_NEAREST);
     C3D_TexSetWrap(&source, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
     C3D_TexBind(0, &source);
-    C3D_FVUnifSet(GPU_VERTEX_SHADER, loc_uvscale_, 1.0f / kTargetSize, 1.0f / kTargetSize, 0.0f, 0.0f);
-    C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(v - vbuf_), 6);
+    use_buffer(Layout::Screen, v);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
 }
 
 void GpuRenderer::evict_textures(std::uint32_t needed) {
@@ -525,19 +637,26 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const bool clear_mode = (r24(regs, 0xD3) & 1u) != 0u;
     if (clear_mode) ++draw_stats_.clears;
     const bool textured = ge::draw_is_textured(regs, layout);
-    ge::decode_screen_vertices(memory, regs, count, vertex_address, index_address, screen_);
 
     float su = 1.0f, sv = 1.0f;
     const C3D_Tex *tex = textured ? bind_texture(memory, regs, su, sv) : nullptr;
     apply_fragment_state(regs, tex != nullptr, clear_mode);
     if (tex != nullptr) C3D_TexBind(0, const_cast<C3D_Tex *>(tex));
-    C3D_FVUnifSet(GPU_VERTEX_SHADER, loc_uvscale_, su, sv, 0.0f, 0.0f);
     {
         const auto x1 = r24(regs, 0xD4) & 0x3FFu, y1 = (r24(regs, 0xD4) >> 10) & 0x3FFu;
         const auto x2 = r24(regs, 0xD5) & 0x3FFu, y2 = (r24(regs, 0xD5) >> 10) & 0x3FFu;
         if (kTargetYSign > 0.0f) C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, y1, x2 + 1u, y2 + 1u);
         else C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, kTargetSize - 1u - y2, x2 + 1u, kTargetSize - y1);
     }
+
+    // Transform-mode triangles: the vertex shader transforms, skins and lights.
+    if (!layout.through && !clear_mode && prim != ge::Prim::Sprites && !cpu_vertices_ &&
+        draw_model(memory, regs, layout, prim, count, vertex_address, index_address, tex != nullptr, su, sv))
+        return;
+
+    ge::decode_screen_vertices(memory, regs, count, vertex_address, index_address, screen_);
+    set_matrix(u_.screen, target_projection());
+    use_screen_vertices(su, sv);
 
     const bool flat = (r24(regs, 0x50) & 1u) == 0u;
     std::uint32_t emitted = 0;
@@ -592,11 +711,142 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
         for (std::uint32_t i = 1; i + 1 < count; ++i) triangle(v[0], v[i], v[i + 1]);
         break;
     }
-    vbuf_used_ -= capacity - emitted; // return what clipped triangles did not use
+    arena_used_ = last_alloc_ + ((emitted * static_cast<std::uint32_t>(sizeof(Vertex)) + 15u) & ~15u); // return the unused tail
     if (emitted == 0u) return;
-    C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(first - vbuf_), static_cast<int>(emitted));
+    use_buffer(Layout::Screen, first);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, static_cast<int>(emitted));
     ++gpu_stats_.draws;
     gpu_stats_.triangles += emitted / 3u;
+}
+
+// Transform-mode triangles through the vertex shader (shaders/ge.v.pica): the
+// CPU only unpacks the referenced vertices (morph targets blended) and the
+// indices; transform, skinning and lighting run on the PICA200 with the GE
+// matrices and light registers as uniforms. Returns false for a draw it
+// cannot take (the caller then uses the CPU transform).
+bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
+                             ge::Prim prim, std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address,
+                             bool textured, float scale_u, float scale_v) {
+    GPU_Primitive_t primitive;
+    switch (prim) {
+    case ge::Prim::Triangles: primitive = GPU_TRIANGLES; break;
+    case ge::Prim::TriangleStrip: primitive = GPU_TRIANGLE_STRIP; break;
+    case ge::Prim::TriangleFan: primitive = GPU_TRIANGLE_FAN; break;
+    default: return false;
+    }
+    if (count < 3u) return true;
+
+    // Referenced vertex range.
+    std::uint32_t lo = 0, hi = count - 1u;
+    if (layout.index_format != 0u) {
+        lo = ~0u; hi = 0u;
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const auto index = ge::vertex_index(memory, layout, index_address, i);
+            lo = std::min(lo, index);
+            hi = std::max(hi, index);
+        }
+    }
+    const std::uint32_t n = hi - lo + 1u;
+    if (n > 0xFFFFu) return false;
+    const bool skinned = layout.weights != 0u;
+    const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
+    const std::uint32_t vertex_bytes = (n * stride + 15u) & ~15u;
+    const std::uint32_t index_bytes = layout.index_format != 0u ? count * 2u : 0u;
+    auto *block = static_cast<std::uint8_t *>(alloc_linear(vertex_bytes + index_bytes));
+    if (block == nullptr) return false;
+
+    ge::ModelVertex m;
+    ShaderVertex s;
+    for (std::uint32_t k = 0; k < n; ++k) {
+        if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, m)) m = ge::ModelVertex{};
+        s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
+        s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
+        s.u = m.uv[0]; s.v = m.uv[1];
+        s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
+        std::memcpy(s.w, m.weights, sizeof s.w);
+        std::memcpy(block + k * stride, &s, stride);
+    }
+    std::uint16_t *indices = nullptr;
+    if (index_bytes != 0u) {
+        indices = reinterpret_cast<std::uint16_t *>(block + vertex_bytes);
+        for (std::uint32_t i = 0; i < count; ++i)
+            indices[i] = static_cast<std::uint16_t>(ge::vertex_index(memory, layout, index_address, i) - lo);
+    }
+
+    // screen = target projection x viewport x PROJ x VIEW (see the shader
+    // header): the screen mapping of decode_screen_vertices as a matrix.
+    const float vpx = ge::ge_float(r24(regs, 0x42)), vpy = ge::ge_float(r24(regs, 0x43)), vpz = ge::ge_float(r24(regs, 0x44));
+    const float vcx = ge::ge_float(r24(regs, 0x45)), vcy = ge::ge_float(r24(regs, 0x46)), vcz = ge::ge_float(r24(regs, 0x47));
+    const float offx = static_cast<float>(r24(regs, 0x4C) & 0xFFFFu) / 16.0f, offy = static_cast<float>(r24(regs, 0x4D) & 0xFFFFu) / 16.0f;
+    C3D_Mtx a;
+    Mtx_Zeros(&a);
+    a.r[0].x = 2.0f * vpx / kTargetSize; a.r[0].w = 2.0f * (vcx - offx) / kTargetSize - 1.0f;
+    a.r[1].y = kTargetYSign * 2.0f * vpy / kTargetSize; a.r[1].w = kTargetYSign * (2.0f * (vcy - offy) / kTargetSize - 1.0f);
+    a.r[2].z = -vpz / 65535.0f; a.r[2].w = -vcz / 65535.0f;
+    a.r[3].w = 1.0f;
+    C3D_Mtx p;
+    const auto &pr = regs.proj; // column-major: clip.x = e.x*p0 + e.y*p4 + e.z*p8 + p12
+    for (int i = 0; i < 4; ++i) { p.r[i].x = pr[i]; p.r[i].y = pr[4 + i]; p.r[i].z = pr[8 + i]; p.r[i].w = pr[12 + i]; }
+    set_matrix(u_.screen, multiply(a, multiply(p, ge_matrix43(regs.view.data()))));
+    const C3D_Mtx world = ge_matrix43(regs.world.data());
+    for (int i = 0; i < 3; ++i) set_uniform(u_.world + i, world.r[i].x, world.r[i].y, world.r[i].z, world.r[i].w);
+
+    if (textured) {
+        const auto info = ge::texture_info(regs);
+        const float tw = static_cast<float>(info.width) * scale_u, th = static_cast<float>(info.height) * scale_v;
+        set_uniform(u_.uvxf, ge::ge_float(r24(regs, 0x48)) * tw, ge::ge_float(r24(regs, 0x49)) * th,
+                    ge::ge_float(r24(regs, 0x4A)) * tw, ge::ge_float(r24(regs, 0x4B)) * th);
+    }
+
+    set_bool(u_.skin, skinned);
+    if (skinned) {
+        for (std::uint32_t b = 0; b < layout.weights && b < 8u; ++b) {
+            const C3D_Mtx bone = ge_matrix43(&regs.bone[b * 12u]);
+            for (int j = 0; j < 3; ++j)
+                set_uniform(u_.bones + static_cast<int>(b) * 3 + j, bone.r[j].x, bone.r[j].y, bone.r[j].z, bone.r[j].w);
+        }
+    }
+
+    const ge::LightingSetup l = ge::lighting_setup(regs, layout);
+    set_bool(u_.light, l.enabled);
+    if (l.enabled) {
+        auto color = [this](int loc, const std::array<float, 4> &c, float alpha) { set_uniform(loc, c[0], c[1], c[2], alpha); };
+        color(u_.emissive, l.emissive, 0.0f);
+        color(u_.matamb, l.material_ambient, l.material_ambient[3]);
+        color(u_.matdif, l.material_diffuse, 0.0f);
+        color(u_.matspe, l.material_specular, 0.0f);
+        color(u_.sceneamb, l.scene_ambient, l.scene_ambient[3]);
+        set_uniform(u_.matsel, l.vertex_ambient ? 1.0f : 0.0f, l.vertex_diffuse ? 1.0f : 0.0f, l.vertex_specular ? 1.0f : 0.0f,
+                    l.reverse_normals ? -1.0f : 1.0f);
+        set_uniform(u_.misc, l.specular_power, 0.0f, 0.0f, 0.0f);
+        for (int i = 0; i < 4; ++i) {
+            const auto &li = l.lights[i];
+            set_bool(u_.lights[i], li.enabled);
+            if (!li.enabled) continue;
+            set_uniform(u_.lpos + i, li.position[0], li.position[1], li.position[2], 0.0f);
+            float d[3] = {li.direction[0], li.direction[1], li.direction[2]};
+            const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            if (dl > 0.0f) for (auto &c : d) c /= dl;
+            set_uniform(u_.ldir + i, d[0], d[1], d[2], 0.0f);
+            if (li.kind == 0u) set_uniform(u_.latt + i, 1.0f, 0.0f, 0.0f, 0.0f);
+            else set_uniform(u_.latt + i, li.attenuation[0], li.attenuation[1], li.attenuation[2], 0.0f);
+            set_uniform(u_.lspot + i, li.kind == 2u ? li.spot_exponent : 0.0f, li.kind == 2u ? li.spot_cutoff : -2.0f,
+                        li.kind != 0u ? 1.0f : 0.0f, li.components == 2u ? l.specular_power : 1.0f);
+            color(u_.lamb + i, li.ambient, 0.0f);
+            color(u_.ldif + i, li.diffuse, 0.0f);
+            if (li.components == 1u) color(u_.lspe + i, li.specular, 0.0f);
+            else set_uniform(u_.lspe + i, 0.0f, 0.0f, 0.0f, 0.0f);
+        }
+    }
+
+    use_buffer(skinned ? Layout::Skinned : Layout::Model, block);
+    if (indices != nullptr) C3D_DrawElements(primitive, static_cast<int>(count), C3D_UNSIGNED_SHORT, indices);
+    else C3D_DrawArrays(primitive, 0, static_cast<int>(count));
+    ++gpu_stats_.draws;
+    ++gpu_stats_.model_draws;
+    gpu_stats_.model_vertices += n;
+    gpu_stats_.triangles += primitive == GPU_TRIANGLES ? count / 3u : count - 2u;
+    return true;
 }
 
 void GpuRenderer::transfer(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs) {
@@ -654,8 +904,6 @@ void GpuRenderer::present(psprecomp::GuestMemory &memory, const hle::DisplayFram
     C3D_FrameDrawOn(top_);
     bound_ = nullptr;
     bound_screen_ = true;
-    const C3D_Mtx proj = screen_projection();
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, loc_projection_, &proj);
     if (source == nullptr) C3D_RenderTargetClear(top_, C3D_CLEAR_ALL, 0x000000FFu, 0);
     else blit(*source, 480.0f, 272.0f, true);
     end_frame();

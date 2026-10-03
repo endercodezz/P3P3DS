@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Vertex shader: GPU transform, skinning and lighting (2026-10-03)
+
+For the black, slow battle (section below). Not yet run on hardware or in Azahar.
+
+- Core (`core/src/ge/geometry.cpp`): vertex decoding reads guest memory through a host pointer instead of per-component accessors; morph targets are blended with MORPH_WEIGHT 0x2C-0x33 (the vertex stride now counts every morph target); skinning with the 8 bone matrices; GE vertex lighting (4 lights: directional/point/spot, ambient/diffuse/specular/powered diffuse, attenuation, material colours from the vertex colour per MATERIAL_COLOR 0x53, scene ambient, NORMAL_REVERSE). Register numbers from PSPSDK `guInternal.h`/`sceGuLight*.c`; behaviour cross-checked against PPSSPP `GPU/Software/Lighting.cpp` (no code copied). This is the CPU reference and is used by the PC software renderer: lit draws on the PC now get lighting. [INFERRED] float arithmetic instead of the hardware's fixed point; separate specular colour added to the primary colour.
+- 3DS (`platform/3ds/shaders/ge.v.pica`, `gpu_renderer.cpp`): transform-mode triangles, strips and fans are drawn as model vertices; the CPU only unpacks the referenced vertices and copies indices (`C3D_DrawElements`), the PICA200 shader does bone blending, WORLD, VIEW x PROJ x viewport (one matrix) and lighting. Through mode, sprites and clear mode keep the CPU transform. Uniforms are only written when they change. `sdmc:/p3p3ds/cpu_vertices.txt` forces the old CPU transform for comparison. Report: `model_draws` counters in the GPU stats.
+- [VERIFIED] CTest 27/27 on the PC (first-day replays unchanged except lit draws); shader assembles with picasso; 3DS build links. [UNVERIFIED] picture and speed on hardware; flat shading of transformed triangles is now smooth on the GPU path.
+- PC route to the first battle: maintainer save 4/9 (slot 1) -> LOAD GAME -> sign-in sheet -> "Go back to your room" (`.tmp` input scripts, not yet in `profiles/p3p/input/`).
+
 ## Hardware run of build 06818ae (0.2.5): first battle reached, scene black (2026-10-03)
 
 Maintainer, New 2DS XL, 602 s wall, quit with START+SELECT during the first battle.

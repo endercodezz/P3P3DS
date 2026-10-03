@@ -1,12 +1,14 @@
-// Shared GE front end (see geometry.hpp). The vertex decode/transform and
-// texel fetch were moved here unchanged from software_renderer.cpp.
-// [INFERRED] as there: sprite UV mapping and transform-mode clipping
-// (vertices behind the eye are marked clipped, no near-plane clipping).
+// Shared GE front end (see geometry.hpp): vertex decode (morphing, skinning,
+// lighting), transform, texel fetch.
+// [INFERRED] sprite UV mapping and transform-mode clipping (vertices behind
+// the eye are marked clipped, no near-plane clipping) as in the first
+// software renderer.
 #include "p3p3ds/ge/geometry.hpp"
 
 #include "psprecomp/guest_memory.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace p3p3ds::ge {
@@ -82,85 +84,285 @@ TextureInfo texture_info(const GeRegisters &regs) {
     return t;
 }
 
+namespace {
+
+// Component reader over a host pointer to one vertex (little endian).
+float read_component(const std::uint8_t *p, std::uint32_t format, bool signed_value, float scale8, float scale16) {
+    switch (format) {
+    case 1: return signed_value ? static_cast<std::int8_t>(p[0]) / scale8 : p[0] / scale8;
+    case 2: {
+        const std::uint16_t raw = static_cast<std::uint16_t>(p[0] | (p[1] << 8));
+        return signed_value ? static_cast<std::int16_t>(raw) / scale16 : raw / scale16;
+    }
+    case 3: { float f; std::memcpy(&f, p, 4); return f; }
+    default: return 0.0f;
+    }
+}
+
+Rgba read_color(const std::uint8_t *p, std::uint32_t format) {
+    if (format == 7u) return unpack32(static_cast<std::uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16)) | (static_cast<std::uint32_t>(p[3]) << 24));
+    return unpack16(static_cast<std::uint32_t>(p[0] | (p[1] << 8)), format == 4u ? 0u : format == 5u ? 1u : 2u);
+}
+
+// One morph target of one vertex. Weights: u8 0x80 and u16 0x8000 are 1.0
+// [INFERRED from the s8/s16 position scaling]; normals scale like positions
+// (they are normalised before lighting).
+void decode_one(const std::uint8_t *p, const VertexLayout &l, ModelVertex &v) {
+    const auto pe = component_size(l.pos_format, 1, 2, 4);
+    if (l.through) {
+        // Through mode: s16/float screen coordinates (x, y), u16 z; integer texel UVs.
+        v.pos[0] = read_component(p + l.pos_offset, l.pos_format, true, 1.0f, 1.0f);
+        v.pos[1] = read_component(p + l.pos_offset + pe, l.pos_format, true, 1.0f, 1.0f);
+        v.pos[2] = read_component(p + l.pos_offset + 2 * pe, l.pos_format, false, 1.0f, 1.0f);
+    } else {
+        for (int i = 0; i < 3; ++i) v.pos[i] = read_component(p + l.pos_offset + i * pe, l.pos_format, true, 128.0f, 32768.0f);
+    }
+    if (l.uv_format) {
+        const auto ue = component_size(l.uv_format, 1, 2, 4);
+        const float s8 = l.through ? 1.0f : 128.0f, s16 = l.through ? 1.0f : 32768.0f;
+        v.uv[0] = read_component(p + l.uv_offset, l.uv_format, false, s8, s16);
+        v.uv[1] = read_component(p + l.uv_offset + ue, l.uv_format, false, s8, s16);
+    }
+    if (l.normal_format) {
+        const auto ne = component_size(l.normal_format, 1, 2, 4);
+        for (int i = 0; i < 3; ++i) v.normal[i] = read_component(p + l.normal_offset + i * ne, l.normal_format, true, 128.0f, 32768.0f);
+    }
+    if (l.weights) {
+        const auto we = component_size(l.weight_format, 1, 2, 4);
+        for (std::uint32_t i = 0; i < l.weights && i < 8u; ++i)
+            v.weights[i] = read_component(p + l.weight_offset + i * we, l.weight_format, false, 128.0f, 32768.0f);
+    }
+    if (l.color_format >= 4u) v.color = read_color(p + l.color_offset, l.color_format);
+}
+
+// v = m * (x, y, z, w) for a GE 4x3 matrix (four columns of three floats).
+void transform43(const float *m, const float *p, float w, float *out) {
+    for (int j = 0; j < 3; ++j) out[j] = p[0] * m[j] + p[1] * m[3 + j] + p[2] * m[6 + j] + w * m[9 + j];
+}
+
+float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
+
+} // namespace
+
+bool decode_model_vertex(psprecomp::GuestMemory &memory, const GeRegisters &regs, const VertexLayout &layout,
+                         std::uint32_t vertex_address, std::uint32_t index, ModelVertex &out) {
+    out = ModelVertex{};
+    const std::uint32_t morphs = layout.through ? 1u : std::max<std::uint32_t>(layout.morphs, 1u);
+    const std::uint32_t stride = layout.size * morphs;
+    const std::uint8_t *p = memory.raw_pointer(vertex_address + index * stride, std::max<std::uint32_t>(stride, 1u));
+    if (p == nullptr) return false;
+    if (morphs == 1u) {
+        out.color = unpack32((r24(regs, 0x55) & 0xFFFFFFu) | ((r24(regs, 0x58) & 0xFFu) << 24));
+        out.has_color = layout.color_format >= 4u;
+        decode_one(p, layout, out);
+        return true;
+    }
+    // Morphing: every attribute is the weighted sum of the morph targets
+    // (MORPH_WEIGHT0.. 0x2C-0x33, PSPSDK sceGuMorphWeight).
+    ModelVertex sum;
+    float color[4] = {};
+    for (std::uint32_t k = 0; k < morphs; ++k) {
+        ModelVertex t;
+        t.color = unpack32((r24(regs, 0x55) & 0xFFFFFFu) | ((r24(regs, 0x58) & 0xFFu) << 24));
+        decode_one(p + k * layout.size, layout, t);
+        const float w = ge_float(r24(regs, 0x2C + k));
+        for (int i = 0; i < 3; ++i) { sum.pos[i] += w * t.pos[i]; sum.normal[i] += w * t.normal[i]; }
+        for (int i = 0; i < 2; ++i) sum.uv[i] += w * t.uv[i];
+        for (int i = 0; i < 8; ++i) sum.weights[i] += w * t.weights[i];
+        for (int i = 0; i < 4; ++i) color[i] += w * t.color[i];
+    }
+    for (int i = 0; i < 4; ++i) sum.color[i] = static_cast<std::uint8_t>(std::clamp(color[i], 0.0f, 255.0f));
+    sum.has_color = layout.color_format >= 4u;
+    out = sum;
+    return true;
+}
+
+std::uint32_t vertex_index(psprecomp::GuestMemory &memory, const VertexLayout &layout, std::uint32_t index_address, std::uint32_t i) {
+    if (layout.index_format == 1u) { const auto *p = memory.raw_pointer(index_address + i, 1u); return p ? p[0] : 0u; }
+    if (layout.index_format == 2u) { const auto *p = memory.raw_pointer(index_address + 2u * i, 2u); return p ? static_cast<std::uint32_t>(p[0] | (p[1] << 8)) : 0u; }
+    return i;
+}
+
+void skin_vertex(const GeRegisters &regs, const VertexLayout &layout, const ModelVertex &v, float pos[3], float normal[3]) {
+    if (layout.weights == 0u) {
+        std::memcpy(pos, v.pos, sizeof v.pos);
+        std::memcpy(normal, v.normal, sizeof v.normal);
+        return;
+    }
+    // Skinning: sum over the vertex weights of BONE_MATRIX[i] (4x3, PSPSDK
+    // sceGuBoneMatrix) applied to the position (w = 1) and normal (w = 0).
+    pos[0] = pos[1] = pos[2] = normal[0] = normal[1] = normal[2] = 0.0f;
+    for (std::uint32_t i = 0; i < layout.weights && i < 8u; ++i) {
+        const float w = v.weights[i];
+        if (w == 0.0f) continue;
+        float p[3], n[3];
+        transform43(&regs.bone[i * 12u], v.pos, 1.0f, p);
+        transform43(&regs.bone[i * 12u], v.normal, 0.0f, n);
+        for (int k = 0; k < 3; ++k) { pos[k] += w * p[k]; normal[k] += w * n[k]; }
+    }
+}
+
+LightingSetup lighting_setup(const GeRegisters &regs, const VertexLayout &layout) {
+    LightingSetup s;
+    s.enabled = !layout.through && (regs.reg[0x17] & 1u) != 0u;
+    if (!s.enabled) return s;
+    auto color = [&](std::uint32_t r) {
+        const auto c = r24(regs, r);
+        return std::array<float, 4>{(c & 0xFF) / 255.0f, ((c >> 8) & 0xFF) / 255.0f, ((c >> 16) & 0xFF) / 255.0f, 0.0f};
+    };
+    s.emissive = color(0x54);
+    s.material_ambient = color(0x55);
+    s.material_ambient[3] = (r24(regs, 0x58) & 0xFF) / 255.0f;
+    s.material_diffuse = color(0x56);
+    s.material_specular = color(0x57);
+    s.scene_ambient = color(0x5C);
+    s.scene_ambient[3] = (r24(regs, 0x5D) & 0xFF) / 255.0f;
+    s.specular_power = ge_float(r24(regs, 0x5B));
+    const auto update = layout.color_format >= 4u ? r24(regs, 0x53) & 7u : 0u;
+    s.vertex_ambient = (update & 1u) != 0u;
+    s.vertex_diffuse = (update & 2u) != 0u;
+    s.vertex_specular = (update & 4u) != 0u;
+    s.reverse_normals = (r24(regs, 0x51) & 1u) != 0u;
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        auto &l = s.lights[i];
+        l.enabled = (regs.reg[0x18 + i] & 1u) != 0u;
+        if (!l.enabled) continue;
+        const auto type = r24(regs, 0x5F + i);
+        l.kind = (type >> 8) & 3u;         // 0 directional, 1 point, 2 spot
+        l.components = type & 3u;          // 0 diffuse, 1 diffuse + specular, 2 powered diffuse
+        for (int k = 0; k < 3; ++k) {
+            l.position[k] = ge_float(r24(regs, 0x63 + i * 3 + k));
+            l.direction[k] = ge_float(r24(regs, 0x6F + i * 3 + k));
+            l.attenuation[k] = ge_float(r24(regs, 0x7B + i * 3 + k));
+        }
+        l.spot_exponent = ge_float(r24(regs, 0x87 + i));
+        l.spot_cutoff = ge_float(r24(regs, 0x8B + i));
+        l.ambient = color(0x8F + i * 3);
+        l.diffuse = color(0x90 + i * 3);
+        l.specular = color(0x91 + i * 3);
+    }
+    return s;
+}
+
+// GE vertex lighting in world space. Semantics (behaviour, not code) as
+// documented by PSPSDK pspgu.h (sceGuLight*, sceGuMaterial, sceGuAmbient) and
+// cross-checked against PPSSPP GPU/Software/Lighting.cpp: colour = emissive +
+// material ambient x scene ambient + per light (ambient + N.L diffuse +
+// (N.H)^power specular with H = L + (0,0,1)) x attenuation 1/(a + b d + c d^2)
+// x spot (cos >= cutoff: cos^exponent); alpha = material ambient alpha x
+// scene ambient alpha. [INFERRED] float arithmetic instead of the hardware's
+// fixed-point rounding; the separate specular colour mode is added to the
+// primary colour.
+Rgba light_vertex(const LightingSetup &s, const float pos[3], const float normal_in[3], const Rgba &vertex_color) {
+    float vc[4];
+    for (int i = 0; i < 4; ++i) vc[i] = vertex_color[i] / 255.0f;
+    const float *ma = s.vertex_ambient ? vc : s.material_ambient.data();
+    const float *md = s.vertex_diffuse ? vc : s.material_diffuse.data();
+    const float *ms = s.vertex_specular ? vc : s.material_specular.data();
+    float n[3] = {normal_in[0], normal_in[1], normal_in[2]};
+    if (s.reverse_normals) for (auto &c : n) c = -c;
+    const float nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    if (nl > 0.0f) for (auto &c : n) c /= nl;
+    float out[4];
+    for (int i = 0; i < 3; ++i) out[i] = s.emissive[i] + ma[i] * s.scene_ambient[i];
+    out[3] = ma[3] * s.scene_ambient[3];
+    for (const auto &l : s.lights) {
+        if (!l.enabled) continue;
+        float L[3] = {l.position[0], l.position[1], l.position[2]};
+        float att = 1.0f;
+        if (l.kind != 0u) {
+            for (int k = 0; k < 3; ++k) L[k] -= pos[k];
+            const float d = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+            if (d > 0.0f) for (auto &c : L) c /= d;
+            const float denom = l.attenuation[0] + l.attenuation[1] * d + l.attenuation[2] * d * d;
+            att = denom > 0.0f ? clamp01(1.0f / denom) : 0.0f;
+        } else {
+            const float d = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+            if (d > 0.0f) for (auto &c : L) c /= d;
+            else { L[0] = 0.0f; L[1] = 0.0f; L[2] = 1.0f; }
+        }
+        if (l.kind == 2u) {
+            float dir[3] = {l.direction[0], l.direction[1], l.direction[2]};
+            const float dl = std::sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+            if (dl > 0.0f) for (auto &c : dir) c /= dl;
+            const float cosine = dir[0] * L[0] + dir[1] * L[1] + dir[2] * L[2];
+            // Below the cutoff: 0; exponent <= 0: 1; else cos^exponent (0 for cos <= 0).
+            att *= cosine < l.spot_cutoff ? 0.0f : l.spot_exponent <= 0.0f ? 1.0f : cosine > 0.0f ? std::pow(cosine, l.spot_exponent) : 0.0f;
+        }
+        float dot = n[0] * L[0] + n[1] * L[1] + n[2] * L[2];
+        if (l.components == 2u && s.specular_power > 0.0f && dot > 0.0f) dot = std::pow(dot, s.specular_power);
+        for (int i = 0; i < 3; ++i) out[i] += att * l.ambient[i] * ma[i];
+        if (dot > 0.0f) for (int i = 0; i < 3; ++i) out[i] += att * dot * l.diffuse[i] * md[i];
+        if (l.components == 1u && dot >= 0.0f) {
+            float h[3] = {L[0], L[1], L[2] + 1.0f};
+            const float hl = std::sqrt(h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
+            if (hl > 0.0f) for (auto &c : h) c /= hl;
+            float spec = n[0] * h[0] + n[1] * h[1] + n[2] * h[2];
+            if (spec > 0.0f) {
+                spec = s.specular_power > 0.0f ? std::pow(spec, s.specular_power) : 1.0f;
+                for (int i = 0; i < 3; ++i) out[i] += att * spec * l.specular[i] * ms[i];
+            }
+        }
+    }
+    Rgba c;
+    for (int i = 0; i < 4; ++i) c[i] = static_cast<std::uint8_t>(clamp01(out[i]) * 255.0f + 0.5f);
+    return c;
+}
+
 void decode_screen_vertices(psprecomp::GuestMemory &memory, const GeRegisters &regs, std::uint32_t count,
                             std::uint32_t vertex_address, std::uint32_t index_address, std::vector<ScreenVertex> &out) {
     const auto layout = vertex_layout(r24(regs, 0x12));
-    auto read_component = [&](std::uint32_t at, std::uint32_t format, bool signed_value, float normal_scale8, float normal_scale16) -> float {
-        switch (format) {
-        case 1: return signed_value ? static_cast<std::int8_t>(memory.load8(at)) / normal_scale8 : memory.load8(at) / normal_scale8;
-        case 2: return signed_value ? static_cast<std::int16_t>(memory.load16(at)) / normal_scale16 : memory.load16(at) / normal_scale16;
-        case 3: { const auto bits = memory.load32(at); float f; std::memcpy(&f, &bits, 4); return f; }
-        default: return 0.0f;
-        }
-    };
-    const auto material = (r24(regs, 0x55) & 0xFFFFFFu) | ((r24(regs, 0x58) & 0xFFu) << 24);
-    auto decode = [&](std::uint32_t index) {
-        ScreenVertex v;
-        const auto base = vertex_address + index * layout.size;
-        if (!memory.contains(base, std::max<std::uint32_t>(layout.size, 1u))) { v.clipped = true; return v; }
-        const auto pe = component_size(layout.pos_format, 1, 2, 4);
-        if (layout.through) {
-            // Through mode: s16/float screen coordinates (x, y), u16 z; integer texel UVs.
-            const bool f = layout.pos_format == 3;
-            v.x = f ? read_component(base + layout.pos_offset, 3, true, 1, 1) : read_component(base + layout.pos_offset, layout.pos_format, true, 1.0f, 1.0f);
-            v.y = f ? read_component(base + layout.pos_offset + 4, 3, true, 1, 1) : read_component(base + layout.pos_offset + pe, layout.pos_format, true, 1.0f, 1.0f);
-            v.z = f ? read_component(base + layout.pos_offset + 8, 3, true, 1, 1) : read_component(base + layout.pos_offset + 2 * pe, layout.pos_format, false, 1.0f, 1.0f);
-        } else {
-            v.x = read_component(base + layout.pos_offset, layout.pos_format, true, 128.0f, 32768.0f);
-            v.y = read_component(base + layout.pos_offset + pe, layout.pos_format, true, 128.0f, 32768.0f);
-            v.z = read_component(base + layout.pos_offset + 2 * pe, layout.pos_format, true, 128.0f, 32768.0f);
-        }
-        if (layout.uv_format) {
-            const auto ue = component_size(layout.uv_format, 1, 2, 4);
-            if (layout.through) {
-                v.u = read_component(base + layout.uv_offset, layout.uv_format, false, 1.0f, 1.0f);
-                v.v = read_component(base + layout.uv_offset + ue, layout.uv_format, false, 1.0f, 1.0f);
-            } else {
-                v.u = read_component(base + layout.uv_offset, layout.uv_format, false, 128.0f, 32768.0f);
-                v.v = read_component(base + layout.uv_offset + ue, layout.uv_format, false, 128.0f, 32768.0f);
-            }
-        }
-        // Colour (material ambient when the vertex has none)
-        if (layout.color_format == 7u) v.color = unpack32(memory.load32(base + layout.color_offset));
-        else if (layout.color_format >= 4u) v.color = unpack16(memory.load16(base + layout.color_offset), layout.color_format == 4u ? 0u : layout.color_format == 5u ? 1u : 2u);
-        else v.color = unpack32(material);
-        return v;
-    };
-
     out.resize(count);
-    for (std::uint32_t i = 0; i < count; ++i) {
-        std::uint32_t index = i;
-        if (layout.index_format == 1u) index = memory.load8(index_address + i);
-        else if (layout.index_format == 2u) index = memory.load16(index_address + 2u * i);
-        out[i] = decode(index);
+    ModelVertex m;
+    if (layout.through) {
+        for (std::uint32_t i = 0; i < count; ++i) {
+            ScreenVertex &v = out[i];
+            v = ScreenVertex{};
+            if (!decode_model_vertex(memory, regs, layout, vertex_address, vertex_index(memory, layout, index_address, i), m)) {
+                v.clipped = true;
+                continue;
+            }
+            v.x = m.pos[0]; v.y = m.pos[1]; v.z = m.pos[2];
+            v.u = m.uv[0]; v.v = m.uv[1];
+            v.color = m.color;
+        }
+        return;
     }
-    if (layout.through) return;
 
     const bool textured = draw_is_textured(regs, layout);
     const auto tex = textured ? texture_info(regs) : TextureInfo{};
+    const LightingSetup lighting = lighting_setup(regs, layout);
     const float offset_x = static_cast<float>(r24(regs, 0x4C) & 0xFFFFu) / 16.0f, offset_y = static_cast<float>(r24(regs, 0x4D) & 0xFFFFu) / 16.0f;
-    for (auto &v : out) {
-        if (v.clipped) continue;
-        const auto &w = regs.world, &vw = regs.view;
-        const float wx = v.x * w[0] + v.y * w[3] + v.z * w[6] + w[9];
-        const float wy = v.x * w[1] + v.y * w[4] + v.z * w[7] + w[10];
-        const float wz = v.x * w[2] + v.y * w[5] + v.z * w[8] + w[11];
-        const float ex = wx * vw[0] + wy * vw[3] + wz * vw[6] + vw[9];
-        const float ey = wx * vw[1] + wy * vw[4] + wz * vw[7] + vw[10];
-        const float ez = wx * vw[2] + wy * vw[5] + wz * vw[8] + vw[11];
+    for (std::uint32_t i = 0; i < count; ++i) {
+        ScreenVertex &v = out[i];
+        v = ScreenVertex{};
+        if (!decode_model_vertex(memory, regs, layout, vertex_address, vertex_index(memory, layout, index_address, i), m)) {
+            v.clipped = true;
+            continue;
+        }
+        float model_pos[3], model_normal[3], world_pos[3], world_normal[3];
+        skin_vertex(regs, layout, m, model_pos, model_normal);
+        transform43(regs.world.data(), model_pos, 1.0f, world_pos);
+        v.color = m.color;
+        if (lighting.enabled) {
+            transform43(regs.world.data(), model_normal, 0.0f, world_normal);
+            v.color = light_vertex(lighting, world_pos, world_normal, m.color);
+        }
+        float e[3];
+        transform43(regs.view.data(), world_pos, 1.0f, e);
         const auto &p = regs.proj;
-        const float cx = ex * p[0] + ey * p[4] + ez * p[8] + p[12];
-        const float cy = ex * p[1] + ey * p[5] + ez * p[9] + p[13];
-        const float cz = ex * p[2] + ey * p[6] + ez * p[10] + p[14];
-        const float cw = ex * p[3] + ey * p[7] + ez * p[11] + p[15];
+        const float cx = e[0] * p[0] + e[1] * p[4] + e[2] * p[8] + p[12];
+        const float cy = e[0] * p[1] + e[1] * p[5] + e[2] * p[9] + p[13];
+        const float cz = e[0] * p[2] + e[1] * p[6] + e[2] * p[10] + p[14];
+        const float cw = e[0] * p[3] + e[1] * p[7] + e[2] * p[11] + p[15];
         if (cw <= 0.0f) { v.clipped = true; continue; }
         v.x = ge_float(r24(regs, 0x42)) * cx / cw + ge_float(r24(regs, 0x45)) - offset_x;
         v.y = ge_float(r24(regs, 0x43)) * cy / cw + ge_float(r24(regs, 0x46)) - offset_y;
         v.z = ge_float(r24(regs, 0x44)) * cz / cw + ge_float(r24(regs, 0x47));
         v.w = cw;
         if (textured) {
-            v.u = (v.u * ge_float(r24(regs, 0x48)) + ge_float(r24(regs, 0x4A))) * static_cast<float>(tex.width);
-            v.v = (v.v * ge_float(r24(regs, 0x49)) + ge_float(r24(regs, 0x4B))) * static_cast<float>(tex.height);
+            v.u = (m.uv[0] * ge_float(r24(regs, 0x48)) + ge_float(r24(regs, 0x4A))) * static_cast<float>(tex.width);
+            v.v = (m.uv[1] * ge_float(r24(regs, 0x49)) + ge_float(r24(regs, 0x4B))) * static_cast<float>(tex.height);
         }
     }
 }
