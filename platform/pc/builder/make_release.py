@@ -27,8 +27,8 @@ WINDOWS = sys.platform == "win32"
 EXE = ".exe" if WINDOWS else ""
 
 RUNTIME_OBJECTS = {
-    "main.o": BUILD3DS / "CMakeFiles/p3p3ds.dir/main.o",
-    "gpu_renderer.o": BUILD3DS / "CMakeFiles/p3p3ds.dir/gpu_renderer.o",
+    "main.o": BUILD3DS / "CMakeFiles/p3p3ds_objects.dir/main.o",
+    "gpu_renderer.o": BUILD3DS / "CMakeFiles/p3p3ds_objects.dir/gpu_renderer.o",
     "ge_shbin.o": BUILD3DS / "CMakeFiles/p3p_ge_shader_bin.dir/.dkp-generated/p3p_ge_shader_bin/ge_shbin.o",
     "libp3p3ds_core.a": BUILD3DS / "libp3p3ds_core.a",
     "libpsprecomp_runtime.a": BUILD3DS / "libpsprecomp_runtime.a",

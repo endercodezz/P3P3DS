@@ -84,7 +84,9 @@ osSetSpeedupEnable(true);       // Boost CPU to 804 MHz and enable L2 cache
 ## 3b. P3P3DS Builder release
 
 - Sources: `platform/pc/builder/` (`pipeline.cpp` = the build steps, `psp_eboot.cpp` = decryption, `builder_main.cpp` = Win32 wizard, `fun_facts.hpp`). Compile flags, unit count and load base in `pipeline.cpp` must match `platform/3ds/CMakeLists.txt` and `profiles/p3p/config/aot_layout.cmake`; runtime-layout defines must match the prebuilt objects.
-- Release: build the host (`--target p3p3ds_builder`, psp_recomp) and `build/3ds`, then `python platform/pc/builder/make_release.py --version X --devkitpro <dir>` -> `out/P3P3DS-Builder-X/` + `.zip` (it deletes and recreates that folder, including any `work/` cache in it).
+- Release (normal way): bump `FileVersion`/`FILEVERSION` in `platform/pc/builder/builder.rc`, commit, push, `git tag vX` and `git push origin vX`. `.github/workflows/release.yml` builds the New 3DS runtime in the devkitPro container, the Windows and Linux packages, and publishes the GitHub release; it fails when the tag does not match `builder.rc`. Watch it with `gh run watch` (GitHub CLI: `C:/Program Files/GitHub CLI/gh.exe` on the maintainer's PC); a dry run of any ref: `gh workflow run release.yml -f ref=master`.
+- Release by hand (fallback): build the host (`--target p3p3ds_builder`, psp_recomp) and `build/3ds`, then `python platform/pc/builder/make_release.py --version X --devkitpro <dir>` -> `out/P3P3DS-Builder-X/` + `.zip` (it deletes and recreates that folder, including any `work/` cache in it).
+- Without `profiles/p3p/game/eboot.elf` both CMake projects skip the game-derived targets (`P3P_HAVE_GAME`); the runner objects are the object library `p3p3ds_objects` (`CMakeFiles/p3p3ds_objects.dir/main.o`, `gpu_renderer.o`).
 - Test without the window: `P3P3DS-Builder.exe --cli --iso <iso> [--jobs n]`, then run `output/p3p3ds.3dsx` in Azahar. Never put a `.3dsx`, `work/` or `output/` into a release: they contain code made from the game.
 - Facts in `fun_facts.hpp` must be well-known public facts or P3P3DS measurements; no guesses.
 

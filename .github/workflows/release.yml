@@ -1,0 +1,171 @@
+# P3P3DS Builder packages for Windows and Linux. Pushing a tag v<version>
+# builds and publishes a GitHub release; the tag must match the version in
+# platform/pc/builder/builder.rc. Run by hand (Actions -> Release -> Run
+# workflow) it builds the packages of any ref as workflow artifacts without
+# publishing (a dry run). Contents: the Builder, psp_recomp and the prebuilt
+# New 3DS runtime; nothing from the game (README.md, "Continuous integration").
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to package (dry run, not published)
+        default: master
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
+  PUBLISH: ${{ github.event_name == 'push' }}
+
+jobs:
+  check:
+    name: Version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF }}
+      - id: version
+        name: Version from builder.rc (a release tag must match it)
+        run: |
+          rc=$(sed -n 's/.*VALUE "FileVersion", "\([^"]*\)".*/\1/p' platform/pc/builder/builder.rc)
+          echo "ref $REF, builder.rc $rc, publish $PUBLISH"
+          if [ -z "$rc" ]; then echo "::error::no FileVersion in builder.rc"; exit 1; fi
+          if [ "$PUBLISH" = "true" ] && [ "$REF" != "v$rc" ]; then
+            echo "::error::tag $REF does not match builder.rc FileVersion $rc"
+            exit 1
+          fi
+          echo "version=$rc" >> "$GITHUB_OUTPUT"
+
+  n3ds:
+    name: New 3DS runtime
+    needs: check
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF }}
+      - name: Install tools
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends python3 cmake make git
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Build
+        run: |
+          cmake -S platform/3ds -B build/3ds -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/3DS.cmake" -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/3ds -j4
+      - name: Strip debug info
+        # Debug info is 95 % of these archives (make_release.py --devkitpro does the same locally).
+        run: |
+          cd build/3ds
+          for f in CMakeFiles/p3p3ds_objects.dir/main.o CMakeFiles/p3p3ds_objects.dir/gpu_renderer.o \
+                   CMakeFiles/p3p_ge_shader_bin.dir/.dkp-generated/p3p_ge_shader_bin/ge_shbin.o \
+                   libp3p3ds_core.a libpsprecomp_runtime.a; do
+            "$DEVKITARM/bin/arm-none-eabi-strip" --strip-debug "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: n3ds-runtime
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            build/3ds/CMakeFiles/p3p3ds_objects.dir/main.o
+            build/3ds/CMakeFiles/p3p3ds_objects.dir/gpu_renderer.o
+            build/3ds/CMakeFiles/p3p_ge_shader_bin.dir/.dkp-generated/p3p_ge_shader_bin/ge_shbin.o
+            build/3ds/libp3p3ds_core.a
+            build/3ds/libpsprecomp_runtime.a
+            build/3ds/generated/patches.txt
+
+  linux:
+    name: Linux package
+    needs: [check, n3ds]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF }}
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-14
+      - name: Build Builder and psp_recomp
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14
+          cmake --build build -j4 --target p3p3ds_builder psp_recomp
+      - uses: actions/download-artifact@v4
+        with:
+          name: n3ds-runtime
+          path: build/3ds
+      - name: Package
+        run: python3 platform/pc/builder/make_release.py --version "${{ needs.check.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-linux
+          if-no-files-found: error
+          path: out/P3P3DS-Builder-*-linux.tar.gz
+
+  windows:
+    name: Windows package
+    needs: [check, n3ds]
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF }}
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            git
+      - name: Build Builder and psp_recomp
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j4 --target p3p3ds_builder psp_recomp
+      - uses: actions/download-artifact@v4
+        with:
+          name: n3ds-runtime
+          path: build/3ds
+      - name: Package
+        run: python platform/pc/builder/make_release.py --version "${{ needs.check.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-windows
+          if-no-files-found: error
+          path: out/P3P3DS-Builder-*.zip
+
+  publish:
+    name: Publish GitHub release
+    needs: [check, linux, windows]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -l dist
+          if gh release view "$REF" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$REF" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$REF" dist/* --repo "$GITHUB_REPOSITORY" --title "P3P3DS Builder ${{ needs.check.outputs.version }}" \
+              --notes "Builds P3P3DS from your own Persona 3 Portable (ULUS-10512) ISO: Windows (zip) and Linux x86-64 (tar.gz). See README.md for the current state of the port."
+          fi

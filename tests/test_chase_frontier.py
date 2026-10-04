@@ -70,6 +70,7 @@ class ChaserTests(unittest.TestCase):
         with self.assertRaises(ValueError): chase.candidate(e)
 
     def test_manifest_duplicate_and_containment(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)  # absent in a fresh clone
         with tempfile.TemporaryDirectory(dir=ROOT / ".tmp") as d:
             a, b, out = [Path(d) / name for name in ("a.csv", "b.csv", "out.csv")]
             a.write_bytes(chase.encoded([{"name": "a", "address": "0x1000", "size": "cfg"}]))

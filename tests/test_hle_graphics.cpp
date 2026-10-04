@@ -2,6 +2,7 @@
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/elf32.hpp"
+#include <filesystem>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -71,7 +72,9 @@ int main() {
         CHECK(m.vram_writes().operations==3); CHECK(m.vram_writes().bytes==7); CHECK(m.vram_writes().changed==1);
         CHECK(m.vram_writes().minimum==0x04000000); CHECK(m.vram_writes().maximum==0x04000006);
     }
-    {
+    if (!std::filesystem::exists("profiles/p3p/game/eboot.elf")) {
+        std::cout << "local ELF absent (tools/prepare_game.py): reset-list checks skipped\n";
+    } else {
         // Real local ELF reset list, followed by the 29-word captured setup fixture.
         psprecomp::Runtime r; GeManager g;
         auto elf=psprecomp::Elf32Image::from_file("profiles/p3p/game/eboot.elf");

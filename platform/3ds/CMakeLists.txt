@@ -27,7 +27,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-find_program(P3P_PSP_RECOMP NAMES psp_recomp psp_recomp.exe HINTS "${P3P_HOST_BUILD}/recomp/PSPRecomp" NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+# Without the local EBOOT (CI, a fresh clone) only the game-independent part is
+# built: the P3P3DS runtime objects and libraries the P3P3DS Builder ships, the
+# shader and the CWCheat patch list. With it, also the AOT code and the .3dsx.
+if(EXISTS "${P3P_ELF}")
+    set(P3P_HAVE_GAME ON)
+    find_program(P3P_PSP_RECOMP NAMES psp_recomp psp_recomp.exe HINTS "${P3P_HOST_BUILD}/recomp/PSPRecomp" NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+else()
+    set(P3P_HAVE_GAME OFF)
+    message(STATUS "No ${P3P_ELF}: building the runtime without the game (no AOT code, no .3dsx)")
+endif()
 include("${P3P_ROOT}/profiles/p3p/config/aot_layout.cmake")
 include("${P3P_ROOT}/cmake/p3p3ds_sources.cmake")
 
@@ -41,6 +50,18 @@ add_compile_definitions(PSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 PSPRECOMP_NO_FRONTI
 set(GEN_DIR "${CMAKE_BINARY_DIR}/generated/auto")
 set(PATCH_LIST "${CMAKE_BINARY_DIR}/generated/patches.txt")
 file(MAKE_DIRECTORY "${GEN_DIR}")
+# CWCheat patch list (community codes selected in profiles/p3p/config): input
+# of the AOT generation and shipped with the P3P3DS Builder.
+add_custom_command(
+    OUTPUT "${PATCH_LIST}"
+    COMMAND "${Python3_EXECUTABLE}" "${P3P_ROOT}/tools/cwcheat_patches.py" "${P3P_ROOT}/p3p/p3p-patches/ULUS10512.ini"
+            "${P3P_ROOT}/profiles/p3p/config/cwcheat_patches.txt" "${PATCH_LIST}"
+    DEPENDS "${P3P_ROOT}/tools/cwcheat_patches.py" "${P3P_ROOT}/p3p/p3p-patches/ULUS10512.ini"
+            "${P3P_ROOT}/profiles/p3p/config/cwcheat_patches.txt"
+    COMMENT "CWCheat patch list"
+    VERBATIM
+)
+add_custom_target(p3p_patch_list ALL DEPENDS "${PATCH_LIST}")
 set(AOT_SOURCES "${GEN_DIR}/generated_registry.cpp")
 math(EXPR _last "${P3P_AOT_UNIT_COUNT} - 1")
 foreach(_unit RANGE 0 ${_last})
@@ -49,17 +70,17 @@ foreach(_unit RANGE 0 ${_last})
     string(REPEAT "0" ${_pad} _zeros)
     list(APPEND AOT_SOURCES "${GEN_DIR}/generated_unit_${_zeros}${_unit}.cpp")
 endforeach()
+if(P3P_HAVE_GAME)
 add_custom_command(
     OUTPUT ${AOT_SOURCES} "${GEN_DIR}/generated_units.hpp"
-    COMMAND "${Python3_EXECUTABLE}" "${P3P_ROOT}/tools/cwcheat_patches.py" "${P3P_ROOT}/p3p/p3p-patches/ULUS10512.ini"
-            "${P3P_ROOT}/profiles/p3p/config/cwcheat_patches.txt" "${PATCH_LIST}"
     COMMAND "${P3P_PSP_RECOMP}" "${P3P_ELF}" --auto "${GEN_DIR}" "${P3P_AOT_LOAD_BASE}" "${P3P_AOT_UNIT_SPAN}" "${PATCH_LIST}" --no-transfer-records
     COMMAND "${Python3_EXECUTABLE}" "${P3P_ROOT}/tools/verify_aot_layout.py" "${GEN_DIR}" "${P3P_AOT_UNIT_COUNT}" "${P3P_AOT_UNIT_SPAN}"
-    DEPENDS "${P3P_PSP_RECOMP}" "${P3P_ELF}" "${P3P_ROOT}/profiles/p3p/config/aot_layout.cmake"
-            "${P3P_ROOT}/profiles/p3p/config/cwcheat_patches.txt"
+    DEPENDS "${P3P_PSP_RECOMP}" "${P3P_ELF}" "${P3P_ROOT}/profiles/p3p/config/aot_layout.cmake" "${PATCH_LIST}"
     COMMENT "Generating P3P AOT units for 3DS (${P3P_AOT_UNIT_COUNT} x ${P3P_AOT_UNIT_SPAN} bytes)..."
     VERBATIM
 )
+
+endif()
 
 list(TRANSFORM PSPRECOMP_RUNTIME_SOURCES PREPEND "${P3P_ROOT}/")
 list(TRANSFORM P3P3DS_CORE_SOURCES PREPEND "${P3P_ROOT}/")
@@ -70,11 +91,13 @@ target_include_directories(psprecomp_runtime PUBLIC "${P3P_ROOT}/recomp/PSPRecom
 # entries registered elsewhere are looked up in the hash map.
 target_compile_definitions(psprecomp_runtime PRIVATE PSPRECOMP_DIRECT_WINDOW_MAX=0x400000u)
 
-add_library(p3p_aot STATIC ${AOT_SOURCES})
-target_include_directories(p3p_aot PRIVATE "${GEN_DIR}")
-target_link_libraries(p3p_aot PUBLIC psprecomp_runtime)
-separate_arguments(_aot_opt NATIVE_COMMAND "${P3P_AOT_OPT}")
-target_compile_options(p3p_aot PRIVATE ${_aot_opt})
+if(P3P_HAVE_GAME)
+    add_library(p3p_aot STATIC ${AOT_SOURCES})
+    target_include_directories(p3p_aot PRIVATE "${GEN_DIR}")
+    target_link_libraries(p3p_aot PUBLIC psprecomp_runtime)
+    separate_arguments(_aot_opt NATIVE_COMMAND "${P3P_AOT_OPT}")
+    target_compile_options(p3p_aot PRIVATE ${_aot_opt})
+endif()
 
 add_library(p3p3ds_core STATIC ${P3P3DS_CORE_SOURCES})
 target_include_directories(p3p3ds_core PUBLIC "${P3P_ROOT}/core/include" "${P3P_ROOT}/profiles/p3p/config")
@@ -86,17 +109,24 @@ execute_process(COMMAND git -C "${P3P_ROOT}" rev-parse --short HEAD
 ctr_add_shader_library(p3p_ge_shader "${CMAKE_CURRENT_SOURCE_DIR}/shaders/ge.v.pica" OUTPUT "${CMAKE_BINARY_DIR}/ge.shbin")
 dkp_add_embedded_binary_library(p3p_ge_shader_bin p3p_ge_shader)
 
-add_executable(p3p3ds main.cpp gpu_renderer.cpp)
-target_compile_definitions(p3p3ds PRIVATE P3P3DS_BUILD_ID="${P3P_BUILD_ID}")
-target_link_libraries(p3p3ds PRIVATE p3p_aot p3p3ds_core p3p_ge_shader_bin citro3d)
+# Runner objects (main.o, gpu_renderer.o): linked here into the .3dsx and
+# shipped prebuilt with the P3P3DS Builder (platform/pc/builder/make_release.py).
+add_library(p3p3ds_objects OBJECT main.cpp gpu_renderer.cpp)
+target_compile_definitions(p3p3ds_objects PRIVATE P3P3DS_BUILD_ID="${P3P_BUILD_ID}")
+target_link_libraries(p3p3ds_objects PRIVATE p3p3ds_core p3p_ge_shader_bin citro3d)
 
-# romfs: the decrypted EBOOT the AOT code was generated from.
-set(ROMFS_DIR "${CMAKE_BINARY_DIR}/romfs")
-file(MAKE_DIRECTORY "${ROMFS_DIR}")
-configure_file("${P3P_ELF}" "${ROMFS_DIR}/eboot.elf" COPYONLY)
+if(P3P_HAVE_GAME)
+    add_executable(p3p3ds $<TARGET_OBJECTS:p3p3ds_objects>)
+    target_link_libraries(p3p3ds PRIVATE p3p_aot p3p3ds_core p3p_ge_shader_bin citro3d)
 
-ctr_generate_smdh(OUTPUT "${CMAKE_BINARY_DIR}/p3p3ds.smdh"
-    NAME "P3P3DS"
-    DESCRIPTION "Persona 3 Portable recompilation"
-    AUTHOR "enderlit aka endercodezz")
-ctr_create_3dsx(p3p3ds SMDH "${CMAKE_BINARY_DIR}/p3p3ds.smdh" ROMFS "${ROMFS_DIR}")
+    # romfs: the decrypted EBOOT the AOT code was generated from.
+    set(ROMFS_DIR "${CMAKE_BINARY_DIR}/romfs")
+    file(MAKE_DIRECTORY "${ROMFS_DIR}")
+    configure_file("${P3P_ELF}" "${ROMFS_DIR}/eboot.elf" COPYONLY)
+
+    ctr_generate_smdh(OUTPUT "${CMAKE_BINARY_DIR}/p3p3ds.smdh"
+        NAME "P3P3DS"
+        DESCRIPTION "Persona 3 Portable recompilation"
+        AUTHOR "enderlit aka endercodezz")
+    ctr_create_3dsx(p3p3ds SMDH "${CMAKE_BINARY_DIR}/p3p3ds.smdh" ROMFS "${ROMFS_DIR}")
+endif()

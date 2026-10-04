@@ -1,0 +1,71 @@
+# Build and test without the game: CI has no EBOOT/ISO, so the AOT code, the
+# PC runner and the tests that execute game code are left out by CMake
+# (P3P_HAVE_GAME). What is built: the runtime, tools, P3P3DS Builder and the
+# host tests (Linux and Windows), and the New 3DS runtime the Builder ships
+# (devkitPro container). See README.md, "Continuous integration".
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux host build + tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-14
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14
+      - name: Build
+        run: cmake --build build -j4
+      - name: Test
+        run: ctest --test-dir build -j4 --output-on-failure
+
+  windows:
+    name: Windows host build + tests
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            git
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j4
+      - name: Test
+        run: ctest --test-dir build -j4 --output-on-failure
+
+  n3ds:
+    name: New 3DS runtime (devkitARM)
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends python3 cmake make git
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Configure
+        run: cmake -S platform/3ds -B build/3ds -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/3DS.cmake" -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build/3ds -j4

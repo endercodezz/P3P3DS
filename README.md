@@ -303,6 +303,15 @@ python platform/pc/builder/make_release.py --version 0.1.0 --devkitpro <devkitPr
 
 `make_release.py` needs the host build (`psp_recomp.exe`) and the New 3DS build in `build/3ds/` (runtime objects, CWCheat patch list); it packages the build of the platform it runs on: `out/P3P3DS-Builder-<version>/` and a `.zip` on Windows, `out/P3P3DS-Builder-<version>-linux/` and a `.tar.gz` on Linux. `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--jobs <n>]` runs the same build without the window. Sources: `platform/pc/builder/` (pipeline, EBOOT decryption, wizard, trivia).
 
+### Continuous integration and releases (GitHub Actions)
+
+Without the game files (no `profiles/p3p/game/eboot.elf`) both CMake projects build everything that does not come from the game: the host runtime, tools, P3P3DS Builder and tests (the AOT code, the PC runner and the tests that run game code are left out), and the New 3DS runtime the Builder ships (no `.3dsx`). GitHub Actions uses this:
+
+- `.github/workflows/ci.yml`, on every push to `master` and every pull request: Linux (GCC 14) and Windows (MSYS2 UCRT64 GCC) host build + CTest, New 3DS runtime in the `devkitpro/devkitarm` container.
+- `.github/workflows/release.yml`: pushing a tag `v<version>` that matches `FileVersion` in `platform/pc/builder/builder.rc` builds the New 3DS runtime (debug info stripped), the Windows and Linux Builder packages with `make_release.py`, and publishes them as a GitHub release (an existing release of that tag gets the files replaced). Started by hand (Actions -> Release -> Run workflow, with a branch or commit) it only builds the packages as workflow artifacts, for a dry run.
+
+To release: bump the version in `builder.rc`, commit, push, then `git tag v<version>` and `git push origin v<version>`.
+
 ### Run the game on PC
 
 ```bash

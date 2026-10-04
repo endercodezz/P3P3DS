@@ -2,6 +2,13 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## GitHub Actions: CI and Builder releases (2026-10-04)
+
+- Both CMake projects build without the game (`P3P_HAVE_GAME` off when `profiles/p3p/game/eboot.elf` is missing): host runtime, tools, Builder and the tests that do not run game code; the New 3DS runtime objects and libraries plus the CWCheat patch list (now its own custom command), the runner objects in the object library `p3p3ds_objects`.
+- Two tests depended on local state and now do not: `test_hle_graphics` skips its reset-list block without the ELF; `test_chase_frontier.py` creates `.tmp/` (absent in a fresh clone; it passed only when another test had created it first).
+- [VERIFIED] Clean worktree without the game (Windows MinGW): build OK, CTest 24/24 (3 skipped: pspautotests absent), also with `.tmp/` removed; 3DS build without the game: `main.o`, `gpu_renderer.o`, `ge_shbin.o`, both libraries and a `patches.txt` identical to the game build's. With the game: host CTest 27/27, `.3dsx` links.
+- `.github/workflows/ci.yml` (push to master, pull requests) and `release.yml` (tag `v*` -> packages for Windows and Linux, GitHub release; manual run = dry run). README "Continuous integration and releases". Results of the first runs: below when known.
+
 ## Frame drops at dialog text and character loads: Mod Support stat (2026-10-04)
 
 Azahar 2126.1.2 (New 3DS mode, build b5f79144 plus this change's diagnostics), maintainer playing the opening.

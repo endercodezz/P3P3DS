@@ -35,6 +35,16 @@ set(P3P_GENERATED_CPP "${P3P_GENERATED_DIR}/p3p_generated.cpp")
 
 # Generation command using psp_recomp
 set(P3P_ELF "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/game/eboot.elf")
+# The decrypted EBOOT is local (tools/prepare_game.py). Without it (CI, a fresh
+# clone) everything made from the game is left out: the AOT units, the PC
+# runner and the tests that execute game code. The runtime, the tools, the
+# P3P3DS Builder and the other tests still build.
+if(EXISTS "${P3P_ELF}")
+    set(P3P_HAVE_GAME ON)
+else()
+    set(P3P_HAVE_GAME OFF)
+    message(STATUS "No ${P3P_ELF}: building without the game-derived targets")
+endif()
 set(P3P_FUNCTIONS_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/p3p_functions.csv")
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(P3P_FRONTIER_CSV "${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/frontier_seeds.csv" CACHE FILEPATH
@@ -49,7 +59,9 @@ set_property(CACHE P3P_AOT_MODE PROPERTY STRINGS AUTO MANUAL)
 set(P3P_AOT_OPT "-O2" CACHE STRING "Optimization flag for generated AOT units (GCC/Clang)")
 include("${CMAKE_CURRENT_SOURCE_DIR}/profiles/p3p/config/aot_layout.cmake")
 
-if(P3P_AOT_MODE STREQUAL "AUTO")
+if(NOT P3P_HAVE_GAME)
+    # No generated code without the EBOOT.
+elseif(P3P_AOT_MODE STREQUAL "AUTO")
     set(P3P_AUTO_DIR "${P3P_GENERATED_DIR}/auto")
     # OFF drops the per-transfer rt.record_transfer diagnostics from the
     # generated code (frontier tooling then has no transfer trace).
@@ -121,7 +133,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(p3p3ds_core PRIVATE -Wall -Wextra)
 endif()
 
-# PC Bootstrap Runner
+# PC Bootstrap Runner (linked with the game's generated code)
+if(P3P_HAVE_GAME)
 add_executable(p3p_pc_bootstrap
     platform/pc/main.cpp
     ${P3P_AOT_RUNNER_SOURCES}
@@ -143,6 +156,7 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(p3p_pc_bootstrap PRIVATE -Wall -Wextra)
+endif()
 endif()
 
 # Decoder Compatibility Verification Tool
@@ -223,6 +237,7 @@ set_tests_properties(p3p_hle_threadman PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+if(P3P_HAVE_GAME)
 add_test(
     NAME p3p_pc_bootstrap_smoke
     COMMAND p3p_pc_bootstrap --verify-bootstrap --max-dispatches 100000
@@ -238,6 +253,7 @@ add_test(
 set_tests_properties(p3p_decoder_compatibility PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )
+endif()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_FOUND)
@@ -277,8 +293,8 @@ target_link_libraries(test_frontier PRIVATE p3p3ds_core)
 add_test(NAME p3p_frontier_safety COMMAND test_frontier)
 add_test(NAME p3p_frontier_workflow COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_chase_frontier.py")
 
-# Interpreter vs AOT differential test (needs the local ELF; skips otherwise).
-if(P3P_AOT_MODE STREQUAL "AUTO")
+# Interpreter vs AOT differential test (needs the local ELF).
+if(P3P_HAVE_GAME AND P3P_AOT_MODE STREQUAL "AUTO")
     add_executable(test_interpreter_diff tests/test_interpreter_diff.cpp)
     target_link_libraries(test_interpreter_diff PRIVATE p3p_aot p3p3ds_core)
     add_test(NAME p3p_interpreter_differential COMMAND test_interpreter_diff "${P3P_ELF}")
