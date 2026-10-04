@@ -7,6 +7,8 @@
 .claude/local/
 local/
 private/
+logs/
+.direnv/
 
 # Workspace containment directories
 .tmp/
