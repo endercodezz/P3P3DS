@@ -77,24 +77,9 @@ For evidence provenance (not a competing API research order):
 
 ## 5. Repository Boundaries & Third-Party Code
 
-The following directories contain upstream/reference projects and must **never** undergo mass refactoring or formatting sweeps:
-- `recomp/` (PSPRecomp, Yakumo, sal063-recomp, psprecomp, N64Recomp)
-- `references/` (ppsspp, pspautotests, uofw, DaedalusX64-3DS)
-- `psp/` (pspsdk, vfpu-docs, prxtool, ghidra-allegrex)
-- `3ds/` (libctru, citro3d, citro2d, 3ds-examples)
-- `p3p/` (p3p-patches, Persona-3-Portable-Mod-Menu)
-- `tools/` (Atlus-Script-Tools, AemulusModManager, Amicitia, AtlusFileSystemLibrary, CriFsV2Lib, CriPakTools)
+Tracked third-party code: `recomp/PSPRecomp` and `p3p/p3p-patches`. Never mass-refactor or reformat them; a needed change is the **minimal viable patch**, commented with the reason (`P3P3DS:`), without unrelated cleanups.
 
-**Our Code Boundaries:**
-All P3P3DS-specific code lives in:
-- `core/` (Target-agnostic P3P runtime, HLE definitions, memory map)
-- `platform/pc/` (Development/debugging PC host runner)
-- `platform/3ds/` (New 3DS `libctru`/`citro3d`/`ndsp` native implementation)
-- `profiles/p3p/` (P3P-specific static recompilation profile, configs, generated units)
-- `experiments/` (Isolated standalone microtests)
-- `docs/` (Architecture, hardware, and reverse engineering documentation)
-
-If an experiment requires modifying an upstream file in a third-party directory, make the **minimal viable patch**, clearly comment the reason, and do not commit unrelated cleanups.
+Research sources (`references/`, `psp/`, `3ds/`, other recompilers in `recomp/`, the asset tools) are untracked clones made by `python tools/fetch_references.py`; read them, never edit them. Everything else, including `tools/*.py`, is P3P3DS code.
 
 ---
 
@@ -171,25 +156,15 @@ For runtime frontier changes, normally run a Release build, full CTest and stabl
 Generic modding support and arbitrary localization packages are first-class architectural requirements:
 - Asset modifications must not require recompiling the runtime executable.
 - The runtime must remain language-neutral: no specific translation or language may be hardcoded into the core engine.
-- Implement the verified fallback resolution chain. On PSP it is provided by the community CWCheat "Mod Support" patch (`p3p/p3p-patches/ULUS10512.ini`, applied by the recompiler) and served by the VFS; ULUS-10512 has no `data.cpk` (`docs/VERIFICATION.md`):
-  ```text
-  sdmc:/p3p3ds/mods/bind/<relative_path>     (ms0:/PSP/P3P/bind/)
-    ↓
-  sdmc:/p3p3ds/mods/mod.cpk
-    ↓
-  sdmc:/p3p3ds/mods/mod1.cpk ... mod3.cpk
-    ↓
-  disc0:/PSP_GAME/USRDIR/umd0.cpk, umd1.cpk  (original game archives)
-  ```
-- Support arbitrary community mod packages and fan translations equally (e.g. Russian, German, French, Spanish, custom balancing, UI overhauls).
-- Inspect whether community patches require binary hook addresses (e.g. CWCheat patches or EBOOT hooks) and implement them cleanly in the profile loader.
+- Support arbitrary community mod packages and fan translations equally; community binary hooks (CWCheat/EBOOT patches) are applied cleanly through the profile.
+- The verified mod fallback chain (`bind/` -> `mod*.cpk` -> `umd0.cpk`/`umd1.cpk`) is in the `p3p-modding-vfs` skill.
 
 ---
 
 ## 10. Nintendo 3DS Target Constraints
 
 - Target **New Nintendo 3DS / New 3DS XL / New 2DS XL only** (Old 3DS is not supported).
-- Any assertion regarding CPU clock (804 MHz), core affinities (Core 0 / Core 2), memory modes (124 MB / 178 MB application heap), L2 cache, PICA200 Tev stages, or NDSP buffers must be verified against `3ds/libctru` sources and empirical hardware/Citra tests.
+- Any assertion regarding CPU clock (804 MHz), core affinities (Core 0 / Core 2), memory modes (124 MB / 178 MB application heap), L2 cache, PICA200 Tev stages, or NDSP buffers must be verified against libctru sources (devkitPro install or `tools/fetch_references.py`) and empirical hardware/emulator tests.
 
 ---
 
@@ -204,14 +179,7 @@ If `.Codex/LOCAL.md` exists, the agent is **obligated to read it immediately aft
 
 ## 12. Documentation Maintenance
 
-Maintain established documentation files in `docs/` instead of proliferating ad-hoc markdown files:
-- `docs/REPOSITORIES.md` — Inventory and roles of repositories.
-- `docs/ARCHITECTURE_OPTIONS.md` — Comparative analysis of architectural paths.
-- `docs/P3P_RESEARCH.md` — Formats, addresses, patches, and asset pipelines.
-- `docs/3DS_PLATFORM.md` — Hardware specifications, 3DS services, and backend design.
-- `docs/NEXT_STEPS.md` — Actionable technical roadmap and experiment milestones.
-- `docs/VERIFICATION.md` — Registry of technical claims and their verification statuses.
-- `docs/P3P_EXECUTABLE_ANALYSIS.md` — Verified technical analysis of the P3P executable.
+Extend the existing files in `docs/` instead of creating ad-hoc markdown files. `docs/CURRENT_STATE.md` records the verified frontier; `docs/VERIFICATION.md` is the claim registry.
 
 ---
 
@@ -262,11 +230,7 @@ After completing a well-defined user task or milestone, the agent must automatic
 2. All regression, verification, and smoke tests have passed cleanly;
 3. There is no explicit instruction from the user forbidding commits.
 
-**Pre-Commit Verification Checklist:**
-- Inspect `git status` and staged/unstaged `git diff`.
-- Ensure no temporary files (`.tmp/`, `.cache/`, scratchpads), local maintainer overrides (`.Codex/LOCAL.md`), credentials, or proprietary game assets/ROMs/dumps are staged.
-- Strictly adhere to Section 15: never alter git `author.name` or `author.email`, and never add AI attribution trailers (`Co-Authored-By`, `Generated-By`, etc.).
-- Use a concise conventional-style commit subject (e.g. `feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`) and an informative body summarizing changes and verification results.
+Never stage temporary files, `.Codex/LOCAL.md`, credentials or game assets. The procedure and its pre/post-commit check scripts are in the `p3p3ds-commit` skill.
 
 **STRICTLY FORBIDDEN AUTOMATIC ACTIONS:**
 - Never execute `git push`
@@ -305,25 +269,7 @@ Existing commits are immutable.
 
 Even if the current task fixes something introduced by the immediately previous commit, it MUST still become a separate follow-up commit.
 
-**Required workflow:**
-```text
-record HEAD before
-→ make changes
-→ verify
-→ git add only relevant files
-→ git commit
-→ verify that the new commit's parent is exactly HEAD before
-→ STOP
-```
-
-**Post-Commit Verification:**
-After committing, explicitly verify:
-```bash
-git rev-parse HEAD
-git rev-parse HEAD^
-git log -2 --oneline
-```
-`HEAD^` MUST equal the recorded HEAD before the task.
+Record HEAD before the task; after committing, `HEAD^` MUST equal it (`p3p3ds-commit` skill, `postcommit_check.sh`).
 
 Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
 
@@ -333,6 +279,5 @@ Do not push, pull, fetch, modify remotes, or rewrite history unless the user exp
 
 Reusable workflows live in `.claude/skills/<name>/SKILL.md` (with helper scripts under `scripts/`); `.agents/skills/` is a byte-identical mirror for other coding agents.
 - Edit skills only in `.claude/skills/`, then run `python tools/sync_agent_skills.py`. CTest `p3p_skills_mirror` (`--check`) fails while the mirror differs.
-- Main workflows: `p3p-run-triage` (build, run, classify the stop, inspect frames/audio, prove determinism), `p3p3ds-commit` (Sections 14-17 commit procedure and host editing pitfalls), `psp-hle-runtime`, `psp-static-recomp`, `p3p3ds-research-verification`, `psp-emulator-debugging`, `p3p-modding-vfs`, `n3ds-platform`.
 - When the same manual procedure is repeated across tasks, capture it as a skill (or extend one) instead of re-deriving it.
 - Report where produced artifacts (frame dumps, WAV, traces) are stored, with exact paths.

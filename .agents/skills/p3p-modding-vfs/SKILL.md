@@ -43,8 +43,10 @@ Do **not** assume all mods are purely asset replacements. For every modification
 
 The HLE `IoFileMgr` subsystem must resolve all game path requests through this strict priority order:
 
+On PSP the chain comes from the community CWCheat "Mod Support" patch (`p3p/p3p-patches/ULUS10512.ini`, applied by the recompiler) and is served by the VFS. ULUS-10512 has no `data.cpk`: the original archives are `USRDIR/umd0.cpk` and `umd1.cpk` (`docs/VERIFICATION.md`). On 3DS `<root>` is `sdmc:/p3p3ds` (`<root>/mods/` maps to PSP `ms0:/PSP/P3P/`).
+
 ```text
-Game calls: sceIoOpen("disc0:/PSP_GAME/USRDIR/data.cpk") or sub-file
+Game calls: sceIoOpen("disc0:/PSP_GAME/USRDIR/umd0.cpk") or sub-file
     │
     ▼
 1. Check: <root>/mods/bind/<relative_path>
@@ -57,12 +59,12 @@ Game calls: sceIoOpen("disc0:/PSP_GAME/USRDIR/data.cpk") or sub-file
     └── Not found
     │
     ▼
-3. Check: <root>/mods/mod1.cpk ... modN.cpk (sequential priority)
+3. Check: <root>/mods/mod1.cpk ... mod3.cpk (sequential priority)
     ├── Contains file? ──► Stream file chunk from modN.cpk
     └── Not found
     │
     ▼
-4. Fallback: <root>/data/data.cpk (Original game archive)
+4. Fallback: disc0:/PSP_GAME/USRDIR/umd0.cpk, umd1.cpk (original game archives)
     ├── Contains file? ──► Stream from base game archive
     └── Not found ──► Return SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND (-0x80010002)
 ```
