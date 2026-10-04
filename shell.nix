@@ -24,6 +24,7 @@ let
     p.git
     p.which
     p.file
+    p.ccache
     (p.python3.withPackages (ps: [ ps.pillow ]))
     # Runtime libraries the devkitARM / picasso / tex3ds / 3dsxtool binaries link against.
     p.stdenv.cc.cc.lib
@@ -42,6 +43,7 @@ let
       export DEVKITPRO="''${DEVKITPRO:-$PWD/.cache/devkitpro}"
       export DEVKITARM="$DEVKITPRO/devkitARM"
       export PATH="$DEVKITPRO/tools/bin:$DEVKITARM/bin:$PATH"
+      export CCACHE_DIR="''${CCACHE_DIR:-$PWD/.cache/ccache}" CCACHE_MAXSIZE="''${CCACHE_MAXSIZE:-20G}"
     '';
     runScript = "bash";
   };
@@ -72,6 +74,7 @@ in
     pkgs.cmake
     pkgs.ninja
     pkgs.git
+    pkgs.ccache # picked up by cmake/ccache.cmake
     python
     pkgs.glibc.static # the host targets link with -static
     p3p-3ds
@@ -84,5 +87,6 @@ in
     export TMPDIR="$PWD/.tmp" TEMP="$PWD/.tmp" TMP="$PWD/.tmp"
     export DEVKITPRO="''${DEVKITPRO:-$PWD/.cache/devkitpro}"
     export DEVKITARM="$DEVKITPRO/devkitARM"
+    export CCACHE_DIR="''${CCACHE_DIR:-$PWD/.cache/ccache}" CCACHE_MAXSIZE="''${CCACHE_MAXSIZE:-20G}"
   '';
 }

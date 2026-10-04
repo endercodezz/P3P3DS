@@ -11,6 +11,7 @@
 # code and is for personal testing only, never for distribution.
 cmake_minimum_required(VERSION 3.20)
 project(p3p3ds_3ds C CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/ccache.cmake")
 
 if(NOT NINTENDO_3DS)
     message(FATAL_ERROR "Configure with -DCMAKE_TOOLCHAIN_FILE=<devkitPro>/cmake/3DS.cmake")
