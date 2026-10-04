@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## P3P3DS Builder on Linux (2026-10-04)
+
+Tooling only; the runtime frontier is unchanged.
+
+- `platform/pc/builder/`: the pipeline is portable (`posix_spawn` on POSIX, `CreateProcessW` + job object on Windows; arguments as a list instead of a quoted command line; `.exe` suffix only on Windows; devkitPro from `$DEVKITPRO` or `/opt/devkitpro`; job count from `MemAvailable`). On Linux `P3P3DS-Builder` is a console program with the `--cli` options; the Win32 wizard is unchanged. `make_release.py` packages the host platform (`-linux.tar.gz` on Linux).
+- [VERIFIED] Linux GCC 16.2 (nixpkgs): builds static, CTest 27/27 (2 skipped as before). Stub-devkitPro run (real decryption, SHA-256 `be2abbd4...`, and real `psp_recomp`; stub compiler/linker/packagers, paths with spaces): forced compiler failure reported with its log, resumed build compiled 174 of 238 units, linked through the response file and packaged.
+- [VERIFIED] MinGW-w64 GCC 15.3 cross build of `P3P3DS-Builder.exe` links; imports only system DLLs; `-Wall -Wextra` warning counts unchanged (pipeline 0, wizard 11 pre-existing).
+- [UNVERIFIED] a real Linux build with devkitPro to a `.3dsx`; the Windows `.exe` was not run; cancellation by Ctrl+C on Linux.
+
 ## Vertex shader: GPU transform, skinning and lighting (2026-10-03)
 
 For the black, slow battle (section below). Not yet run on hardware or in Azahar.

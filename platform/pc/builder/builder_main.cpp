@@ -1,10 +1,13 @@
-// P3P3DS Builder: Windows wizard (Win32, no external UI library) around
-// pipeline.cpp. Portable: sdk/, work/ and output/ live next to the .exe.
+// P3P3DS Builder around pipeline.cpp. Portable: sdk/, work/ and output/ live
+// next to the executable.
+// Windows: a wizard (Win32, no external UI library);
 // `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--out <file>]
-// [--jobs <n>]` runs the same build in a console (used for testing).
-#include "fun_facts.hpp"
+// [--jobs <n>] [--work <dir>]` runs the same build in a console.
+// Linux and other POSIX hosts: console only, same options (`--cli` optional).
 #include "pipeline.hpp"
 
+#ifdef _WIN32
+#include "fun_facts.hpp"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -13,9 +16,11 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#endif
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <thread>
@@ -24,6 +29,41 @@
 namespace fs = std::filesystem;
 using namespace p3p3ds::builder;
 
+namespace {
+
+Settings default_settings(const fs::path &exe_dir) {
+    Settings s;
+    s.sdk = exe_dir / "sdk";
+    s.work = exe_dir / "work";
+    s.output = exe_dir / "output" / "p3p3ds.3dsx";
+    s.devkitpro = Pipeline::find_devkitpro();
+    return s;
+}
+
+int run_console(const Settings &s) {
+    const auto start = std::chrono::steady_clock::now();
+    std::string last;
+    Pipeline p(s, [&](const Progress &pr) {
+        if (pr.step != last || pr.units_done % 20 == 0) {
+            std::printf("[%5.1f%%] %s %u/%u eta=%.0fs\n", pr.fraction * 100, pr.step.c_str(), pr.units_done, pr.units_total, pr.eta_seconds);
+            std::fflush(stdout);
+            last = pr.step;
+        }
+    }, [](const std::string &l) { std::printf("%s\n", l.c_str()); std::fflush(stdout); });
+    try {
+        p.run();
+    } catch (const std::exception &e) {
+        std::printf("FAILED: %s\n", e.what());
+        return 1;
+    }
+    std::printf("OK in %.0f s: %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(),
+                s.output.string().c_str());
+    return 0;
+}
+
+} // namespace
+
+#ifdef _WIN32
 namespace {
 
 constexpr int kWidth = 620, kHeight = 470, kHeader = 64;
@@ -402,11 +442,7 @@ int run_cli(int argc, wchar_t **argv) {
         if (!AttachConsole(ATTACH_PARENT_PROCESS)) AllocConsole();
         std::freopen("CONOUT$", "w", stdout);
     }
-    Settings s;
-    s.sdk = app.exe_dir / "sdk";
-    s.work = app.exe_dir / "work";
-    s.output = app.exe_dir / "output" / "p3p3ds.3dsx";
-    s.devkitpro = Pipeline::find_devkitpro();
+    Settings s = default_settings(app.exe_dir);
     for (int i = 1; i + 1 < argc; ++i) {
         const std::wstring a = argv[i];
         if (a == L"--iso") s.iso = argv[++i];
@@ -415,24 +451,7 @@ int run_cli(int argc, wchar_t **argv) {
         else if (a == L"--jobs") s.jobs = static_cast<unsigned>(_wtoi(argv[++i]));
         else if (a == L"--work") s.work = argv[++i];
     }
-    const auto start = std::chrono::steady_clock::now();
-    std::string last;
-    Pipeline p(s, [&](const Progress &pr) {
-        if (pr.step != last || pr.units_done % 20 == 0) {
-            std::printf("[%5.1f%%] %s %u/%u eta=%.0fs\n", pr.fraction * 100, pr.step.c_str(), pr.units_done, pr.units_total, pr.eta_seconds);
-            std::fflush(stdout);
-            last = pr.step;
-        }
-    }, [](const std::string &l) { std::printf("%s\n", l.c_str()); std::fflush(stdout); });
-    try {
-        p.run();
-    } catch (const std::exception &e) {
-        std::printf("FAILED: %s\n", e.what());
-        return 1;
-    }
-    std::printf("OK in %.0f s: %s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(),
-                s.output.string().c_str());
-    return 0;
+    return run_console(s);
 }
 
 } // namespace
@@ -487,3 +506,38 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     if (app.worker.joinable()) { app.pipeline->cancel(); app.worker.join(); }
     return 0;
 }
+
+#else // POSIX: console only
+
+int main(int argc, char **argv) {
+    std::error_code ec;
+    fs::path self = fs::read_symlink("/proc/self/exe", ec); // Linux; elsewhere fall back to argv[0]
+    if (ec) self = fs::absolute(argv[0]);
+    Settings s = default_settings(self.parent_path());
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        const bool has_value = i + 1 < argc;
+        if (a == "--cli") continue;
+        if (a == "--help" || a == "-h") {
+            std::printf("usage: %s --iso <ULUS-10512.iso> [--devkitpro <dir>] [--out <file.3dsx>] [--jobs <n>] [--work <dir>]\n", argv[0]);
+            return 0;
+        }
+        if (!has_value || (a != "--iso" && a != "--devkitpro" && a != "--out" && a != "--jobs" && a != "--work")) {
+            std::fprintf(stderr, "unknown or incomplete option: %s (see --help)\n", a.c_str());
+            return 2;
+        }
+        const char *v = argv[++i];
+        if (a == "--iso") s.iso = v;
+        else if (a == "--devkitpro") s.devkitpro = v;
+        else if (a == "--out") s.output = v;
+        else if (a == "--work") s.work = v;
+        else s.jobs = static_cast<unsigned>(std::strtoul(v, nullptr, 10));
+    }
+    if (s.iso.empty()) {
+        std::fprintf(stderr, "--iso is required (see --help)\n");
+        return 2;
+    }
+    return run_console(s);
+}
+
+#endif

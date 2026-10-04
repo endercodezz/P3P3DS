@@ -70,7 +70,7 @@ There is **no ready-made download of the game**: the `.3dsx` contains code gener
 You need:
 - a **New 3DS / New 3DS XL / New 2DS XL** with custom firmware and the Homebrew Launcher (Old 3DS models are not supported yet);
 - your own *Persona 3 Portable* `ULUS-10512` ISO;
-- Windows 10/11 and [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the **3DS Development** component (official installer; the builder uses its ARM compiler and 3DS libraries).
+- Windows 10/11 or Linux x86-64, and [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the **3DS Development** component (Windows installer, or `dkp-pacman -S 3ds-dev` on Linux; the builder uses its ARM compiler and 3DS libraries).
 
 ### With the P3P3DS Builder (recommended)
 
@@ -78,6 +78,8 @@ You need:
 2. Run `P3P3DS-Builder.exe`, choose your ISO (devkitPro is found automatically when installed in the usual place) and press **Build**.
 3. Wait about 5-15 minutes: the game's code is translated to C++ and compiled for the 3DS on all CPU cores, with a progress bar, a time estimate and Persona 3 trivia. An interrupted build continues where it stopped.
 4. The builder can copy everything to your SD card itself; otherwise copy as shown below.
+
+On Linux the builder is a console program (`P3P3DS-Builder-<version>-linux.tar.gz`): `./P3P3DS-Builder --iso <iso> [--devkitpro <dir>] [--out <file>] [--jobs <n>]`; devkitPro is looked up in `$DEVKITPRO`, then `/opt/devkitpro`. On NixOS run it inside `p3p-3ds` from `shell.nix`, where devkitPro's prebuilt binaries work.
 
 The builder package (about 2 MB zipped) contains no game data: only the prebuilt P3P3DS runtime for the 3DS, the code generator and the community CWCheat patch list; everything made from the game is generated on your PC. Measured clean builds on a 12-thread CPU: 4 min 23 s with 12 compiler jobs, 4 min 55 s with 7 (the builder picks the number from CPU cores and free memory).
 
@@ -295,11 +297,11 @@ Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen
 ### Build the P3P3DS Builder release
 
 ```bash
-cmake --build build --target p3p3ds_builder          # P3P3DS-Builder.exe (Win32, static)
+cmake --build build --target p3p3ds_builder          # P3P3DS-Builder.exe (Win32 wizard) / P3P3DS-Builder (Linux console), static
 python platform/pc/builder/make_release.py --version 0.1.0 --devkitpro <devkitPro folder>
 ```
 
-`make_release.py` needs the host build (`psp_recomp.exe`) and the New 3DS build in `build/3ds/` (runtime objects, CWCheat patch list); it writes `out/P3P3DS-Builder-<version>/` and a `.zip` for GitHub Releases. `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--jobs <n>]` runs the same build without the window. Sources: `platform/pc/builder/` (pipeline, EBOOT decryption, wizard, trivia).
+`make_release.py` needs the host build (`psp_recomp.exe`) and the New 3DS build in `build/3ds/` (runtime objects, CWCheat patch list); it packages the build of the platform it runs on: `out/P3P3DS-Builder-<version>/` and a `.zip` on Windows, `out/P3P3DS-Builder-<version>-linux/` and a `.tar.gz` on Linux. `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--jobs <n>]` runs the same build without the window. Sources: `platform/pc/builder/` (pipeline, EBOOT decryption, wizard, trivia).
 
 ### Run the game on PC
 
