@@ -30,7 +30,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
       - id: version
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
       - name: Install tools
@@ -71,7 +71,7 @@ jobs:
                    libp3p3ds_core.a libpsprecomp_runtime.a; do
             "$DEVKITARM/bin/arm-none-eabi-strip" --strip-debug "$f"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: n3ds-runtime
           include-hidden-files: true
@@ -89,7 +89,7 @@ jobs:
     needs: [check, n3ds]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
       - name: Install tools
@@ -98,13 +98,13 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14
           cmake --build build -j4 --target p3p3ds_builder psp_recomp
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: n3ds-runtime
           path: build/3ds
       - name: Package
         run: python3 platform/pc/builder/make_release.py --version "${{ needs.check.outputs.version }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: package-linux
           if-no-files-found: error
@@ -118,7 +118,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
       - uses: msys2/setup-msys2@v2
@@ -135,13 +135,13 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j4 --target p3p3ds_builder psp_recomp
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: n3ds-runtime
           path: build/3ds
       - name: Package
         run: python platform/pc/builder/make_release.py --version "${{ needs.check.outputs.version }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: package-windows
           if-no-files-found: error
@@ -153,7 +153,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: package-*
           merge-multiple: true
