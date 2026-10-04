@@ -1,5 +1,7 @@
 #include "p3p3ds/vfs.hpp"
 
+#include "p3p3ds/profile.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -28,6 +30,8 @@ public:
     std::size_t read(std::uint64_t offset, void *destination, std::size_t length) const override {
         if (offset >= size_) return 0u;
         length = static_cast<std::size_t>(std::min<std::uint64_t>(length, size_ - offset));
+        const ProfileScope timer(host_profile().io_ns, host_profile().io_calls);
+        if (host_profile().enabled) host_profile().io_bytes += length;
         std::lock_guard guard(*lock_);
         stream_->clear();
         stream_->seekg(static_cast<std::streamoff>(offset_ + offset));
@@ -49,6 +53,8 @@ public:
     std::size_t read(std::uint64_t offset, void *destination, std::size_t length) const override {
         if (offset >= size_) return 0u;
         length = static_cast<std::size_t>(std::min<std::uint64_t>(length, size_ - offset));
+        const ProfileScope timer(host_profile().io_ns, host_profile().io_calls);
+        if (host_profile().enabled) host_profile().io_bytes += length;
         std::lock_guard guard(lock_);
         stream_.clear();
         stream_.seekg(static_cast<std::streamoff>(offset));
@@ -166,9 +172,60 @@ std::optional<std::vector<Entry>> IsoFileSystem::list(std::string_view path) con
 // Host directory
 // ---------------------------------------------------------------------------
 
-HostFileSystem::HostFileSystem(std::filesystem::path root) : root_(std::move(root)) {}
+HostFileSystem::HostFileSystem(std::filesystem::path root, bool fixed_contents)
+    : root_(std::move(root)), fixed_contents_(fixed_contents) {}
+
+std::shared_ptr<const HostFileSystem::Listing> HostFileSystem::listing(const std::string &key, const std::filesystem::path &directory) const {
+    std::lock_guard guard(cache_lock_);
+    if (const auto it = listings_.find(key); it != listings_.end()) return it->second;
+    std::shared_ptr<Listing> result;
+    std::error_code ec;
+    std::filesystem::directory_iterator it(directory, ec);
+    if (!ec) {
+        result = std::make_shared<Listing>();
+        // Names and kinds only: sizes are read for the entries actually found.
+        for (; it != std::filesystem::directory_iterator(); it.increment(ec)) {
+            if (ec) break;
+            std::error_code kind_ec;
+            const auto name = it->path().filename().string();
+            (*result)[upper(name)] = Listed{name, it->is_directory(kind_ec)};
+        }
+    }
+    listings_[key] = result;
+    return result;
+}
+
+std::optional<std::pair<std::filesystem::path, bool>> HostFileSystem::resolve_cached(std::string_view path) const {
+    const auto clean = normalize(path);
+    if (!clean) return std::nullopt;
+    std::filesystem::path current = root_;
+    std::string key;
+    if (!listing(key, current)) return std::nullopt; // the root itself is missing
+    bool directory = true;
+    std::size_t start = 0;
+    while (start < clean->size()) {
+        if (!directory) return std::nullopt;
+        const auto end = clean->find('/', start);
+        const auto part = upper(clean->substr(start, end == std::string::npos ? std::string::npos : end - start));
+        const auto dir = listing(key, current);
+        if (!dir) return std::nullopt;
+        const auto found = dir->find(part);
+        if (found == dir->end()) return std::nullopt;
+        current /= found->second.name;
+        directory = found->second.directory;
+        key = key.empty() ? part : key + "/" + part;
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return std::pair{current, directory};
+}
 
 std::optional<std::filesystem::path> HostFileSystem::resolve(std::string_view path) const {
+    if (fixed_contents_) {
+        const auto cached = resolve_cached(path);
+        if (!cached) return std::nullopt;
+        return cached->first;
+    }
     const auto clean = normalize(path);
     if (!clean) return std::nullopt;
     // Case-insensitive component match, as on the PSP.
@@ -203,8 +260,14 @@ std::shared_ptr<const Source> HostFileSystem::open(std::string_view path) const 
 }
 
 std::optional<Entry> HostFileSystem::stat(std::string_view path) const {
-    const auto resolved = resolve(path);
     std::error_code ec;
+    if (fixed_contents_) {
+        const auto cached = resolve_cached(path);
+        if (!cached) return std::nullopt;
+        const auto &[host, directory] = *cached;
+        return Entry{host.filename().string(), directory, directory ? 0u : std::filesystem::file_size(host, ec)};
+    }
+    const auto resolved = resolve(path);
     if (!resolved || !std::filesystem::exists(*resolved, ec)) return std::nullopt;
     const bool directory = std::filesystem::is_directory(*resolved, ec);
     return Entry{resolved->filename().string(), directory, directory ? 0u : std::filesystem::file_size(*resolved, ec)};

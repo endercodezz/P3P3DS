@@ -2,6 +2,17 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Frame drops at dialog text and character loads: Mod Support stat (2026-10-04)
+
+Azahar 2126.1.2 (New 3DS mode, build b5f79144 plus this change's diagnostics), maintainer playing the opening.
+
+- [VERIFIED] Not Azahar: at a drop its status bar showed `Speed: 100%` with `App: 17 FPS`. Not the game logic: it renders 1 frame per 2 vblanks in drops too (17.7 frames at 35 vblanks/s); the vblank rate falls, i.e. the runtime falls behind real time.
+- [VERIFIED] Not the recompiled code: per-second split (new `sdmc:/p3p3ds/profile_seconds.txt` switch -> `profile_seconds.csv`), 19 slow seconds (< 50 vblanks) vs 123 steady: AOT share lower in slow seconds (34.6 % vs 39.9 %), HLE share up (32 % vs 18.8 %) with fewer HLE calls.
+- [VERIFIED] Cause: `sceIoGetstat` at 83 ms per call (48 calls, 4,007 ms in the slow seconds; 2 calls in 123 steady seconds). PC runner `new_game.txt` events: every getstat is `ms0:/PSP/P3P/bind/...` (CWCheat Mod Support), all missing, including voice files (`bind/data/sound/voice/v450001.afs`) loaded with dialog lines. Each lookup did several SD operations in `HostFileSystem::resolve`.
+- Fix: `HostFileSystem(root, fixed_contents=true)` for the read-only mod folder lists each directory once and answers lookups from memory (sizes only for found files). Regression checks in `tests/test_iofilemgr.cpp` compare it with uncached lookups. [UNVERIFIED] the drop is gone in Azahar / on hardware: the 3DS build with the fix was not run.
+- Diagnostics kept: `io` (VFS read time) in the report split; per-import HLE time in `psprecomp::runtime_profile()` (`per_import`), top 3 per second in the CSV.
+- [VERIFIED] CTest 27/27 (2 skipped as before).
+
 ## P3P3DS Builder on Linux (2026-10-04)
 
 Tooling only; the runtime frontier is unchanged.

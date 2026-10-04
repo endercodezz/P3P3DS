@@ -119,13 +119,23 @@ RuntimeProfile &runtime_profile() noexcept { static RuntimeProfile profile; retu
 namespace {
 struct HleTimer {
     std::chrono::steady_clock::time_point start;
+    std::string_view library;
+    std::uint32_t nid;
     bool on;
-    HleTimer() : on(runtime_profile().enabled) { if (on) start = std::chrono::steady_clock::now(); }
+    HleTimer(std::string_view lib, std::uint32_t id) : library(lib), nid(id), on(runtime_profile().enabled) {
+        if (on) start = std::chrono::steady_clock::now();
+    }
     ~HleTimer() {
         if (!on) return;
         auto &p = runtime_profile();
-        p.hle_ns += static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
+        const auto ns = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
+        p.hle_ns += ns;
         ++p.hle_calls;
+        if (!p.per_import) return;
+        auto &entry = p.imports[std::hash<std::string_view>{}(library) * 31u + nid];
+        if (entry.calls == 0u) { entry.library = std::string(library); entry.nid = nid; }
+        entry.ns += ns;
+        ++entry.calls;
     }
 };
 } // namespace
@@ -1254,7 +1264,7 @@ void Runtime::invoke_import_cached(std::uint32_t slot, std::string_view library,
         import_bindings_[slot] = bound;
     }
 
-    const HleTimer hle_timer; // P3P3DS profiling
+    const HleTimer hle_timer(library, nid); // P3P3DS profiling
     (*bound)(*this, ctx);
     if (!stopped_ && g_post_import_hook != nullptr) g_post_import_hook(*this, ctx);
 }
@@ -1274,7 +1284,7 @@ void Runtime::invoke_import(std::string_view library, std::uint32_t nid, Allegre
         stop("Missing HLE import " + library_name + "::" + name);
         return;
     }
-    const HleTimer hle_timer; // P3P3DS profiling
+    const HleTimer hle_timer(library, nid); // P3P3DS profiling
     function_it->second(*this, ctx);
     if (!stopped_ && g_post_import_hook != nullptr) g_post_import_hook(*this, ctx);
 }

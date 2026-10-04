@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace p3p3ds::vfs {
@@ -65,16 +66,29 @@ private:
 };
 
 // A directory on the host (loose-file overrides, extracted data, ms0:).
+// fixed_contents: the tree does not change while the game runs (read-only
+// mod folders). Each directory is then listed from the host once and lookups
+// are answered from memory: the Mod Support patch stats ms0:/PSP/P3P/bind/<file>
+// before every game file it loads (voices, scripts), almost always missing,
+// and each host lookup costs several SD card operations on the 3DS.
 class HostFileSystem final : public FileSystem {
 public:
-    explicit HostFileSystem(std::filesystem::path root);
+    explicit HostFileSystem(std::filesystem::path root, bool fixed_contents = false);
     [[nodiscard]] std::shared_ptr<const Source> open(std::string_view path) const override;
     [[nodiscard]] std::optional<Entry> stat(std::string_view path) const override;
     [[nodiscard]] std::optional<std::vector<Entry>> list(std::string_view path) const override;
 
 private:
+    struct Listed { std::string name; bool directory{}; };
+    using Listing = std::map<std::string, Listed>; // upper-case name -> entry
     [[nodiscard]] std::optional<std::filesystem::path> resolve(std::string_view path) const;
+    // fixed_contents: host path and whether it is a directory, from cached listings.
+    [[nodiscard]] std::optional<std::pair<std::filesystem::path, bool>> resolve_cached(std::string_view path) const;
+    [[nodiscard]] std::shared_ptr<const Listing> listing(const std::string &key, const std::filesystem::path &directory) const;
     std::filesystem::path root_;
+    bool fixed_contents_{};
+    mutable std::mutex cache_lock_;
+    mutable std::map<std::string, std::shared_ptr<const Listing>> listings_; // upper-case relative dir -> listing (null: missing)
 };
 
 // In-memory byte source (tests, synthesized overlays).
