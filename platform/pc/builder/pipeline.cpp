@@ -1,20 +1,32 @@
-// See pipeline.hpp. Windows-only (CreateProcessW job pool).
+// See pipeline.hpp.
 #include "pipeline.hpp"
 
 #include "psp_eboot.hpp"
 #include "p3p3ds/vfs.hpp"
 
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#else
+#include <fcntl.h>
+#include <signal.h>
+#include <spawn.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char **environ;
+#endif
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -33,15 +45,125 @@ constexpr const char *kCompileFlags =
     "-D__3DS__ -DNDEBUG -std=gnu++20 -Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2 "
     "-DPSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 -DPSPRECOMP_NO_FRONTIER_DIAGNOSTICS=1 -DPSPRECOMP_CHAIN_NOINLINE=1";
 constexpr const char *kArchFlags = "-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -mword-relocations";
+#ifdef _WIN32
+constexpr const char *kExe = ".exe";
+#else
+constexpr const char *kExe = "";
+#endif
 
-std::wstring widen(const std::string &s) {
-    if (s.empty()) return {};
-    const int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
-    std::wstring w(static_cast<std::size_t>(n), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), w.data(), n);
-    return w;
+using Args = std::vector<fs::path>;
+
+fs::path tool(const fs::path &dir, const char *name) { return dir / (std::string(name) + kExe); }
+// "-I" + path as one argument, without converting the path through a narrow encoding.
+fs::path joined(const char *flag, const fs::path &p) {
+    fs::path r(flag);
+    r += p.native();
+    return r;
 }
-std::wstring quote(const fs::path &p) { return L"\"" + p.wstring() + L"\""; }
+void append_words(Args &args, const char *words) {
+    std::istringstream in(words);
+    for (std::string w; in >> w;) args.emplace_back(w);
+}
+
+// ---- Child processes: stdout and stderr redirected to a log file ----------
+#ifdef _WIN32
+struct Child { HANDLE process{}; };
+
+// CommandLineToArgvW quoting rules.
+std::wstring quote_arg(const std::wstring &a) {
+    if (!a.empty() && a.find_first_of(L" \t\"") == std::wstring::npos) return a;
+    std::wstring r = L"\"";
+    std::size_t slashes = 0;
+    for (const wchar_t c : a) {
+        if (c == L'\\') { ++slashes; continue; }
+        r.append(c == L'"' ? slashes * 2 + 1 : slashes, L'\\');
+        slashes = 0;
+        r += c;
+    }
+    r.append(slashes * 2, L'\\');
+    return r + L"\"";
+}
+
+Child spawn_child(const Args &argv, const fs::path &log, void *job, bool low_priority) {
+    std::wstring cmd;
+    for (const auto &a : argv) cmd += (cmd.empty() ? L"" : L" ") + quote_arg(a.wstring());
+    SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+    HANDLE out = CreateFileW(log.wstring().c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (out == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot create " + log.string() + ".");
+    STARTUPINFOW si{};
+    si.cb = sizeof si;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = si.hStdError = out;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    PROCESS_INFORMATION pi{};
+    const DWORD flags = CREATE_NO_WINDOW | (low_priority ? BELOW_NORMAL_PRIORITY_CLASS : 0);
+    const BOOL ok = CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, flags, nullptr, nullptr, &si, &pi);
+    CloseHandle(out);
+    if (!ok)
+        throw std::runtime_error("Cannot start " + argv[0].filename().string() + " (Windows error " + std::to_string(GetLastError()) + ").");
+    if (job) AssignProcessToJobObject(static_cast<HANDLE>(job), pi.hProcess);
+    CloseHandle(pi.hThread);
+    return {pi.hProcess};
+}
+
+// True once the child has exited; `code` is its exit code.
+bool child_done(Child &c, int &code) {
+    if (WaitForSingleObject(c.process, 0) == WAIT_TIMEOUT) return false;
+    DWORD exit_code = 1;
+    GetExitCodeProcess(c.process, &exit_code);
+    CloseHandle(c.process);
+    c.process = nullptr;
+    code = static_cast<int>(exit_code);
+    return true;
+}
+
+void kill_child(Child &c) {
+    if (!c.process) return;
+    TerminateProcess(c.process, 1);
+    WaitForSingleObject(c.process, 5000);
+    CloseHandle(c.process);
+    c.process = nullptr;
+}
+#else
+struct Child { pid_t pid{-1}; };
+
+Child spawn_child(const Args &argv, const fs::path &log, void *, bool low_priority) {
+    std::vector<std::string> strings;
+    for (const auto &a : argv) strings.push_back(a.string());
+    std::vector<char *> ptrs;
+    for (auto &s : strings) ptrs.push_back(s.data());
+    ptrs.push_back(nullptr);
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, log.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+    pid_t pid = -1;
+    const int rc = posix_spawn(&pid, ptrs[0], &actions, nullptr, ptrs.data(), environ);
+    posix_spawn_file_actions_destroy(&actions);
+    if (rc != 0) throw std::runtime_error("Cannot start " + strings[0] + ": " + std::strerror(rc) + ".");
+    if (low_priority) setpriority(PRIO_PROCESS, static_cast<id_t>(pid), 10); // like BELOW_NORMAL_PRIORITY_CLASS
+    return {pid};
+}
+
+// True once the child has exited; `code` is its exit status (128 + signal when killed).
+bool child_done(Child &c, int &code) {
+    int status = 0;
+    const pid_t r = waitpid(c.pid, &status, WNOHANG);
+    if (r == 0) return false;
+    code = r < 0 ? 1 : WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+    c.pid = -1;
+    return true;
+}
+
+void kill_child(Child &c) {
+    if (c.pid <= 0) return;
+    kill(c.pid, SIGKILL);
+    int status = 0;
+    waitpid(c.pid, &status, 0);
+    c.pid = -1;
+}
+#endif
+
 // gcc response files treat backslashes as escapes: forward slashes only.
 std::string rsp_path(const fs::path &p) {
     const auto u = p.generic_u8string();
@@ -111,8 +233,8 @@ std::string Pipeline::check_iso(const fs::path &iso) {
 
 std::string Pipeline::check_devkitpro(const fs::path &root) {
     if (root.empty()) return "devkitPro was not found.";
-    const fs::path need[] = {"devkitARM/bin/arm-none-eabi-g++.exe", "libctru/lib/libctru.a", "libctru/lib/libcitro3d.a",
-                             "libctru/default_icon.png", "tools/bin/3dsxtool.exe", "tools/bin/smdhtool.exe"};
+    const fs::path need[] = {tool("devkitARM/bin", "arm-none-eabi-g++"), "libctru/lib/libctru.a", "libctru/lib/libcitro3d.a",
+                             "libctru/default_icon.png", tool("tools/bin", "3dsxtool"), tool("tools/bin", "smdhtool")};
     for (const auto &n : need)
         if (!fs::exists(root / n)) return "Missing " + (root / n).generic_string() + ": install the \"3DS Development\" packages.";
     return {};
@@ -120,49 +242,48 @@ std::string Pipeline::check_devkitpro(const fs::path &root) {
 
 fs::path Pipeline::find_devkitpro() {
     std::vector<fs::path> candidates;
-    if (const char *env = std::getenv("DEVKITPRO")) candidates.emplace_back(env); // usable only when it is a Windows path
+    if (const char *env = std::getenv("DEVKITPRO")) candidates.emplace_back(env); // on Windows usable only when it is a Windows path
+#ifdef _WIN32
     for (const char *drive : {"C:", "D:", "E:"}) candidates.emplace_back(std::string(drive) + "\\devkitPro");
+#else
+    candidates.emplace_back("/opt/devkitpro"); // devkitPro pacman default
+#endif
     for (const auto &c : candidates)
         if (check_devkitpro(c).empty()) return c;
     return {};
 }
 
 unsigned Pipeline::automatic_jobs() {
+#ifdef _WIN32
     const unsigned cores = std::max<unsigned>(1, GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
     MEMORYSTATUSEX mem{};
     mem.dwLength = sizeof mem;
     GlobalMemoryStatusEx(&mem);
+    const auto avail_mib = static_cast<long long>(mem.ullAvailPhys / (1024 * 1024));
+#else
+    const unsigned cores = std::max<unsigned>(1, std::thread::hardware_concurrency());
+    // MemAvailable counts reclaimable page cache, like ullAvailPhys on Windows.
+    long long avail_mib = -1;
+    std::ifstream meminfo("/proc/meminfo");
+    for (std::string line; avail_mib < 0 && std::getline(meminfo, line);)
+        if (line.rfind("MemAvailable:", 0) == 0) avail_mib = std::atoll(line.c_str() + 13) / 1024;
+    if (avail_mib < 0) return cores;
+#endif
     // Measured: 383 MiB peak working set per compiler on the largest units
     // (-Os, devkitARM GCC 16.1); 450 MiB leaves headroom. Keep 1.5 GiB for the system.
-    const auto avail_mib = static_cast<long long>(mem.ullAvailPhys / (1024 * 1024));
     const unsigned by_memory = static_cast<unsigned>(std::max<long long>(1, (avail_mib - 1536) / 450));
     return std::max<unsigned>(1, std::min(cores, by_memory));
 }
 
-int Pipeline::run_tool(const std::wstring &command, const fs::path &log_file) {
-    SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
-    HANDLE out = CreateFileW(log_file.wstring().c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    STARTUPINFOW si{};
-    si.cb = sizeof si;
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdOutput = si.hStdError = out;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    PROCESS_INFORMATION pi{};
-    std::wstring cmd = command;
-    if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-        CloseHandle(out);
-        throw std::runtime_error("Cannot start a build tool (Windows error " + std::to_string(GetLastError()) + ").");
+int Pipeline::run_tool(const Args &argv, const fs::path &log_file) {
+    Child child = spawn_child(argv, log_file, job_, false);
+    int code = 1;
+    while (!child_done(child, code)) {
+        if (cancelled_) { kill_child(child); throw std::runtime_error("Cancelled."); }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    if (job_) AssignProcessToJobObject(static_cast<HANDLE>(job_), pi.hProcess);
-    CloseHandle(out);
-    while (WaitForSingleObject(pi.hProcess, 200) == WAIT_TIMEOUT)
-        if (cancelled_) TerminateProcess(pi.hProcess, 1);
-    DWORD code = 1;
-    GetExitCodeProcess(pi.hProcess, &code);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
     if (cancelled_) throw std::runtime_error("Cancelled.");
-    return static_cast<int>(code);
+    return code;
 }
 
 void Pipeline::decrypt() {
@@ -194,8 +315,8 @@ void Pipeline::generate() {
     std::error_code ec;
     fs::remove_all(gen_, ec);
     fs::create_directories(gen_);
-    const std::wstring cmd = quote(s_.sdk / "bin" / "psp_recomp.exe") + L" " + quote(elf_) + L" --auto " + quote(gen_) + L" " +
-                             widen(kLoadBase) + L" " + widen(kUnitSpan) + L" " + quote(s_.sdk / "patches.txt") + L" --no-transfer-records";
+    const Args cmd = {tool(s_.sdk / "bin", "psp_recomp"), elf_, "--auto", gen_, kLoadBase, kUnitSpan, s_.sdk / "patches.txt",
+                      "--no-transfer-records"};
     const fs::path log = s_.work / "generate.log";
     if (run_tool(cmd, log) != 0) throw std::runtime_error("Code generation failed:\n" + read_text(log));
     unsigned units = 0;
@@ -208,9 +329,9 @@ void Pipeline::generate() {
 void Pipeline::compile() {
     obj_ = s_.work / "obj";
     fs::create_directories(obj_);
-    const fs::path gxx = s_.devkitpro / "devkitARM" / "bin" / "arm-none-eabi-g++.exe";
-    const std::wstring common = widen(kCompileFlags) + L" -I" + quote(gen_) + L" -I" + quote(s_.sdk / "include") + L" -isystem " +
-                                quote(s_.devkitpro / "libctru" / "include");
+    Args common = {tool(s_.devkitpro / "devkitARM" / "bin", "arm-none-eabi-g++")};
+    append_words(common, kCompileFlags);
+    common.insert(common.end(), {joined("-I", gen_), joined("-I", s_.sdk / "include"), "-isystem", s_.devkitpro / "libctru" / "include"});
     const std::string flags_stamp = std::string(kCompileFlags) + " " + read_text(gen_ / "builder.stamp", 400);
 
     struct Unit { fs::path src, obj; std::uint64_t bytes; };
@@ -231,7 +352,7 @@ void Pipeline::compile() {
     const unsigned jobs = s_.jobs ? s_.jobs : automatic_jobs();
     if (log_) log_("Compiling " + std::to_string(pending.size()) + " of " + std::to_string(total) + " units with " + std::to_string(jobs) + " parallel jobs.");
 
-    struct Active { PROCESS_INFORMATION pi; Unit unit; fs::path log; };
+    struct Active { Child child; Unit unit; fs::path log; };
     std::vector<Active> active;
     const auto start = std::chrono::steady_clock::now();
     const std::uint64_t start_bytes = done_bytes;
@@ -245,7 +366,7 @@ void Pipeline::compile() {
         progress("Compiling the game code for the 3DS", 0.12 + 0.76 * frac, eta, done, total);
     };
     auto kill_all = [&] {
-        for (auto &a : active) { TerminateProcess(a.pi.hProcess, 1); CloseHandle(a.pi.hProcess); CloseHandle(a.pi.hThread); }
+        for (auto &a : active) kill_child(a.child);
         active.clear();
     };
     report();
@@ -253,42 +374,36 @@ void Pipeline::compile() {
         while (next < pending.size() && active.size() < jobs) {
             const Unit &u = pending[next++];
             const fs::path log = fs::path(u.obj).replace_extension(".log");
-            const std::wstring cmd = quote(gxx) + L" " + common + L" -c " + quote(u.src) + L" -o " + quote(u.obj);
-            SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
-            HANDLE out = CreateFileW(log.wstring().c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-            STARTUPINFOW si{};
-            si.cb = sizeof si;
-            si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdOutput = si.hStdError = out;
-            PROCESS_INFORMATION pi{};
-            std::wstring mutable_cmd = cmd;
-            const BOOL ok = CreateProcessW(nullptr, mutable_cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS,
-                                           nullptr, nullptr, &si, &pi);
-            CloseHandle(out);
-            if (!ok) { kill_all(); throw std::runtime_error("Cannot start the devkitARM compiler (Windows error " + std::to_string(GetLastError()) + ")."); }
-            if (job_) AssignProcessToJobObject(static_cast<HANDLE>(job_), pi.hProcess);
-            active.push_back({pi, u, log});
+            Args cmd = common;
+            cmd.insert(cmd.end(), {"-c", u.src, "-o", u.obj});
+            try {
+                active.push_back({spawn_child(cmd, log, job_, true), u, log});
+            } catch (...) {
+                kill_all();
+                throw;
+            }
         }
-        std::vector<HANDLE> handles;
-        for (auto &a : active) handles.push_back(a.pi.hProcess);
-        const DWORD w = WaitForMultipleObjects(static_cast<DWORD>(handles.size()), handles.data(), FALSE, 250);
         if (cancelled_) { kill_all(); throw std::runtime_error("Cancelled."); }
-        if (w == WAIT_TIMEOUT) { report(); continue; }
-        if (w >= WAIT_OBJECT_0 + handles.size()) { kill_all(); throw std::runtime_error("Waiting for the compiler failed."); }
-        Active a = active[w - WAIT_OBJECT_0];
-        active.erase(active.begin() + (w - WAIT_OBJECT_0));
-        DWORD code = 1;
-        GetExitCodeProcess(a.pi.hProcess, &code);
-        CloseHandle(a.pi.hProcess);
-        CloseHandle(a.pi.hThread);
-        if (code != 0) {
-            kill_all();
-            throw std::runtime_error("Compiling " + a.unit.src.filename().string() + " failed:\n" + read_text(a.log));
+        bool finished = false;
+        for (std::size_t i = 0; i < active.size();) {
+            int code = 1;
+            if (!child_done(active[i].child, code)) { ++i; continue; }
+            const Active a = active[i];
+            active.erase(active.begin() + static_cast<std::ptrdiff_t>(i));
+            if (code != 0) {
+                kill_all();
+                throw std::runtime_error("Compiling " + a.unit.src.filename().string() + " failed:\n" + read_text(a.log));
+            }
+            write_text(fs::path(a.unit.obj).replace_extension(".stamp"), flags_stamp);
+            done_bytes += a.unit.bytes;
+            ++done;
+            finished = true;
+            report();
         }
-        write_text(fs::path(a.unit.obj).replace_extension(".stamp"), flags_stamp);
-        done_bytes += a.unit.bytes;
-        ++done;
-        report();
+        if (!finished) {
+            report();
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        }
     }
 }
 
@@ -307,7 +422,7 @@ void Pipeline::link_and_package() {
         write_text(rsp, r.str());
     }
     const fs::path link_log = s_.work / "link.log";
-    if (run_tool(quote(dkp / "devkitARM" / "bin" / "arm-none-eabi-g++.exe") + L" @" + quote(rsp), link_log) != 0)
+    if (run_tool({tool(dkp / "devkitARM" / "bin", "arm-none-eabi-g++"), joined("@", rsp)}, link_log) != 0)
         throw std::runtime_error("Linking failed:\n" + read_text(link_log));
 
     progress("Packaging p3p3ds.3dsx", 0.98);
@@ -315,27 +430,31 @@ void Pipeline::link_and_package() {
     fs::create_directories(romfs);
     fs::copy_file(elf_, romfs / "eboot.elf", fs::copy_options::overwrite_existing);
     const fs::path tool_log = s_.work / "package.log";
-    if (run_tool(quote(dkp / "tools" / "bin" / "smdhtool.exe") + L" --create \"P3P3DS\" \"Persona 3 Portable recompilation\" \"enderlit aka endercodezz\" " +
-                     quote(dkp / "libctru" / "default_icon.png") + L" " + quote(smdh), tool_log) != 0)
+    if (run_tool({tool(dkp / "tools" / "bin", "smdhtool"), "--create", "P3P3DS", "Persona 3 Portable recompilation", "enderlit aka endercodezz",
+                  dkp / "libctru" / "default_icon.png", smdh},
+                 tool_log) != 0)
         throw std::runtime_error("smdhtool failed:\n" + read_text(tool_log));
-    fs::create_directories(s_.output.parent_path());
-    if (run_tool(quote(dkp / "tools" / "bin" / "3dsxtool.exe") + L" " + quote(s_.work / "p3p3ds.elf") + L" " + quote(s_.output) +
-                     L" --smdh=" + quote(smdh) + L" --romfs=" + quote(romfs), tool_log) != 0)
+    if (!s_.output.parent_path().empty()) fs::create_directories(s_.output.parent_path());
+    if (run_tool({tool(dkp / "tools" / "bin", "3dsxtool"), s_.work / "p3p3ds.elf", s_.output, joined("--smdh=", smdh), joined("--romfs=", romfs)},
+                 tool_log) != 0)
         throw std::runtime_error("3dsxtool failed:\n" + read_text(tool_log));
     progress("Done", 1.0);
 }
 
 void Pipeline::run() {
+#ifdef _WIN32
     // Children (generator, compilers, packaging tools) are killed with the builder.
+    // On POSIX they share the builder's process group, so Ctrl+C reaches them too.
     if (!job_) {
         job_ = CreateJobObjectW(nullptr, nullptr);
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
         info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         if (job_) SetInformationJobObject(static_cast<HANDLE>(job_), JobObjectExtendedLimitInformation, &info, sizeof info);
     }
+#endif
     fs::create_directories(s_.work);
     if (const auto problem = check_devkitpro(s_.devkitpro); !problem.empty()) throw std::runtime_error(problem);
-    if (!fs::exists(s_.sdk / "bin" / "psp_recomp.exe")) throw std::runtime_error("The builder's sdk folder is incomplete: reinstall the builder.");
+    if (!fs::exists(tool(s_.sdk / "bin", "psp_recomp"))) throw std::runtime_error("The builder's sdk folder is incomplete: reinstall the builder.");
     decrypt();
     generate();
     compile();

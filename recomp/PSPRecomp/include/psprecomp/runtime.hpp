@@ -457,7 +457,15 @@ void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcep
 using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
 void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept;
 // P3P3DS: optional wall-time accounting of HLE calls (runner --profile).
-struct RuntimeProfile { bool enabled{}; std::uint64_t hle_ns{}, hle_calls{}; };
+struct RuntimeProfile {
+    bool enabled{};
+    std::uint64_t hle_ns{}, hle_calls{};
+    // P3P3DS: with per_import also set, time and calls per HLE import
+    // (key: hash of library and NID), to find the expensive services.
+    struct Import { std::string library; std::uint32_t nid{}; std::uint64_t ns{}, calls{}; };
+    bool per_import{};
+    std::unordered_map<std::uint64_t, Import> imports;
+};
 RuntimeProfile &runtime_profile() noexcept;
 
 // P3P3DS: optional execution fallback (the Allegrex interpreter) for PCs

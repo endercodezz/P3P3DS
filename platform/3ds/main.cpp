@@ -19,6 +19,8 @@
 // at 133 s). Only while the screen shows a CPU-written picture: the title
 // screen also decodes video, and a START there would pick a menu entry.
 // An empty sdmc:/p3p3ds/play_movies.txt turns this off.
+// Short slowdowns: an empty sdmc:/p3p3ds/profile_seconds.txt writes the time
+// split of every second to sdmc:/p3p3ds/profile_seconds.csv.
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/input.hpp"
 #include "p3p3ds/interpreter.hpp"
@@ -44,6 +46,8 @@
 #include <new>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace psprecomp {
@@ -114,9 +118,13 @@ double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM1
 // split over the last 10 s next to the run average, so slow places show up.
 struct TimeSample {
     u64 wall{}, present{}, idle{}, ui{}, hash{}, upload{}, wait{};
-    double guest_us{}, hle_ns{}, render_ns{};
+    double guest_us{}, hle_ns{}, render_ns{}, io_ns{}, io_bytes{}, hle_calls{};
+    std::uint64_t vblanks{}, game_frames{};
 };
 std::deque<TimeSample> g_samples;
+// sdmc:/p3p3ds/profile_seconds.txt present: one CSV line per second with the
+// split of that second, to find short slowdowns the 10 s report averages out.
+FILE *g_seconds_log = nullptr;
 
 // 3DS buttons -> PSP buttons by position (PSP: Cross bottom, Circle right,
 // Square left, Triangle top).
@@ -297,29 +305,89 @@ TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
     }
     t.guest_us = static_cast<double>(guest_us);
     t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns);
+    t.hle_calls = static_cast<double>(psprecomp::runtime_profile().hle_calls);
     t.render_ns = static_cast<double>(p3p3ds::host_profile().render_ns);
+    t.io_ns = static_cast<double>(p3p3ds::host_profile().io_ns);
+    t.io_bytes = static_cast<double>(p3p3ds::host_profile().io_bytes);
+    t.vblanks = s.frames;
+    t.game_frames = s.game_frames;
     return t;
 }
 
-// One line per split: AOT (translated game code and dispatch), HLE (kernel
-// and services, without what is listed separately), GE (display lists and
-// the PICA200 backend), present, idle (pacing sleep: the game was ahead of
-// real time), ui (report), then what GE time went to.
+// Shares of wall time between two samples, in seconds. AOT is everything
+// outside HLE calls (translated game code and dispatch); GE (display lists
+// and the PICA200 backend), file reads (io), present, idle (pacing sleep: the
+// game was ahead of real time) and ui (report) all run inside HLE calls and
+// are subtracted from it.
+struct Split { double wall, aot, hle, ge, io, present, idle, ui; };
+Split split_of(const TimeSample &a, const TimeSample &b) {
+    Split s{};
+    s.wall = ticks_to_s(b.wall - a.wall);
+    const double hle = (b.hle_ns - a.hle_ns) / 1e9;
+    s.ge = (b.render_ns - a.render_ns) / 1e9;
+    s.io = (b.io_ns - a.io_ns) / 1e9;
+    s.present = ticks_to_s(b.present - a.present);
+    s.idle = ticks_to_s(b.idle - a.idle);
+    s.ui = ticks_to_s(b.ui - a.ui);
+    s.aot = s.wall - hle;
+    s.hle = hle - s.ge - s.io - s.present - s.idle - s.ui;
+    return s;
+}
+
+// One line per split, then what GE time went to.
 std::string split_text(const char *label, const TimeSample &a, const TimeSample &b) {
-    const double wall = ticks_to_s(b.wall - a.wall);
-    if (wall <= 0) return {};
-    const double hle = (b.hle_ns - a.hle_ns) / 1e9, ge = (b.render_ns - a.render_ns) / 1e9;
-    const double present = ticks_to_s(b.present - a.present), idle = ticks_to_s(b.idle - a.idle), ui = ticks_to_s(b.ui - a.ui);
-    const double hle_rest = hle - ge - present - idle - ui; // all of these run inside HLE calls
-    auto pct = [wall](double v) { return 100.0 * v / wall; };
+    const Split s = split_of(a, b);
+    if (s.wall <= 0) return {};
+    auto pct = [&s](double v) { return 100.0 * v / s.wall; };
     char buf[320];
     std::snprintf(buf, sizeof buf,
         "%s: speed %3.0f%%  (%% of time)\n"
-        " aot %2.0f hle %2.0f ge %2.0f pres %2.0f idle %2.0f\n"
+        " aot %2.0f hle %2.0f ge %2.0f io %2.0f pres %2.0f idle %2.0f\n"
         " ge: hash %.1f tex %.1f wait %.1f ui %.1f\n",
-        label, 100.0 * (b.guest_us - a.guest_us) / 1e6 / wall, pct(wall - hle), pct(hle_rest), pct(ge), pct(present), pct(idle),
-        pct(ticks_to_s(b.hash - a.hash)), pct(ticks_to_s(b.upload - a.upload)), pct(ticks_to_s(b.wait - a.wait)), pct(ui));
+        label, 100.0 * (b.guest_us - a.guest_us) / 1e6 / s.wall, pct(s.aot), pct(s.hle), pct(s.ge), pct(s.io), pct(s.present), pct(s.idle),
+        pct(ticks_to_s(b.hash - a.hash)), pct(ticks_to_s(b.upload - a.upload)), pct(ticks_to_s(b.wait - a.wait)), pct(s.ui));
     return buf;
+}
+
+// The three HLE imports with the most time since the previous call, as
+// "name:ms/calls" separated by spaces (inclusive time: a wait that sleeps or
+// presents counts that too).
+std::string top_imports(const psprecomp::Runtime &rt) {
+    static std::unordered_map<std::uint64_t, std::pair<std::uint64_t, std::uint64_t>> previous;
+    struct Delta { const psprecomp::RuntimeProfile::Import *import; std::uint64_t ns, calls; };
+    std::vector<Delta> deltas;
+    for (const auto &[key, import] : psprecomp::runtime_profile().imports) {
+        auto &prev = previous[key];
+        if (import.ns > prev.first) deltas.push_back({&import, import.ns - prev.first, import.calls - prev.second});
+        prev = {import.ns, import.calls};
+    }
+    const std::size_t n = std::min<std::size_t>(3u, deltas.size());
+    std::partial_sort(deltas.begin(), deltas.begin() + static_cast<std::ptrdiff_t>(n), deltas.end(),
+                      [](const Delta &x, const Delta &y) { return x.ns > y.ns; });
+    std::string out;
+    for (std::size_t i = 0; i < n; ++i) {
+        const auto &d = deltas[i];
+        char nid[16];
+        std::snprintf(nid, sizeof nid, "%08lX", static_cast<unsigned long>(d.import->nid));
+        const std::string name = rt.nids().resolve(d.import->library, d.import->nid).value_or(d.import->library + "_" + nid);
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "%s%s:%.0f/%llu", out.empty() ? "" : " ", name.c_str(), static_cast<double>(d.ns) / 1e6,
+                      static_cast<unsigned long long>(d.calls));
+        out += buf;
+    }
+    return out;
+}
+
+void log_second(const TimeSample &a, const TimeSample &b, const psprecomp::Runtime &rt) {
+    if (!g_seconds_log) return;
+    const Split s = split_of(a, b);
+    if (s.wall <= 0) return;
+    auto pct = [&s](double v) { return 100.0 * v / s.wall; };
+    std::fprintf(g_seconds_log, "%.1f,%.2f,%.2f,%llu,%llu,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%s\n", ticks_to_s(b.wall), b.guest_us / 1e6,
+                 s.wall, static_cast<unsigned long long>(b.vblanks - a.vblanks), static_cast<unsigned long long>(b.game_frames - a.game_frames),
+                 pct(s.aot), pct(s.hle), pct(s.ge), pct(s.io), pct(s.present), pct(s.idle), pct(s.ui), (b.io_bytes - a.io_bytes) / 1024.0,
+                 b.hle_calls - a.hle_calls, 100.0 * (b.guest_us - a.guest_us) / 1e6 / s.wall, top_imports(rt).c_str());
+    std::fflush(g_seconds_log);
 }
 
 std::string profile_text(const Stats &s) {
@@ -493,7 +561,8 @@ int main() {
         std::filesystem::create_directories(std::string(kBase) + "/mods", ec);
         kernel.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/ms0"), true);
         kernel.savedata().root = std::string(kBase) + "/ms0/PSP/SAVEDATA";
-        kernel.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods"));
+        // Read-only and unchanged while the game runs: lookups cached (vfs.hpp).
+        kernel.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods", true));
         kernel.threads().init_root_thread("root", entry, sp, module->gp);
         std::set<std::uint32_t> stubs;
         std::vector<std::tuple<std::string, std::uint32_t, std::uint32_t>> imports;
@@ -519,6 +588,15 @@ int main() {
             if (std::fscanf(f, "%llu", &every) == 1) stats.dump_every = every;
             std::fclose(f);
             if (stats.dump_every) std::filesystem::create_directories(std::string(kBase) + "/frames", ec);
+        }
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/profile_seconds.txt", "r")) {
+            std::fclose(f);
+            g_seconds_log = std::fopen("sdmc:/p3p3ds/profile_seconds.csv", "w");
+            if (g_seconds_log)
+                std::fputs("wall_s,guest_s,span_s,vblanks,game_frames,aot_pct,hle_pct,ge_pct,io_pct,present_pct,idle_pct,ui_pct,io_kib,hle_calls,speed_pct,"
+                           "top_imports_ms_calls\n",
+                           g_seconds_log);
+            psprecomp::runtime_profile().per_import = g_seconds_log != nullptr;
         }
 
         stats.status = "running";
@@ -603,6 +681,11 @@ int main() {
                 stats.last_fps_ms = now;
                 g_samples.push_back(time_sample(stats, kernel.threads().now()));
                 if (g_samples.size() > 11u) g_samples.pop_front();
+                if (g_seconds_log && g_samples.size() >= 2u) {
+                    const u64 log_start = svcGetSystemTick();
+                    log_second(g_samples[g_samples.size() - 2], g_samples.back(), rt);
+                    stats.ui_ticks += svcGetSystemTick() - log_start;
+                }
                 // Report every 5 s (bottom screen and SD card): redrawing it each
                 // second cost 8 % of the time in battle on hardware.
                 if (now - stats.last_report_ms >= 5000u) {
@@ -625,6 +708,7 @@ int main() {
     }
     if (!rt.stopped()) rt.stop("Runtime returned");
     stats.status = "stopped";
+    if (g_seconds_log) { std::fclose(g_seconds_log); g_seconds_log = nullptr; }
     const auto text = report_text(stats, rt, kernel) + "stage  : " + stage + "\n" + mem_line();
     write_report(text);
     show(text);

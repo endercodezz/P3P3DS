@@ -51,4 +51,4 @@ For scripted multi-file edits use `scripts/patch_text.py` (`patch(path, [(old, n
 | `const auto a = x >> 6, b = p[i];` | GCC: inconsistent deduction for `auto` | spell the type (`const std::uint32_t a = ..., b = ...;`) |
 | Self-referencing `std::make_shared<std::function<...>>` | GCC 16 `-Warray-bounds` false positive, leak via cycle | a named recursive helper function taking `std::shared_ptr<State>` |
 
-Third-party trees (`recomp/`, `references/`, `psp/`, `3ds/`, `p3p/`, `tools/`) get minimal, commented (`P3P3DS:`) patches only.
+Tracked third-party trees (`recomp/PSPRecomp`, `p3p/p3p-patches`) get minimal, commented (`P3P3DS:`) patches only; fetched research clones (`references/`, `psp/`, `3ds/`) are never edited.

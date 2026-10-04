@@ -7,6 +7,8 @@
 .claude/local/
 local/
 private/
+logs/
+.direnv/
 
 # Workspace containment directories
 .tmp/
@@ -22,7 +24,9 @@ private/
 *.3dsx
 *.cia
 *.smdh
+# KOGO EBOOT?????
 **/EBOOT.BIN
+
 **/BOOT.BIN
 **/DATA.BIN
 **/UMD_DATA.BIN
@@ -115,3 +119,8 @@ profiles/p3p/input/local/
 /recomp/*
 !/recomp/PSPRecomp/
 /tools/*/
+
+lets_larp/
+fart/
+meharmen_hates_all/
+endelit_dumbass/

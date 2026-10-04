@@ -69,7 +69,7 @@ struct Env {
         std::ofstream(dir / "ms0/PSP/P3P/mod.cpk") << "ms0-copy";
         std::ofstream(dir / "mods/mod.cpk") << "mods-copy";
         k.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(dir / "ms0"), true);
-        k.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(dir / "mods"));
+        k.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(dir / "mods", true)); // as the runners
     }
     std::uint32_t call(std::uint32_t nid, std::initializer_list<std::uint32_t> args) {
         auto &ctx = rt.cpu();
@@ -158,6 +158,34 @@ int main() {
     m.store8(kBuf + 9u, 0u);
     CHECK(env.call(0x6A638D83u, {mfd, kBuf, 9u}) == 9u && m.read_c_string(kBuf, 16u) == "mods-copy");
     CHECK(env.call(0x109F50BCu, {env.str("ms0:/PSP/P3P/mod1.cpk"), 1u, 0u}) == SCE_ERROR_ERRNO_FILE_NOT_FOUND);
+    // Mod Support patch lookup of a missing bind file.
+    CHECK(env.call(0xACE946E8u, {env.str("ms0:/PSP/P3P/bind/data/sound/voice/v450001.afs"), kBuf}) == SCE_ERROR_ERRNO_FILE_NOT_FOUND);
+
+    // Cached host lookups (fixed_contents) answer like uncached ones.
+    {
+        const auto tree = dir / "tree";
+        std::filesystem::create_directories(tree / "Bind/Data/Sound");
+        std::ofstream(tree / "Bind/Data/Sound/V450001.AFS") << "voice!";
+        const p3p3ds::vfs::HostFileSystem plain(tree), cached(tree, true);
+        for (const char *path : {"", "bind", "BIND/data", "bind/data/sound/v450001.afs", "./bind//data/sound/V450001.afs",
+                                 "bind/data/sound/missing.afs", "bind/missing/x", "bind/data/sound/v450001.afs/x", "../tree"}) {
+            const auto a = plain.stat(path), b = cached.stat(path);
+            CHECK(a.has_value() == b.has_value());
+            if (a && b) CHECK(a->name == b->name && a->directory == b->directory && a->size == b->size);
+            CHECK((plain.open(path) != nullptr) == (cached.open(path) != nullptr));
+        }
+        const auto voice = cached.stat("bind/data/sound/v450001.afs");
+        CHECK(voice && voice->name == "V450001.AFS" && !voice->directory && voice->size == 6u);
+        const auto src = cached.open("BIND/DATA/SOUND/v450001.afs");
+        char text[7] = {};
+        CHECK(src && src->read(0, text, 6) == 6u && std::string(text) == "voice!");
+        const auto listed = cached.list("bind/data/sound");
+        CHECK(listed && listed->size() == 1u && (*listed)[0].name == "V450001.AFS");
+        CHECK(!p3p3ds::vfs::HostFileSystem(dir / "no_such_root", true).stat("x"));
+        // A file added after its directory was listed stays invisible (contents are fixed by contract).
+        std::ofstream(tree / "Bind/Data/Sound/late.afs") << "x";
+        CHECK(!cached.stat("bind/data/sound/late.afs") && plain.stat("bind/data/sound/late.afs"));
+    }
 
     CHECK(!env.rt.stopped());
     std::cout << "iofilemgr failures=" << failures << "\n";

@@ -3,7 +3,7 @@
 //
 //   1. read EBOOT.BIN and PARAM.SFO from the ISO, check the disc ID
 //   2. decrypt EBOOT.BIN (psp_eboot.cpp), check the reference SHA-256
-//   3. generate the AOT C++ units (bundled psp_recomp.exe)
+//   3. generate the AOT C++ units (bundled psp_recomp)
 //   4. compile them with the user's devkitARM, one job per core
 //   5. link with the prebuilt runtime objects shipped in sdk/lib
 //   6. smdhtool + 3dsxtool (romfs: the decrypted EBOOT)
@@ -12,11 +12,15 @@
 // prebuilt in the release package; only code derived from the user's own
 // executable is generated and compiled on the user's machine. Steps 3-4 are
 // cached in the work directory, so an interrupted build resumes.
+//
+// Runs on Windows (CreateProcessW, job object) and on POSIX hosts
+// (posix_spawn); tool names get the host executable suffix.
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace p3p3ds::builder {
 
@@ -53,14 +57,15 @@ private:
     Log log_;
     std::atomic<bool> cancelled_{false};
     std::filesystem::path elf_, gen_, obj_;
-    void *job_{}; // Windows job object: child tools die with the builder
+    void *job_{}; // Windows job object: child tools die with the builder (unused on POSIX)
 
     void decrypt();
     void generate();
     void compile();
     void link_and_package();
     void progress(const std::string &step, double fraction, double eta = -1, unsigned done = 0, unsigned total = 0);
-    int run_tool(const std::wstring &command, const std::filesystem::path &log_file);
+    // argv[0] is the tool's full path; stdout and stderr go to log_file.
+    int run_tool(const std::vector<std::filesystem::path> &argv, const std::filesystem::path &log_file);
 };
 
 } // namespace p3p3ds::builder

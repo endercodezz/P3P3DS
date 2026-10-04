@@ -1,7 +1,8 @@
 #pragma once
 // Optional wall-time accounting (runner --profile) of the parts of a run that
-// are not AOT code: interpreter fallback and GE rendering. HLE time is kept
-// by psprecomp::runtime_profile(). Off by default: no clock reads.
+// are not AOT code: interpreter fallback, GE rendering and host file reads
+// (VFS sources; they run inside HLE calls). HLE time is kept by
+// psprecomp::runtime_profile(). Off by default: no clock reads.
 #include <chrono>
 #include <cstdint>
 
@@ -11,6 +12,7 @@ struct HostProfile {
     bool enabled{};
     std::uint64_t interpreter_ns{}, interpreter_entries{};
     std::uint64_t render_ns{}, render_calls{};
+    std::uint64_t io_ns{}, io_calls{}, io_bytes{};
 };
 
 inline HostProfile &host_profile() noexcept {

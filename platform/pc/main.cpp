@@ -120,7 +120,7 @@ int main(int argc,char **argv) {
                 return best>=0 ? best : (d.kind==p3p3ds::hle::SavedataDialog::Kind::Save ? 0 : -1);
             };
             if(!mods_path.empty()) {
-                kernel.io().alias("ms0:/PSP/P3P",std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path));
+                kernel.io().alias("ms0:/PSP/P3P",std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path,true)); // read-only: cached lookups
                 std::cout<<"Mods: ms0:/PSP/P3P -> "<<mods_path.string()<<"\n";
             }
         }
