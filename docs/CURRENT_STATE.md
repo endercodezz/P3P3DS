@@ -2,6 +2,17 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Hardware run of build 029f3c8: shader draws characters, battle still wrong and slow (2026-10-04)
+
+Maintainer, New 2DS XL, 448 s wall, quit during the first battle; two photos of the Evoker scene.
+
+- [VERIFIED] Field: own room 30 fps, dorm lounge 25, 2nd floor 21, 3rd floor 26; speed about 89-91 %. Not better than before the shader: field draws are mostly through mode (2D), which still takes the CPU path.
+- [VERIFIED] Battle: the protagonist (Evoker scene) is now drawn, textured and lit; the Evoker is in her hand. Distorted: some limbs and parts of the hair are stretched or misplaced ("exploded"), the face area is blank, the surroundings stay black except a few lit beams.
+- [VERIFIED] Battle speed: 7-11 game frames/s at the Shadow. Report, last 10 s: speed 19-26 %, aot 21 %, hle 7-8 %, ge 62-65 %, idle 6 %; GE: texture hashing 0.3 %, conversion 0.0 %, GPU wait 7.2-8.4 %. Run: 3.67 M draws, 2,759 frame flushes, 6 CPU-to-target uploads.
+- [INFERRED] The GE share is CPU work per draw outside hashing, uploads and GPU wait: unpacking model vertices (`ge::decode_model_vertex` per vertex), the screen path of the many 2D draws, citro3d state and uniform updates. To measure before changing: a split of GE time (vertex unpack, screen path, state).
+- [UNVERIFIED] causes of the distortion, to check one by one against the PC software renderer (same decode, CPU skinning/lighting reference) once the PC route reaches the battle (`profiles/p3p/input/local/first_battle.txt` reaches the own room): (1) the shader's float24 precision for bone blending; (2) a mismatch between the GPU path and the CPU reference (bone row layout, weight count, uniform cache across draws); (3) PSP features still missing on both paths (texture-coordinate generation / environment mapping, morph + skin combinations). The black surroundings may be lit geometry whose material or light setup the shader handles differently from the PSP, or a texture mode not yet supported.
+- Comparison switch for the maintainer: an empty `sdmc:/p3p3ds/cpu_vertices.txt` forces the CPU transform (no skinning/lighting on that path on 3DS).
+
 ## GitHub Actions: CI and Builder releases (2026-10-04)
 
 - Both CMake projects build without the game (`P3P_HAVE_GAME` off when `profiles/p3p/game/eboot.elf` is missing): host runtime, tools, Builder and the tests that do not run game code; the New 3DS runtime objects and libraries plus the CWCheat patch list (now its own custom command), the runner objects in the object library `p3p3ds_objects`.
