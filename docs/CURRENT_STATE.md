@@ -15,6 +15,8 @@ Maintainer, New 2DS XL, 448 s wall, quit during the first battle; two photos of 
 
 ## GitHub Actions: CI and Builder releases (2026-10-04)
 
+- [VERIFIED] First automated release v0.2.6 (commit 2e053cd): all jobs green, release published with `P3P3DS-Builder-0.2.6.zip` (2,353,068 bytes, `FileVersion` 0.2.6) and `P3P3DS-Builder-0.2.6-linux.tar.gz` (2,916,300 bytes); `sdk/VERSION` `0.2.6 2e053cd` in both.
+
 - Both CMake projects build without the game (`P3P_HAVE_GAME` off when `profiles/p3p/game/eboot.elf` is missing): host runtime, tools, Builder and the tests that do not run game code; the New 3DS runtime objects and libraries plus the CWCheat patch list (now its own custom command), the runner objects in the object library `p3p3ds_objects`.
 - Two tests depended on local state and now do not: `test_hle_graphics` skips its reset-list block without the ELF; `test_chase_frontier.py` creates `.tmp/` (absent in a fresh clone; it passed only when another test had created it first).
 - [VERIFIED] Clean worktree without the game (Windows MinGW): build OK, CTest 24/24 (3 skipped: pspautotests absent), also with `.tmp/` removed; 3DS build without the game: `main.o`, `gpu_renderer.o`, `ge_shbin.o`, both libraries and a `patches.txt` identical to the game build's. With the game: host CTest 27/27, `.3dsx` links.
