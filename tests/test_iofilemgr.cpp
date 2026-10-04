@@ -6,6 +6,7 @@
 #include "p3p3ds/vfs.hpp"
 #include "psprecomp/runtime.hpp"
 
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -171,7 +172,14 @@ int main() {
                                  "bind/data/sound/missing.afs", "bind/missing/x", "bind/data/sound/v450001.afs/x", "../tree"}) {
             const auto a = plain.stat(path), b = cached.stat(path);
             CHECK(a.has_value() == b.has_value());
-            if (a && b) CHECK(a->name == b->name && a->directory == b->directory && a->size == b->size);
+            // Names compare case-insensitively: on Windows the uncached lookup keeps the
+            // requested spelling (the host filesystem matches any case), the cached one
+            // returns the name on disk.
+            auto same_name = [](std::string x, std::string y) {
+                for (auto *s : {&x, &y}) for (auto &c : *s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                return x == y;
+            };
+            if (a && b) CHECK(same_name(a->name, b->name) && a->directory == b->directory && a->size == b->size);
             CHECK((plain.open(path) != nullptr) == (cached.open(path) != nullptr));
         }
         const auto voice = cached.stat("bind/data/sound/v450001.afs");
