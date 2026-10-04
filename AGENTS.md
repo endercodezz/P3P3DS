@@ -223,7 +223,7 @@ Do not add yourself as contributor, co-author, author, committer, reviewer, or m
 
 ---
 
-## 16. Git Workflow: Local Commits Only, No Remote Operations
+## 16. Git Workflow: Commit, Then Push Without Rewriting
 
 After completing a well-defined user task or milestone, the agent must automatically create a local git commit if:
 1. The working tree contains modifications belonging to the completed task;
@@ -232,19 +232,17 @@ After completing a well-defined user task or milestone, the agent must automatic
 
 Never stage temporary files, `.Codex/LOCAL.md`, credentials or game assets. The procedure and its pre/post-commit check scripts are in the `p3p3ds-commit` skill.
 
-**STRICTLY FORBIDDEN AUTOMATIC ACTIONS:**
-- Never execute `git push`
-- Never execute `git pull`
-- Never execute `git fetch`
-- Never create or modify remote references or tracking branches
-- Never perform a force push (`--force`)
-- Never modify remote URLs or remotes configuration
+**Allowed remote operations** (maintainer decision, 2026-10-04): `git fetch`, `git pull` (fast-forward or merge, never rebase), `git push origin <branch>` of verified commits, creating branches and pull requests (e.g. contributors' work). GitHub lists contributors by commit author, so pushing does not add the agent as one; section 15 keeps it that way.
 
-Any network/remote Git operation requires explicit, separate user instruction.
+**Still forbidden:**
+- force push (`--force`, `--force-with-lease`) or deleting remote branches;
+- rewriting history (section 17), including to resolve a rejected push: fetch and merge instead;
+- changing remote URLs or remotes configuration, or Git author/committer identity;
+- pushing commits that did not pass the checks of this section.
 
 **Default Execution Loop:**
 ```text
-Work -> Verify & Test -> Local Commit -> STOP (Do NOT push)
+Work -> Verify & Test -> Local Commit -> Push (when the task is done) -> STOP
 ```
 
 ---
@@ -271,7 +269,7 @@ Even if the current task fixes something introduced by the immediately previous 
 
 Record HEAD before the task; after committing, `HEAD^` MUST equal it (`p3p3ds-commit` skill, `postcommit_check.sh`).
 
-Do not push, pull, fetch, modify remotes, or rewrite history unless the user explicitly requests it.
+Never rewrite history or modify remotes, even when the user asks for something that seems to need it: explain the non-rewriting alternative first.
 
 ---
 
