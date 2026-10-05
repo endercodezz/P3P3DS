@@ -7,7 +7,9 @@
 .claude/local/
 local/
 private/
-logs/
+
+# Per-developer environment loaders (direnv: create .envrc with "use nix" for shell.nix)
+.envrc
 .direnv/
 
 # Workspace containment directories
@@ -24,9 +26,7 @@ logs/
 *.3dsx
 *.cia
 *.smdh
-# KOGO EBOOT?????
 **/EBOOT.BIN
-
 **/BOOT.BIN
 **/DATA.BIN
 **/UMD_DATA.BIN
@@ -46,10 +46,9 @@ profiles/*/progress/
 experiments/p3p-analysis/p3p_report_functions_auto.csv
 experiments/p3p-analysis/p3p_report_function_seeds.csv
 
-# Build artifacts & outputs
+# Build artifacts. Generated AOT C++ (build/generated/) is derived from the
+# proprietary EBOOT and rebuilt by CMake; it must never be tracked.
 build/
-# Generated AOT C++ is derived from the proprietary EBOOT and is rebuilt by
-# CMake; it must never be tracked.
 out/
 bin/
 obj/
@@ -69,10 +68,6 @@ build.ninja
 # Logs and profiling traces
 *.log
 logs/
-# Keep only the canonical latest bootstrap trace; other logs remain ignored.
-!logs/
-logs/*
-!logs/p3p_bootstrap_latest.log
 experiments/**/build/
 experiments/**/out/
 experiments/**/logs/
@@ -119,8 +114,3 @@ profiles/p3p/input/local/
 /recomp/*
 !/recomp/PSPRecomp/
 /tools/*/
-
-lets_larp/
-fart/
-meharmen_hates_all/
-endelit_dumbass/

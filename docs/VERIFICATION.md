@@ -110,4 +110,4 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 | Recompiled P3P will run at 90-100% native speed on New 3DS | `[INFERRED]` | Architectural analysis | Inferred from native ARM machine code compilation vs in-flight JIT, but unmeasured without on-device profiling. |
 | PICA200 can maintain 30 FPS for Tartarus 3D dungeons | `[UNVERIFIED]` | Needs citro3d benchmark | Working hypothesis based on geometry complexity vs DaedalusX64-3DS. |
 
-The repository intentionally tracks two canonical current-state artifacts: `logs/p3p_bootstrap_latest.log` is the latest bootstrap/verification trace, and `build/generated/p3p_generated.cpp` is the generated AOT snapshot for the current P3P frontier. Other generated files, build outputs, and logs remain ignored.
+Run logs (`logs/`, written by `tools/run_p3p_trace.sh`) and generated AOT code (`build/generated/`) are not tracked: the logs and evidence cited above are local artifacts of those runs, and generated code is rebuilt from the user's EBOOT.

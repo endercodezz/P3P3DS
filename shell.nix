@@ -5,6 +5,8 @@
 #                                  # devkitpro/devkitarm Docker image into .cache/devkitpro
 #   p3p-3ds                        # FHS shell where devkitPro's prebuilt binaries run
 #
+# direnv users: echo "use nix" > .envrc && direnv allow (.envrc is per-developer, ignored by git).
+#
 # devkitPro is not packaged in nixpkgs and ships glibc binaries for ordinary
 # Linux distributions; p3p-3ds is a buildFHSEnv so they run unmodified.
 # DEVKITPRO defaults to .cache/devkitpro (workspace containment, CLAUDE.md
