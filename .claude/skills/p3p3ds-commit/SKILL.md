@@ -9,7 +9,7 @@ description: Finish a P3P3DS task with a verified local commit (CLAUDE.md sectio
 
 1. Tests: `ctest --test-dir build -j6` must report 100%. For runtime changes also `--verify-bootstrap` PASS and a replay check (`p3p-run-triage` skill, section 5).
 2. Update `docs/CURRENT_STATE.md` with a short dated section at the top: what changed, how it was verified (commands, counts, SHA-256), immediate blocker. Tag every claim `[VERIFIED]` / `[INFERRED]` / `[UNVERIFIED]` / `[WRONG]`. Do not copy history.
-3. When a user-visible milestone changes, update `README.md` (status table, checklist, runner options) in the same commit. README states what works and how to use it; blockers, missing tools and "blocked on X" notes belong in `docs/CURRENT_STATE.md` and the report, not in README. Never touch the donation or credits sections unless asked.
+3. When a user-visible milestone changes, update `README.md` (status table, checklist, runner options) in the same commit. README states what works and how to use it; blockers, missing tools and "blocked on X" notes belong in `docs/CURRENT_STATE.md` and the report, not in README. Never touch the credits section unless asked.
 4. If `.claude/skills/` changed, run `python tools/sync_agent_skills.py` (CTest `p3p_skills_mirror` checks the `.agents/skills/` mirror); keep `CLAUDE.md` and `AGENTS.md` rule changes identical in both files.
 5. Stage only the task's files by name (`git add <paths>`), never `git add -A`.
 6. Gate:
