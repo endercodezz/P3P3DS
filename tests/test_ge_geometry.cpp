@@ -1,10 +1,12 @@
 // Shared GE front end (geometry.hpp): decode_texture must equal fetch_texel
 // for every texel of every non-DXT format, linear and swizzled, with CLUT
-// shift/mask/start; texture_hash must change with texture bytes and palette.
+// shift/mask/start; texture_hash must change with texture bytes and palette; decode_model_vertices
+// must equal decode_model_vertex for every vertex type.
 #include "p3p3ds/ge/geometry.hpp"
 #include "psprecomp/guest_memory.hpp"
 
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 using namespace p3p3ds::ge;
@@ -78,6 +80,41 @@ int main() {
     check(h1 != h0, "texture_hash changes with texture bytes");
     g.clut[3] ^= 0x00010000u;
     check(texture_hash(m, g, t) != h1, "texture_hash changes with the palette");
+
+    // decode_model_vertices equals decode_model_vertex for every vertex type
+    // (weights, UV, colour, normal, position formats; transform mode).
+    {
+        constexpr std::uint32_t kVerts = 0x08920000u;
+        for (std::uint32_t i = 0; i < 0x4000u; i += 4) m.store32(kVerts + i, rng() ^ (rng() << 16));
+        GeRegisters r;
+        r.reg[0x55] = 0x336699u; r.reg[0x58] = 0x80u;
+        bool same = true;
+        int layouts = 0;
+        for (std::uint32_t wf = 0; wf < 4; ++wf)
+            for (std::uint32_t wc = 0; wc < 8; wc += 3)
+                for (std::uint32_t uv = 0; uv < 4; ++uv)
+                    for (std::uint32_t col : {0u, 4u, 5u, 6u, 7u})
+                        for (std::uint32_t nf = 0; nf < 4; ++nf)
+                            for (std::uint32_t pf = 1; pf < 4; ++pf) {
+                                const std::uint32_t vtype = uv | (col << 2) | (nf << 5) | (pf << 7) | (wf << 9) | (wc << 14);
+                                const auto l = vertex_layout(vtype);
+                                std::vector<ModelVertex> fast(17);
+                                if (!decode_model_vertices(m, r, l, kVerts, 3, 17, fast.data())) { same = false; continue; }
+                                ++layouts;
+                                for (std::uint32_t k = 0; k < 17u; ++k) {
+                                    ModelVertex slow;
+                                    decode_model_vertex(m, r, l, kVerts, 3 + k, slow);
+                                    const auto &f = fast[k];
+                                    // bitwise: random float components may be NaN
+                                    same &= f.color == slow.color && f.has_color == slow.has_color &&
+                                            std::memcmp(f.pos, slow.pos, sizeof f.pos) == 0 &&
+                                            std::memcmp(f.normal, slow.normal, sizeof f.normal) == 0 &&
+                                            std::memcmp(f.uv, slow.uv, sizeof f.uv) == 0 &&
+                                            std::memcmp(f.weights, slow.weights, sizeof f.weights) == 0;
+                                }
+                            }
+        check(same && layouts > 0, "decode_model_vertices equals decode_model_vertex");
+    }
 
     if (failures == 0) std::printf("test_ge_geometry: all checks passed\n");
     return failures == 0 ? 0 : 1;

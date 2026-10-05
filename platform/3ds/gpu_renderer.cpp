@@ -796,12 +796,20 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     }
     if (count < 3u) return true;
 
-    // Referenced vertex range.
+    // Referenced vertex range; indices read through one pointer when the
+    // index buffer is in guest memory.
+    const u64 vertex_start = svcGetSystemTick();
+    const std::uint32_t isize = layout.index_format == 1u ? 1u : layout.index_format == 2u ? 2u : 0u;
+    const std::uint8_t *ip = isize != 0u ? memory.raw_pointer(index_address, count * isize) : nullptr;
+    auto index_at = [&](std::uint32_t i) -> std::uint32_t {
+        if (ip != nullptr) return isize == 1u ? ip[i] : static_cast<std::uint32_t>(ip[2u * i] | (ip[2u * i + 1u] << 8));
+        return ge::vertex_index(memory, layout, index_address, i);
+    };
     std::uint32_t lo = 0, hi = count - 1u;
-    if (layout.index_format != 0u) {
+    if (isize != 0u) {
         lo = ~0u; hi = 0u;
         for (std::uint32_t i = 0; i < count; ++i) {
-            const auto index = ge::vertex_index(memory, layout, index_address, i);
+            const auto index = index_at(i);
             lo = std::min(lo, index);
             hi = std::max(hi, index);
         }
@@ -811,18 +819,20 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     const bool skinned = layout.weights != 0u;
     const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
     const std::uint32_t vertex_bytes = n * stride; // stride is a multiple of 4
-    const std::uint32_t index_bytes = layout.index_format != 0u ? count * 2u : 0u;
-    const u64 vertex_start = svcGetSystemTick();
+    const std::uint32_t index_bytes = isize != 0u ? count * 2u : 0u;
     auto *block = static_cast<std::uint8_t *>(alloc_linear(vertex_bytes + index_bytes, stride));
     if (block == nullptr) return false;
     // Index of the first vertex from arena_ (the attribute buffer base); the
     // arena holds fewer than 0x10000 vertices of any layout.
     const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
 
-    ge::ModelVertex m;
+    if (model_.size() < n) model_.resize(n);
+    if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
+        for (std::uint32_t k = 0; k < n; ++k)
+            if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
     ShaderVertex s;
     for (std::uint32_t k = 0; k < n; ++k) {
-        if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, m)) m = ge::ModelVertex{};
+        const ge::ModelVertex &m = model_[k];
         s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
         s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
         s.u = m.uv[0]; s.v = m.uv[1];
@@ -833,29 +843,45 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     std::uint16_t *indices = nullptr;
     if (index_bytes != 0u) {
         indices = reinterpret_cast<std::uint16_t *>(block + vertex_bytes);
-        for (std::uint32_t i = 0; i < count; ++i)
-            indices[i] = static_cast<std::uint16_t>(first + ge::vertex_index(memory, layout, index_address, i) - lo);
+        for (std::uint32_t i = 0; i < count; ++i) indices[i] = static_cast<std::uint16_t>(first + index_at(i) - lo);
     }
     const u64 uniform_start = svcGetSystemTick();
     gpu_stats_.vertex_ticks += uniform_start - vertex_start;
 
+    // Uniforms are rebuilt only when the GE registers they come from change
+    // (consecutive draws of one model share most of them).
     // screen = target projection x viewport x PROJ x VIEW (see the shader
     // header): the screen mapping of decode_screen_vertices as a matrix.
-    const float vpx = ge::ge_float(r24(regs, 0x42)), vpy = ge::ge_float(r24(regs, 0x43)), vpz = ge::ge_float(r24(regs, 0x44));
-    const float vcx = ge::ge_float(r24(regs, 0x45)), vcy = ge::ge_float(r24(regs, 0x46)), vcz = ge::ge_float(r24(regs, 0x47));
-    const float offx = static_cast<float>(r24(regs, 0x4C) & 0xFFFFu) / 16.0f, offy = static_cast<float>(r24(regs, 0x4D) & 0xFFFFu) / 16.0f;
-    C3D_Mtx a;
-    Mtx_Zeros(&a);
-    a.r[0].x = 2.0f * vpx / kTargetSize; a.r[0].w = 2.0f * (vcx - offx) / kTargetSize - 1.0f;
-    a.r[1].y = kTargetYSign * 2.0f * vpy / kTargetSize; a.r[1].w = kTargetYSign * (2.0f * (vcy - offy) / kTargetSize - 1.0f);
-    a.r[2].z = -vpz / 65535.0f; a.r[2].w = -vcz / 65535.0f;
-    a.r[3].w = 1.0f;
-    C3D_Mtx p;
-    const auto &pr = regs.proj; // column-major: clip.x = e.x*p0 + e.y*p4 + e.z*p8 + p12
-    for (int i = 0; i < 4; ++i) { p.r[i].x = pr[i]; p.r[i].y = pr[4 + i]; p.r[i].z = pr[8 + i]; p.r[i].w = pr[12 + i]; }
-    set_matrix(u_.screen, multiply(a, multiply(p, ge_matrix43(regs.view.data()))));
-    const C3D_Mtx world = ge_matrix43(regs.world.data());
-    for (int i = 0; i < 3; ++i) set_uniform(u_.world + i, world.r[i].x, world.r[i].y, world.r[i].z, world.r[i].w);
+    {
+        std::array<std::uint32_t, 8 + 12 + 16> key{};
+        for (std::uint32_t i = 0; i < 6; ++i) key[i] = r24(regs, 0x42 + i);
+        key[6] = r24(regs, 0x4C);
+        key[7] = r24(regs, 0x4D);
+        std::memcpy(&key[8], regs.view.data(), 12 * sizeof(float));
+        std::memcpy(&key[20], regs.proj.data(), 16 * sizeof(float));
+        if (!screen_valid_ || key != screen_key_) {
+            screen_key_ = key;
+            screen_valid_ = true;
+            const float vpx = ge::ge_float(r24(regs, 0x42)), vpy = ge::ge_float(r24(regs, 0x43)), vpz = ge::ge_float(r24(regs, 0x44));
+            const float vcx = ge::ge_float(r24(regs, 0x45)), vcy = ge::ge_float(r24(regs, 0x46)), vcz = ge::ge_float(r24(regs, 0x47));
+            const float offx = static_cast<float>(r24(regs, 0x4C) & 0xFFFFu) / 16.0f, offy = static_cast<float>(r24(regs, 0x4D) & 0xFFFFu) / 16.0f;
+            C3D_Mtx a;
+            Mtx_Zeros(&a);
+            a.r[0].x = 2.0f * vpx / kTargetSize; a.r[0].w = 2.0f * (vcx - offx) / kTargetSize - 1.0f;
+            a.r[1].y = kTargetYSign * 2.0f * vpy / kTargetSize; a.r[1].w = kTargetYSign * (2.0f * (vcy - offy) / kTargetSize - 1.0f);
+            a.r[2].z = -vpz / 65535.0f; a.r[2].w = -vcz / 65535.0f;
+            a.r[3].w = 1.0f;
+            C3D_Mtx p;
+            const auto &pr = regs.proj; // column-major: clip.x = e.x*p0 + e.y*p4 + e.z*p8 + p12
+            for (int i = 0; i < 4; ++i) { p.r[i].x = pr[i]; p.r[i].y = pr[4 + i]; p.r[i].z = pr[8 + i]; p.r[i].w = pr[12 + i]; }
+            screen_mtx_ = multiply(a, multiply(p, ge_matrix43(regs.view.data())));
+        }
+        set_matrix(u_.screen, screen_mtx_);
+    }
+    {
+        const float *w = regs.world.data(); // rows: x' = x*m0 + y*m3 + z*m6 + m9 (ge_matrix43)
+        for (int j = 0; j < 3; ++j) set_uniform(u_.world + j, w[j], w[3 + j], w[6 + j], w[9 + j]);
+    }
 
     if (textured) {
         const auto info = ge::texture_info(regs);
@@ -867,43 +893,54 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     set_bool(u_.skin, skinned);
     if (skinned) {
         for (std::uint32_t b = 0; b < layout.weights && b < 8u; ++b) {
-            const C3D_Mtx bone = ge_matrix43(&regs.bone[b * 12u]);
-            for (int j = 0; j < 3; ++j)
-                set_uniform(u_.bones + static_cast<int>(b) * 3 + j, bone.r[j].x, bone.r[j].y, bone.r[j].z, bone.r[j].w);
+            const float *m = &regs.bone[b * 12u];
+            for (int j = 0; j < 3; ++j) set_uniform(u_.bones + static_cast<int>(b) * 3 + j, m[j], m[3 + j], m[6 + j], m[9 + j]);
         }
     }
 
-    const ge::LightingSetup l = ge::lighting_setup(regs, layout);
-    set_bool(u_.light, l.enabled);
-    if (l.enabled) {
-        auto color = [this](int loc, const std::array<float, 4> &c, float alpha) { set_uniform(loc, c[0], c[1], c[2], alpha); };
-        color(u_.emissive, l.emissive, 0.0f);
-        color(u_.matamb, l.material_ambient, l.material_ambient[3]);
-        color(u_.matdif, l.material_diffuse, 0.0f);
-        color(u_.matspe, l.material_specular, 0.0f);
-        color(u_.sceneamb, l.scene_ambient, l.scene_ambient[3]);
-        set_uniform(u_.matsel, l.vertex_ambient ? 1.0f : 0.0f, l.vertex_diffuse ? 1.0f : 0.0f, l.vertex_specular ? 1.0f : 0.0f,
-                    l.reverse_normals ? -1.0f : 1.0f);
-        set_uniform(u_.misc, l.specular_power, 0.0f, 0.0f, 0.0f);
-        for (int i = 0; i < 4; ++i) {
-            const auto &li = l.lights[i];
-            set_bool(u_.lights[i], li.enabled);
-            if (!li.enabled) continue;
-            set_uniform(u_.lpos + i, li.position[0], li.position[1], li.position[2], 0.0f);
-            float d[3] = {li.direction[0], li.direction[1], li.direction[2]};
-            const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-            if (dl > 0.0f) for (auto &c : d) c /= dl;
-            set_uniform(u_.ldir + i, d[0], d[1], d[2], 0.0f);
-            if (li.kind == 0u) set_uniform(u_.latt + i, 1.0f, 0.0f, 0.0f, 0.0f);
-            else set_uniform(u_.latt + i, li.attenuation[0], li.attenuation[1], li.attenuation[2], 0.0f);
-            set_uniform(u_.lspot + i, li.kind == 2u ? li.spot_exponent : 0.0f, li.kind == 2u ? li.spot_cutoff : -2.0f,
-                        li.kind != 0u ? 1.0f : 0.0f, li.components == 2u ? l.specular_power : 1.0f);
-            color(u_.lamb + i, li.ambient, 0.0f);
-            color(u_.ldif + i, li.diffuse, 0.0f);
-            if (li.components == 1u) color(u_.lspe + i, li.specular, 0.0f);
-            else set_uniform(u_.lspe + i, 0.0f, 0.0f, 0.0f, 0.0f);
+    // Lighting: LIGHTING_ENABLE, LIGHT_ENABLE0-3 and 0x50-0x9A, plus whether
+    // the vertex has a colour (material colour selection).
+    std::array<std::uint32_t, 5 + 0x4B + 1> lkey{};
+    for (std::uint32_t i = 0; i < 5; ++i) lkey[i] = regs.reg[0x17 + i];
+    for (std::uint32_t i = 0; i < 0x4B; ++i) lkey[5 + i] = regs.reg[0x50 + i];
+    lkey[5 + 0x4B] = layout.color_format >= 4u ? 1u : 0u;
+    if (!light_valid_ || lkey != light_key_) {
+        light_key_ = lkey;
+        light_valid_ = true;
+        light_ = ge::lighting_setup(regs, layout);
+        const ge::LightingSetup &l = light_;
+        if (l.enabled) {
+            auto color = [this](int loc, const std::array<float, 4> &c, float alpha) { set_uniform(loc, c[0], c[1], c[2], alpha); };
+            color(u_.emissive, l.emissive, 0.0f);
+            color(u_.matamb, l.material_ambient, l.material_ambient[3]);
+            color(u_.matdif, l.material_diffuse, 0.0f);
+            color(u_.matspe, l.material_specular, 0.0f);
+            color(u_.sceneamb, l.scene_ambient, l.scene_ambient[3]);
+            set_uniform(u_.matsel, l.vertex_ambient ? 1.0f : 0.0f, l.vertex_diffuse ? 1.0f : 0.0f, l.vertex_specular ? 1.0f : 0.0f,
+                        l.reverse_normals ? -1.0f : 1.0f);
+            set_uniform(u_.misc, l.specular_power, 0.0f, 0.0f, 0.0f);
+            for (int i = 0; i < 4; ++i) {
+                const auto &li = l.lights[i];
+                if (!li.enabled) continue;
+                set_uniform(u_.lpos + i, li.position[0], li.position[1], li.position[2], 0.0f);
+                float d[3] = {li.direction[0], li.direction[1], li.direction[2]};
+                const float dl = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                if (dl > 0.0f) for (auto &c : d) c /= dl;
+                set_uniform(u_.ldir + i, d[0], d[1], d[2], 0.0f);
+                if (li.kind == 0u) set_uniform(u_.latt + i, 1.0f, 0.0f, 0.0f, 0.0f);
+                else set_uniform(u_.latt + i, li.attenuation[0], li.attenuation[1], li.attenuation[2], 0.0f);
+                set_uniform(u_.lspot + i, li.kind == 2u ? li.spot_exponent : 0.0f, li.kind == 2u ? li.spot_cutoff : -2.0f,
+                            li.kind != 0u ? 1.0f : 0.0f, li.components == 2u ? l.specular_power : 1.0f);
+                color(u_.lamb + i, li.ambient, 0.0f);
+                color(u_.ldif + i, li.diffuse, 0.0f);
+                if (li.components == 1u) color(u_.lspe + i, li.specular, 0.0f);
+                else set_uniform(u_.lspe + i, 0.0f, 0.0f, 0.0f, 0.0f);
+            }
         }
     }
+    set_bool(u_.light, light_.enabled);
+    if (light_.enabled)
+        for (int i = 0; i < 4; ++i) set_bool(u_.lights[i], light_.lights[i].enabled);
 
     const u64 submit_start = svcGetSystemTick();
     gpu_stats_.uniform_ticks += submit_start - uniform_start;

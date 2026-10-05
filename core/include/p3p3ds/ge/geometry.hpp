@@ -47,6 +47,11 @@ struct ModelVertex {
 // Vertex `index` of the buffer at `vertex_address`; false outside guest memory.
 bool decode_model_vertex(psprecomp::GuestMemory &memory, const GeRegisters &regs, const VertexLayout &layout,
                          std::uint32_t vertex_address, std::uint32_t index, ModelVertex &out);
+// Vertices first .. first + count - 1, the same values as decode_model_vertex,
+// in one pass over guest memory. False (out untouched) for morphing, through
+// mode or a range outside guest memory: the caller then decodes per vertex.
+bool decode_model_vertices(psprecomp::GuestMemory &memory, const GeRegisters &regs, const VertexLayout &layout,
+                           std::uint32_t vertex_address, std::uint32_t first, std::uint32_t count, ModelVertex *out);
 // i-th index of an indexed draw (i itself when VTYPE has no index buffer).
 [[nodiscard]] std::uint32_t vertex_index(psprecomp::GuestMemory &memory, const VertexLayout &layout,
                                          std::uint32_t index_address, std::uint32_t i);

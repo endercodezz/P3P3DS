@@ -177,6 +177,22 @@ bool decode_model_vertex(psprecomp::GuestMemory &memory, const GeRegisters &regs
     return true;
 }
 
+bool decode_model_vertices(psprecomp::GuestMemory &memory, const GeRegisters &regs, const VertexLayout &layout,
+                           std::uint32_t vertex_address, std::uint32_t first, std::uint32_t count, ModelVertex *out) {
+    if (layout.through || layout.morphs > 1u || count == 0u) return false;
+    const std::uint32_t size = layout.size;
+    const std::uint8_t *base = memory.raw_pointer(vertex_address + first * size, std::max<std::uint32_t>(count * size, 1u));
+    if (base == nullptr) return false;
+    ModelVertex blank;
+    blank.color = unpack32((r24(regs, 0x55) & 0xFFFFFFu) | ((r24(regs, 0x58) & 0xFFu) << 24));
+    blank.has_color = layout.color_format >= 4u;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        out[i] = blank;
+        decode_one(base + i * size, layout, out[i]);
+    }
+    return true;
+}
+
 std::uint32_t vertex_index(psprecomp::GuestMemory &memory, const VertexLayout &layout, std::uint32_t index_address, std::uint32_t i) {
     if (layout.index_format == 1u) { const auto *p = memory.raw_pointer(index_address + i, 1u); return p ? p[0] : 0u; }
     if (layout.index_format == 2u) { const auto *p = memory.raw_pointer(index_address + 2u * i, 2u); return p ? static_cast<std::uint32_t>(p[0] | (p[1] << 8)) : 0u; }

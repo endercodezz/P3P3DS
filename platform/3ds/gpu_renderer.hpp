@@ -150,6 +150,14 @@ private:
     const C3D_Tex *bound_tex_{};
     C3D_Tex bound_tex_copy_{};
     bool state_valid_{};
+    // Model draws: the screen matrix and the lighting setup with the GE
+    // registers they were built from (rebuilt only when those change).
+    std::array<std::uint32_t, 36> screen_key_{};
+    C3D_Mtx screen_mtx_{};
+    bool screen_valid_{};
+    std::array<std::uint32_t, 81> light_key_{};
+    ge::LightingSetup light_{};
+    bool light_valid_{};
     bool cpu_vertices_{}; // sdmc:/p3p3ds/cpu_vertices.txt: every draw through the CPU transform
     C3D_RenderTarget *top_{};
     void *shared_depth_{};
