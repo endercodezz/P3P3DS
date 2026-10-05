@@ -54,7 +54,7 @@ Since 2026-10-03 the research sources are not tracked in git (`.gitignore`): `re
 
 ## 2. wizardengineer/psprecomp comparison and decisions
 
-The observations below concern the imported revision in `docs/UPSTREAMS.md`. They are research findings, not P3P execution measurements. The project is GPL-2.0-or-later (`recomp/psprecomp-wizardengineer/README.md:406-412`); implementation code from it must not be copied into our `core/`.
+The observations below concern the revision imported on 2026-09-28 (recorded in the git history of `docs/UPSTREAMS.md`). They are research findings, not P3P execution measurements. The project is GPL-2.0-or-later (`recomp/psprecomp-wizardengineer/README.md:406-412`); implementation code from it must not be copied into our `core/`.
 
 | Area | Observed reference design and evidence | P3P3DS consequence |
 | :--- | :--- | :--- |
