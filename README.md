@@ -13,7 +13,6 @@
 | Issue | Where | State |
 |---|---|---|
 | Battle: 5-7.5 fps, 18-25 % of real time; graphics work on the CPU takes 63-70 % of the time | first Shadow battle | next optimisation target (goal: 20 fps at 100 % speed) |
-| Battle: no fog | 3D scenes | most battle draws enable fog; neither renderer applies it yet |
 | Dorm: 21-26 fps on the floors (30 in the own room), 89-91 % speed | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
 | Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
