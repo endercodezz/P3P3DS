@@ -12,7 +12,7 @@
 
 | Issue | Where | State |
 |---|---|---|
-| Battle: slow. 0.2.7 on hardware: 5-7.5 fps, 18-25 % of real time. 0.2.8 in Azahar: about 10 fps, 33 % (per-draw GPU work cut; not yet measured on hardware) | first Shadow battle | next optimisation target (goal: 20 fps at 100 % speed) |
+| Battle: slow. 0.2.7 on hardware: 5-7.5 fps, 18-25 % of real time. 0.2.8 in Azahar: about 10 fps, 33 % (per-draw GPU work cut; not yet measured on hardware) | first Shadow battle | next optimisation target (goal: 20 fps first, then the game's full 30 fps) |
 | Dorm: 21-26 fps on the floors (30 in the own room), 89-91 % speed | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
 | Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
