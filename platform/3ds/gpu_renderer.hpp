@@ -165,6 +165,7 @@ private:
     // Step timing samples every 16th draw (svcGetSystemTick is a system call).
     std::uint32_t timed_seq_{};
     bool timed_{};
+    u64 tick_cost_{}; // ticks of one svcGetSystemTick, measured at start and subtracted per step
     // Model draws: the screen matrix and the lighting setup with the GE
     // registers they were built from (rebuilt only when those change).
     std::array<std::uint32_t, 36> screen_key_{};

@@ -252,6 +252,46 @@ bool update_save_menu(p3p3ds::hle::SavedataUtility &sd, SaveMenu &menu) {
 }
 std::uint64_t g_skip_presses = 0;
 
+// Unattended runs (sdmc:/p3p3ds/autotest/, for measuring on hardware or in
+// Azahar without anyone at the controls): input.txt is a vblank-keyed input
+// script (core/include/p3p3ds/input.hpp) added to the buttons, savedata.txt a
+// slot index chosen in every save/load list (no menu), stop.txt the vblank at
+// which the run ends (report written, app closed), dump_every.txt as in
+// sdmc:/p3p3ds/, and ms0/ the memory stick used instead of sdmc:/p3p3ds/ms0
+// (so the player's own saves are not touched).
+struct Autotest {
+    bool active{};
+    std::unique_ptr<p3p3ds::input::InputScript> script;
+    int savedata_slot{-1};
+    std::uint64_t stop_vblank{};
+    std::string ms0;
+};
+
+std::string read_text(const std::string &path) {
+    std::string text;
+    if (FILE *f = std::fopen(path.c_str(), "rb")) {
+        char buf[4096];
+        std::size_t n;
+        while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+        std::fclose(f);
+    }
+    return text;
+}
+
+Autotest load_autotest() {
+    Autotest a;
+    const std::string dir = std::string(kBase) + "/autotest";
+    const std::string input = read_text(dir + "/input.txt");
+    if (input.empty()) return a;
+    a.active = true;
+    a.script = std::make_unique<p3p3ds::input::InputScript>(p3p3ds::input::InputScript::parse(input));
+    a.savedata_slot = std::atoi(read_text(dir + "/savedata.txt").c_str());
+    a.stop_vblank = std::strtoull(read_text(dir + "/stop.txt").c_str(), nullptr, 10);
+    std::error_code ec;
+    if (std::filesystem::is_directory(dir + "/ms0", ec)) a.ms0 = dir + "/ms0";
+    return a;
+}
+
 void write_bmp(const char *path, const std::vector<std::uint8_t> &rgb, std::uint32_t w, std::uint32_t h) {
     FILE *f = std::fopen(path, "wb");
     if (!f) return;
@@ -509,6 +549,7 @@ int main() {
     std::cout.rdbuf(nullptr); // runtime diagnostics on std::cout are discarded on 3DS
 
     Stats stats;
+    Autotest autotest;
     stats.start_ms = stats.last_report_ms = stats.last_fps_ms = osGetTime();
     std::printf("P3P3DS by %s\nbuild %s\n\nLoading...\n", kAuthor, P3P3DS_BUILD_ID);
 
@@ -571,10 +612,12 @@ int main() {
         kernel.umd().set_medium_present(true);
         kernel.io().mount("disc0:", std::make_shared<p3p3ds::vfs::IsoFileSystem>(stats.iso));
         std::error_code ec;
-        std::filesystem::create_directories(std::string(kBase) + "/ms0", ec);
+        autotest = load_autotest();
+        const std::string ms0 = autotest.ms0.empty() ? std::string(kBase) + "/ms0" : autotest.ms0;
+        std::filesystem::create_directories(ms0, ec);
         std::filesystem::create_directories(std::string(kBase) + "/mods", ec);
-        kernel.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/ms0"), true);
-        kernel.savedata().root = std::string(kBase) + "/ms0/PSP/SAVEDATA";
+        kernel.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(ms0), true);
+        kernel.savedata().root = ms0 + "/PSP/SAVEDATA";
         // Read-only and unchanged while the game runs: lookups cached (vfs.hpp).
         kernel.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods", true));
         kernel.threads().init_root_thread("root", entry, sp, module->gp);
@@ -597,7 +640,7 @@ int main() {
         kernel.ge().set_renderer(std::move(gpu));
         rt.memory().vram_write_observer = [](std::uint32_t address, std::size_t bytes) { g_gpu->note_cpu_write(address, bytes); };
         if (FILE *f = std::fopen("sdmc:/p3p3ds/play_movies.txt", "r")) { stats.skip_movies = false; std::fclose(f); }
-        if (FILE *f = std::fopen("sdmc:/p3p3ds/dump_every.txt", "r")) {
+        if (FILE *f = std::fopen(autotest.active ? "sdmc:/p3p3ds/autotest/dump_every.txt" : "sdmc:/p3p3ds/dump_every.txt", "r")) {
             unsigned long long every = 0;
             if (std::fscanf(f, "%llu", &every) == 1) stats.dump_every = every;
             std::fclose(f);
@@ -634,6 +677,15 @@ int main() {
             last_presented_vblank = vblank;
             if (!aptMainLoop()) { rt.stop("Closed by the system (HOME)"); throw psprecomp::FrontierHalt{}; }
             hid->poll();
+            if (autotest.active) {
+                hid->pad.buttons |= autotest.script->sample(vblank).buttons;
+                if (const auto *d = kernel.savedata().pending_dialog(); d != nullptr && autotest.savedata_slot >= 0)
+                    kernel.savedata().resolve(std::min(autotest.savedata_slot, static_cast<int>(d->slots.size()) - 1));
+                if (autotest.stop_vblank != 0u && vblank >= autotest.stop_vblank) {
+                    rt.stop("Autotest end at vblank " + std::to_string(vblank));
+                    throw psprecomp::FrontierHalt{};
+                }
+            }
             if (stats.skip_movies) {
                 std::uint64_t decoded = 0;
                 for (const auto &[handle, inst] : kernel.mpeg().instances) decoded += inst.video_decoded;
@@ -726,7 +778,7 @@ int main() {
     const auto text = report_text(stats, rt, kernel) + "stage  : " + stage + "\n" + mem_line();
     write_report(text);
     show(text);
-    wait_exit("Report saved to sdmc:/p3p3ds/report.txt");
+    if (!autotest.active) wait_exit("Report saved to sdmc:/p3p3ds/report.txt");
     g_gpu = nullptr;
     kernel_owner.reset(); // the GPU renderer (citro3d) shuts down before gfx
     romfsExit();

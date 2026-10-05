@@ -200,6 +200,12 @@ GpuRenderer::GpuRenderer() {
     }
 
     arena_ = static_cast<std::uint8_t *>(linearAlloc(kVertexBytes + kIndexBytes));
+    {
+        const u64 t0 = svcGetSystemTick();
+        u64 t = t0;
+        for (int i = 0; i < 64; ++i) t = svcGetSystemTick();
+        tick_cost_ = (t - t0) / 64u;
+    }
     if (FILE *f = std::fopen("sdmc:/p3p3ds/cpu_vertices.txt", "r")) { cpu_vertices_ = true; std::fclose(f); }
 
     for (int i = 1; i < 6; ++i) C3D_TexEnvInit(C3D_GetTexEnv(i));
@@ -663,7 +669,7 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     if (stride == 0u) return;
     timed_ = (++timed_seq_ & 15u) == 0u;
     auto tick = [this] { return timed_ ? svcGetSystemTick() : 0u; };
-    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_) acc += (to - from) * 16u; };
+    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_ && to - from > tick_cost_) acc += (to - from - tick_cost_) * 16u; };
     const u64 prep_start = tick();
     begin_frame();
     if (command_buffer_fill() > kCmdBufFlushUsage) {
@@ -955,7 +961,7 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
                              bool start, bool textured, float scale_u, float scale_v) {
     if (count < 3u) return;
     auto tick = [this] { return timed_ ? svcGetSystemTick() : 0u; };
-    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_) acc += (to - from) * 16u; };
+    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_ && to - from > tick_cost_) acc += (to - from - tick_cost_) * 16u; };
     const u64 vertex_start = tick();
     // Referenced vertex range; indices read through one pointer when the
     // index buffer is in guest memory.
