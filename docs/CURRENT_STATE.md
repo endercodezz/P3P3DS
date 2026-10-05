@@ -2,6 +2,14 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Hardware run of build 72bd103: first battle renders correctly, 5-7.5 fps (2026-10-05)
+
+Maintainer, New 2DS XL, 572 s wall, quit with START+SELECT in the battle; three photos (Evoker scene, protagonist on the roof).
+
+- [VERIFIED] The culling fix works on hardware: the protagonist has her face (closed eyes in the Evoker scene, open eyes with the Evoker drawn), hair and uniform without spikes; the roof, its walls, the green floor and the starry sky are drawn. The maintainer: "everything works".
+- [VERIFIED] Speed in the Evoker scene: 7.5 game frames/s, last 10 s 25 % of real time (aot 21, hle 8, ge 63, idle 0 %; GE: hash 0.3, GPU wait 9.8-10.5 %). At quit (battle): 5.2 frames/s, last 10 s 18 % (aot 17, hle 6, ge 70, idle 5 %; GPU wait 20.4 %). Run: 4.19 M draws, 17.98 M triangles, 3,458 frame flushes, 665 render-target binds.
+- [INFERRED] The GE share is still CPU work per draw (vertex unpack, state and uniform updates; about 1,000 draws per frame), and the GPU wait doubled in the battle proper: the GPU now draws the full scene (walls and floor were culled before). Next: measure the split of GE time.
+
 ## First battle on the PC; inside-out models were a culling bug (2026-10-05)
 
 - PC route through the first battle: the maintainer's 4/9 evening save, own room, cursor on the bed right of the pillow, "Sleep", then CROSS through the Dark Hour scenes, the Evoker, Orpheus and the battle to the hospital (local, ignored: `profiles/p3p/input/local/first_battle.txt`; about 55 M dispatches to the Evoker scene).
