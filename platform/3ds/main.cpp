@@ -118,6 +118,7 @@ double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM1
 // split over the last 10 s next to the run average, so slow places show up.
 struct TimeSample {
     u64 wall{}, present{}, idle{}, ui{}, hash{}, upload{}, wait{};
+    u64 prep{}, vertex{}, uniform{}, submit{}; // GPU renderer steps (GpuStats)
     double guest_us{}, hle_ns{}, render_ns{}, io_ns{}, io_bytes{}, hle_calls{};
     std::uint64_t vblanks{}, game_frames{};
 };
@@ -279,15 +280,16 @@ std::string gpu_text() {
         "gpu    : draws %llu tris %llu skip %llu\n"
         "         tex %lu up %llu hit %llu rtt %llu\n"
         "         present gpu %llu cpu %llu same %llu\n"
-        "         cpu->rtt %llu flushes %llu\n"
-        "movie  : skip presses %llu\n",
+        "         flush cmd %llu arena %llu w/draw %llu\n"
+        "movie  : skip presses %llu  cpu->rtt %llu\n",
         static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
         static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
         static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
         static_cast<unsigned long long>(g.target_textures), static_cast<unsigned long long>(g.gpu_presents),
         static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g.skipped_presents),
-        static_cast<unsigned long long>(g.cpu_to_target), static_cast<unsigned long long>(g.frame_flushes),
-        static_cast<unsigned long long>(g_skip_presses));
+        static_cast<unsigned long long>(g.command_flushes), static_cast<unsigned long long>(g.arena_flushes),
+        static_cast<unsigned long long>(g.counted_draws != 0u ? g.command_words / g.counted_draws : 0u),
+        static_cast<unsigned long long>(g_skip_presses), static_cast<unsigned long long>(g.cpu_to_target));
     return buf;
 }
 
@@ -302,6 +304,10 @@ TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
         t.hash = g.hash_ticks;
         t.upload = g.upload_ticks;
         t.wait = g.wait_ticks;
+        t.prep = g.prep_ticks;
+        t.vertex = g.vertex_ticks;
+        t.uniform = g.uniform_ticks;
+        t.submit = g.submit_ticks;
     }
     t.guest_us = static_cast<double>(guest_us);
     t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns);
@@ -334,8 +340,9 @@ Split split_of(const TimeSample &a, const TimeSample &b) {
     return s;
 }
 
-// One line per split, then what GE time went to.
-std::string split_text(const char *label, const TimeSample &a, const TimeSample &b) {
+// One line per split, then what GE time went to; with draws, the GPU
+// renderer's steps per draw (the rest of GE is display-list execution).
+std::string split_text(const char *label, const TimeSample &a, const TimeSample &b, bool draws = false) {
     const Split s = split_of(a, b);
     if (s.wall <= 0) return {};
     auto pct = [&s](double v) { return 100.0 * v / s.wall; };
@@ -346,7 +353,13 @@ std::string split_text(const char *label, const TimeSample &a, const TimeSample 
         " ge: hash %.1f tex %.1f wait %.1f ui %.1f\n",
         label, 100.0 * (b.guest_us - a.guest_us) / 1e6 / s.wall, pct(s.aot), pct(s.hle), pct(s.ge), pct(s.io), pct(s.present), pct(s.idle),
         pct(ticks_to_s(b.hash - a.hash)), pct(ticks_to_s(b.upload - a.upload)), pct(ticks_to_s(b.wait - a.wait)), pct(s.ui));
-    return buf;
+    std::string text = buf;
+    if (draws) {
+        std::snprintf(buf, sizeof buf, " draw: prep %.1f vtx %.1f unif %.1f sub %.1f\n", pct(ticks_to_s(b.prep - a.prep)),
+                      pct(ticks_to_s(b.vertex - a.vertex)), pct(ticks_to_s(b.uniform - a.uniform)), pct(ticks_to_s(b.submit - a.submit)));
+        text += buf;
+    }
+    return text;
 }
 
 // The three HLE imports with the most time since the previous call, as
@@ -393,7 +406,7 @@ void log_second(const TimeSample &a, const TimeSample &b, const psprecomp::Runti
 std::string profile_text(const Stats &s) {
     if (s.run_start_ticks == 0 || g_samples.empty()) return {};
     const TimeSample start{}; // the run started with every counter at zero
-    std::string text = split_text("last 10s", g_samples.front(), g_samples.back());
+    std::string text = split_text("last 10s", g_samples.front(), g_samples.back(), true);
     text += split_text("run avg ", start, g_samples.back());
     char buf[96];
     std::snprintf(buf, sizeof buf, "hle    : %llu calls  interp %.1f%%\n", static_cast<unsigned long long>(psprecomp::runtime_profile().hle_calls),

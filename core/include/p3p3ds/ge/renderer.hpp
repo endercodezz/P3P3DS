@@ -22,6 +22,9 @@ struct GeRegisters {
     std::array<float, 16> proj{};
     std::array<std::uint32_t, 256> clut{}; // 1 KiB CLUT cache (as 32-bit words)
     std::uint32_t clut_words{};
+    // Hash of the loaded CLUT words, updated with them (LOADCLUT): texture
+    // cache keys use it instead of rehashing the palette on every draw.
+    std::uint64_t clut_hash{};
 };
 
 enum class Prim : std::uint32_t { Points = 0, Lines = 1, LineStrip = 2, Triangles = 3, TriangleStrip = 4, TriangleFan = 5, Sprites = 6 };

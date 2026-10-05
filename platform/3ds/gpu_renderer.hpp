@@ -19,6 +19,7 @@
 
 #include <citro3d.h>
 
+#include <array>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -33,6 +34,13 @@ struct GpuStats {
     // CPU time (ARM11 system ticks) spent hashing texture data, converting
     // textures to PICA layout, and waiting in C3D_FrameBegin for the GPU.
     std::uint64_t hash_ticks{}, upload_ticks{}, wait_ticks{};
+    // CPU time per draw step: target, texture and fragment state (prep),
+    // vertex unpack or CPU transform (vertex), shader uniforms (uniform),
+    // citro3d state emission and the draw command (submit).
+    std::uint64_t prep_ticks{}, vertex_ticks{}, uniform_ticks{}, submit_ticks{};
+    // GPU command words added by draws (frames not flushed in between), and
+    // why frames were submitted early: command buffer or vertex arena full.
+    std::uint64_t command_words{}, counted_draws{}, command_flushes{}, arena_flushes{};
     std::uint32_t textures{}, targets{};
 };
 
@@ -99,10 +107,11 @@ private:
                                   std::uint32_t format);
     void blit(C3D_Tex &source, float src_w, float src_h, bool to_screen);
     const C3D_Tex *bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v);
-    void apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode);
-    Vertex *alloc_vertices(std::uint32_t count);
-    void *alloc_linear(std::uint32_t bytes);
-    void use_buffer(Layout layout, const void *data);
+    void apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode, bool no_cull);
+    Vertex *alloc_vertices(std::uint32_t count, std::uint32_t &first);
+    void *alloc_linear(std::uint32_t bytes, std::uint32_t align);
+    void use_buffer(Layout layout);
+    void set_scissor(const ge::GeRegisters &regs);
     void set_uniform(int loc, float x, float y, float z, float w);
     void set_matrix(int loc, const C3D_Mtx &m);
     void set_bool(int loc, bool value);
@@ -127,8 +136,20 @@ private:
     bool uniform_known_[96]{};
     int bool_cache_[16]{};
     C3D_AttrInfo attr_[3]{};
+    // Every layout's attribute buffer starts at arena_ (draws address their
+    // vertices by index), so its configuration is sent only when the layout
+    // changes, not per draw.
     Layout attr_bound_{Layout::Screen};
     bool attr_valid_{};
+    // GE registers the fragment state was last built from, the bound texture
+    // and the scissor: unchanged state is not set again (citro3d re-sends
+    // every block that is set, whether or not it changed). blit() sets its
+    // own state and clears state_valid_.
+    std::array<std::uint32_t, 20> frag_key_{};
+    std::uint32_t scissor_key_[2]{};
+    const C3D_Tex *bound_tex_{};
+    C3D_Tex bound_tex_copy_{};
+    bool state_valid_{};
     bool cpu_vertices_{}; // sdmc:/p3p3ds/cpu_vertices.txt: every draw through the CPU transform
     C3D_RenderTarget *top_{};
     void *shared_depth_{};

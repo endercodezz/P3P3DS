@@ -264,6 +264,9 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         const auto bytes=std::min<std::uint32_t>((arg&0x3F)*32u,1024u);
         regs_.clut.fill(0); regs_.clut_words=bytes/4u;
         for(std::uint32_t i=0;i<bytes;i+=4) if(mem.contains(address+i,4)) regs_.clut[i/4]=mem.load32(address+i);
+        std::uint64_t h=0x84222325CBF29CE4ull^regs_.clut_words;
+        for(std::uint32_t i=0;i<regs_.clut_words;++i) h=(h^regs_.clut[i])*0x100000001B3ull;
+        regs_.clut_hash=h;
         break;
     }
     case 0xEA: {

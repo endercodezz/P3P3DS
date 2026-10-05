@@ -21,8 +21,10 @@ namespace {
 constexpr std::uint32_t kTargetSize = 512;          // PSP framebuffers: stride <= 512, 272 rows
 constexpr std::uint32_t kMaxTargets = 4;            // 1 MiB of VRAM each
 constexpr std::uint32_t kVertexBytes = 1u << 20;    // vertices and indices per GPU frame
+static_assert(kVertexBytes / 28u < 0x10000u, "u16 indices count vertices from the arena start");
 constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded textures
-// Submit the queued frame when the citro3d command buffer (C3D_Init(0x80000))
+constexpr std::uint32_t kCommandBufferBytes = 0xC0000; // C3D_Init
+// Submit the queued frame when the citro3d command buffer (kCommandBufferBytes)
 // is this full: GPUCMD_Add panics (svcBreak) on overflow. One draw adds a few
 // KiB at most. Measured on hardware: a frame left open across vblanks (no new
 // picture to present) overflowed at the first Shadow with a draw-count rule,
@@ -135,7 +137,7 @@ C3D_Mtx screen_projection() {
 } // namespace
 
 GpuRenderer::GpuRenderer() {
-    C3D_Init(0x80000);
+    C3D_Init(kCommandBufferBytes);
     top_ = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, -1);
     C3D_RenderTargetSetOutput(top_, GFX_TOP, GFX_LEFT, kTransferFlags);
 
@@ -246,35 +248,44 @@ void GpuRenderer::flush_frame() {
     if (keep) bind_target(*keep);
 }
 
-// Vertices and indices of the open GPU frame (16-byte aligned); a full arena
-// submits the frame first (the GPU must finish reading it before reuse).
-void *GpuRenderer::alloc_linear(std::uint32_t bytes) {
-    bytes = (bytes + 15u) & ~15u;
+// Vertices and indices of the open GPU frame, at an offset that is a multiple
+// of align (a vertex stride: the draw then addresses its vertices by index
+// from arena_); a full arena submits the frame first (the GPU must finish
+// reading it before reuse).
+void *GpuRenderer::alloc_linear(std::uint32_t bytes, std::uint32_t align) {
+    bytes = (bytes + 3u) & ~3u;
     if (bytes > kVertexBytes) return nullptr;
-    if (arena_used_ + bytes > kVertexBytes) flush_frame();
-    last_alloc_ = arena_used_;
-    void *p = arena_ + arena_used_;
-    arena_used_ += bytes;
-    return p;
-}
-
-GpuRenderer::Vertex *GpuRenderer::alloc_vertices(std::uint32_t count) {
-    return static_cast<Vertex *>(alloc_linear(count * static_cast<std::uint32_t>(sizeof(Vertex))));
-}
-
-void GpuRenderer::use_buffer(Layout layout, const void *data) {
-    const int k = static_cast<int>(layout);
-    if (!attr_valid_ || attr_bound_ != layout) {
-        C3D_SetAttrInfo(&attr_[k]);
-        attr_bound_ = layout;
-        attr_valid_ = true;
+    std::uint32_t at = (arena_used_ + align - 1u) / align * align;
+    if (at + bytes > kVertexBytes) {
+        ++gpu_stats_.arena_flushes;
+        flush_frame();
+        at = 0;
     }
+    last_alloc_ = at;
+    arena_used_ = at + bytes;
+    return arena_ + at;
+}
+
+GpuRenderer::Vertex *GpuRenderer::alloc_vertices(std::uint32_t count, std::uint32_t &first) {
+    constexpr auto stride = static_cast<std::uint32_t>(sizeof(Vertex));
+    auto *v = static_cast<Vertex *>(alloc_linear(count * stride, stride));
+    if (v != nullptr) first = static_cast<std::uint32_t>(reinterpret_cast<std::uint8_t *>(v) - arena_) / stride;
+    return v;
+}
+
+// One attribute buffer at arena_ per layout; set only when the layout changes
+// (the buffer configuration is about 40 command words).
+void GpuRenderer::use_buffer(Layout layout) {
+    if (attr_valid_ && attr_bound_ == layout) return;
+    C3D_SetAttrInfo(&attr_[static_cast<int>(layout)]);
     C3D_BufInfo buf;
     BufInfo_Init(&buf);
-    if (layout == Layout::Screen) BufInfo_Add(&buf, data, sizeof(Vertex), 3, 0x210);
-    else if (layout == Layout::Model) BufInfo_Add(&buf, data, offsetof(ShaderVertex, w), 4, 0x3210);
-    else BufInfo_Add(&buf, data, sizeof(ShaderVertex), 6, 0x543210);
+    if (layout == Layout::Screen) BufInfo_Add(&buf, arena_, sizeof(Vertex), 3, 0x210);
+    else if (layout == Layout::Model) BufInfo_Add(&buf, arena_, offsetof(ShaderVertex, w), 4, 0x3210);
+    else BufInfo_Add(&buf, arena_, sizeof(ShaderVertex), 6, 0x543210);
     C3D_SetBufInfo(&buf);
+    attr_bound_ = layout;
+    attr_valid_ = true;
 }
 
 void GpuRenderer::set_uniform(int loc, float x, float y, float z, float w) {
@@ -369,8 +380,10 @@ void GpuRenderer::upload_guest_framebuffer(psprecomp::GuestMemory &memory, std::
 }
 
 void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen) {
-    Vertex *v = alloc_vertices(6);
+    std::uint32_t first = 0;
+    Vertex *v = alloc_vertices(6, first);
     if (v == nullptr) return;
+    state_valid_ = false; // the state below is not the GE's
     set_matrix(u_.screen, to_screen ? screen_projection() : target_projection());
     use_screen_vertices(1.0f / kTargetSize, 1.0f / kTargetSize);
     const float w = to_screen ? 400.0f : src_w, h = to_screen ? 240.0f : src_h;
@@ -390,8 +403,8 @@ void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen
     C3D_TexSetFilter(&source, to_screen ? GPU_LINEAR : GPU_NEAREST, to_screen ? GPU_LINEAR : GPU_NEAREST);
     C3D_TexSetWrap(&source, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
     C3D_TexBind(0, &source);
-    use_buffer(Layout::Screen, v);
-    C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
+    use_buffer(Layout::Screen);
+    C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(first), 6);
 }
 
 void GpuRenderer::evict_textures(std::uint32_t needed) {
@@ -435,7 +448,7 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
                         (static_cast<std::uint64_t>(info.stride) << 40);
     if (info.format >= 4) {
         key ^= static_cast<std::uint64_t>(r24(regs, 0xC5)) * 0x9E3779B97F4A7C15ull;
-        for (std::uint32_t i = 0; i < regs.clut_words; ++i) key = (key ^ regs.clut[i]) * 0x100000001B3ull;
+        key = (key ^ regs.clut_hash) * 0x100000001B3ull; // palette hash computed at LOADCLUT
     }
     auto it = textures_.find(key);
     if (it != textures_.end() && it->second.checked_frame == frame_) {
@@ -494,7 +507,7 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
     return &it->second.tex;
 }
 
-void GpuRenderer::apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode) {
+void GpuRenderer::apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode, bool no_cull) {
     C3D_TexEnv *env = C3D_GetTexEnv(0);
     C3D_TexEnvInit(env);
     if (clear_mode) {
@@ -608,8 +621,18 @@ void GpuRenderer::apply_fragment_state(const ge::GeRegisters &regs, bool texture
     // the opposite winding [VERIFIED on the PC renderer, first battle: the
     // through-mode mapping culled the faces turned to the camera].
     const bool through = (r24(regs, 0x12) & (1u << 23)) != 0u;
-    if (on(regs, 0x1D)) C3D_CullFace(((r24(regs, 0x9B) & 1u) != 0u) == through ? GPU_CULL_FRONT_CCW : GPU_CULL_BACK_CCW);
-    else C3D_CullFace(GPU_CULL_NONE);
+    if (on(regs, 0x1D) && !no_cull) C3D_CullFace(((r24(regs, 0x9B) & 1u) != 0u) == through ? GPU_CULL_FRONT_CCW : GPU_CULL_BACK_CCW);
+    else C3D_CullFace(GPU_CULL_NONE); // sprites are never culled
+}
+
+void GpuRenderer::set_scissor(const ge::GeRegisters &regs) {
+    const std::uint32_t a = r24(regs, 0xD4), b = r24(regs, 0xD5);
+    if (state_valid_ && scissor_key_[0] == a && scissor_key_[1] == b) return;
+    scissor_key_[0] = a;
+    scissor_key_[1] = b;
+    const auto x1 = a & 0x3FFu, y1 = (a >> 10) & 0x3FFu, x2 = b & 0x3FFu, y2 = (b >> 10) & 0x3FFu;
+    if (kTargetYSign > 0.0f) C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, y1, x2 + 1u, y2 + 1u);
+    else C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, kTargetSize - 1u - y2, x2 + 1u, kTargetSize - y1);
 }
 
 void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, ge::Prim prim, std::uint32_t count,
@@ -620,8 +643,12 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const std::uint32_t color_address = 0x04000000u | (r24(regs, 0x9C) & 0x1FFFF0u);
     const std::uint32_t stride = r24(regs, 0x9D) & 0x7FCu;
     if (stride == 0u) return;
+    const u64 prep_start = svcGetSystemTick();
     begin_frame();
-    if (command_buffer_fill() > kCmdBufFlushUsage) flush_frame();
+    if (command_buffer_fill() > kCmdBufFlushUsage) {
+        ++gpu_stats_.command_flushes;
+        flush_frame();
+    }
     Target *target = target_for(color_address, r24(regs, 0xD2) & 3u, true);
     if (target == nullptr) { ++gpu_stats_.skipped_prims; return; }
     if (bound_ != target || bound_screen_) bind_target(*target);
@@ -642,23 +669,47 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
 
     float su = 1.0f, sv = 1.0f;
     const C3D_Tex *tex = textured ? bind_texture(memory, regs, su, sv) : nullptr;
-    apply_fragment_state(regs, tex != nullptr, clear_mode);
-    if (tex != nullptr) C3D_TexBind(0, const_cast<C3D_Tex *>(tex));
-    {
-        const auto x1 = r24(regs, 0xD4) & 0x3FFu, y1 = (r24(regs, 0xD4) >> 10) & 0x3FFu;
-        const auto x2 = r24(regs, 0xD5) & 0x3FFu, y2 = (r24(regs, 0xD5) >> 10) & 0x3FFu;
-        if (kTargetYSign > 0.0f) C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, y1, x2 + 1u, y2 + 1u);
-        else C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, kTargetSize - 1u - y2, x2 + 1u, kTargetSize - y1);
+    // Fragment state from the GE registers it depends on; unchanged state is not set again.
+    const bool sprites = prim == ge::Prim::Sprites;
+    const std::array<std::uint32_t, 20> key = {
+        r24(regs, 0xC9), r24(regs, 0xCA), regs.reg[0x22] & 1u, r24(regs, 0xDB), regs.reg[0x21] & 1u, r24(regs, 0xDF),
+        r24(regs, 0xE0), r24(regs, 0xE1), r24(regs, 0xE8), regs.reg[0x23] & 1u, r24(regs, 0xDE), r24(regs, 0xE7),
+        regs.reg[0x1D] & 1u, r24(regs, 0x9B), layout.through ? 1u : 0u, r24(regs, 0xD3), tex != nullptr ? 1u : 0u,
+        sprites ? 1u : 0u, 0u, 0u};
+    if (!state_valid_ || key != frag_key_) {
+        apply_fragment_state(regs, tex != nullptr, clear_mode, sprites);
+        frag_key_ = key;
     }
+    if (tex != nullptr && (!state_valid_ || tex != bound_tex_ || std::memcmp(tex, &bound_tex_copy_, sizeof(C3D_Tex)) != 0)) {
+        C3D_TexBind(0, const_cast<C3D_Tex *>(tex));
+        bound_tex_ = tex;
+        std::memcpy(&bound_tex_copy_, tex, sizeof(C3D_Tex));
+    }
+    set_scissor(regs);
+    state_valid_ = true;
+    u32 *cmd_base = nullptr;
+    u32 cmd_size = 0, cmd_before = 0;
+    GPUCMD_GetBuffer(&cmd_base, &cmd_size, &cmd_before);
+    const u64 vertex_start = svcGetSystemTick();
+    gpu_stats_.prep_ticks += vertex_start - prep_start;
+    auto count_commands = [&] {
+        u32 *b = nullptr;
+        u32 s = 0, after = 0;
+        GPUCMD_GetBuffer(&b, &s, &after);
+        if (b == cmd_base && after >= cmd_before) {
+            gpu_stats_.command_words += after - cmd_before;
+            ++gpu_stats_.counted_draws;
+        }
+    };
 
     // Transform-mode triangles: the vertex shader transforms, skins and lights.
-    if (!layout.through && !clear_mode && prim != ge::Prim::Sprites && !cpu_vertices_ &&
-        draw_model(memory, regs, layout, prim, count, vertex_address, index_address, tex != nullptr, su, sv))
+    if (!layout.through && !clear_mode && !sprites && !cpu_vertices_ &&
+        draw_model(memory, regs, layout, prim, count, vertex_address, index_address, tex != nullptr, su, sv)) {
+        count_commands();
         return;
+    }
 
     ge::decode_screen_vertices(memory, regs, count, vertex_address, index_address, screen_);
-    set_matrix(u_.screen, target_projection());
-    use_screen_vertices(su, sv);
 
     const bool flat = (r24(regs, 0x50) & 1u) == 0u;
     std::uint32_t emitted = 0;
@@ -682,13 +733,12 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     default: capacity = count >= 3u ? (count - 2u) * 3u : 0u; break;
     }
     if (capacity == 0u) return;
-    out = alloc_vertices(capacity);
+    std::uint32_t first = 0;
+    out = alloc_vertices(capacity, first);
     if (out == nullptr) { ++gpu_stats_.skipped_prims; return; }
-    Vertex *first = out;
     const auto &v = screen_;
     switch (prim) {
     case ge::Prim::Sprites:
-        C3D_CullFace(GPU_CULL_NONE);
         for (std::uint32_t i = 0; i + 1 < count; i += 2) {
             const auto &a = v[i], &b = v[i + 1];
             // Corners keep the software mapping: u follows x and v follows y from a to b.
@@ -713,10 +763,18 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
         for (std::uint32_t i = 1; i + 1 < count; ++i) triangle(v[0], v[i], v[i + 1]);
         break;
     }
-    arena_used_ = last_alloc_ + ((emitted * static_cast<std::uint32_t>(sizeof(Vertex)) + 15u) & ~15u); // return the unused tail
+    arena_used_ = last_alloc_ + emitted * static_cast<std::uint32_t>(sizeof(Vertex)); // return the unused tail
+    const u64 uniform_start = svcGetSystemTick();
+    gpu_stats_.vertex_ticks += uniform_start - vertex_start;
     if (emitted == 0u) return;
-    use_buffer(Layout::Screen, first);
-    C3D_DrawArrays(GPU_TRIANGLES, 0, static_cast<int>(emitted));
+    set_matrix(u_.screen, target_projection());
+    use_screen_vertices(su, sv);
+    const u64 submit_start = svcGetSystemTick();
+    gpu_stats_.uniform_ticks += submit_start - uniform_start;
+    use_buffer(Layout::Screen);
+    C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(first), static_cast<int>(emitted));
+    gpu_stats_.submit_ticks += svcGetSystemTick() - submit_start;
+    count_commands();
     ++gpu_stats_.draws;
     gpu_stats_.triangles += emitted / 3u;
 }
@@ -752,10 +810,14 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     if (n > 0xFFFFu) return false;
     const bool skinned = layout.weights != 0u;
     const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
-    const std::uint32_t vertex_bytes = (n * stride + 15u) & ~15u;
+    const std::uint32_t vertex_bytes = n * stride; // stride is a multiple of 4
     const std::uint32_t index_bytes = layout.index_format != 0u ? count * 2u : 0u;
-    auto *block = static_cast<std::uint8_t *>(alloc_linear(vertex_bytes + index_bytes));
+    const u64 vertex_start = svcGetSystemTick();
+    auto *block = static_cast<std::uint8_t *>(alloc_linear(vertex_bytes + index_bytes, stride));
     if (block == nullptr) return false;
+    // Index of the first vertex from arena_ (the attribute buffer base); the
+    // arena holds fewer than 0x10000 vertices of any layout.
+    const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
 
     ge::ModelVertex m;
     ShaderVertex s;
@@ -772,8 +834,10 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     if (index_bytes != 0u) {
         indices = reinterpret_cast<std::uint16_t *>(block + vertex_bytes);
         for (std::uint32_t i = 0; i < count; ++i)
-            indices[i] = static_cast<std::uint16_t>(ge::vertex_index(memory, layout, index_address, i) - lo);
+            indices[i] = static_cast<std::uint16_t>(first + ge::vertex_index(memory, layout, index_address, i) - lo);
     }
+    const u64 uniform_start = svcGetSystemTick();
+    gpu_stats_.vertex_ticks += uniform_start - vertex_start;
 
     // screen = target projection x viewport x PROJ x VIEW (see the shader
     // header): the screen mapping of decode_screen_vertices as a matrix.
@@ -841,9 +905,12 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
         }
     }
 
-    use_buffer(skinned ? Layout::Skinned : Layout::Model, block);
+    const u64 submit_start = svcGetSystemTick();
+    gpu_stats_.uniform_ticks += submit_start - uniform_start;
+    use_buffer(skinned ? Layout::Skinned : Layout::Model);
     if (indices != nullptr) C3D_DrawElements(primitive, static_cast<int>(count), C3D_UNSIGNED_SHORT, indices);
-    else C3D_DrawArrays(primitive, 0, static_cast<int>(count));
+    else C3D_DrawArrays(primitive, static_cast<int>(first), static_cast<int>(count));
+    gpu_stats_.submit_ticks += svcGetSystemTick() - submit_start;
     ++gpu_stats_.draws;
     ++gpu_stats_.model_draws;
     gpu_stats_.model_vertices += n;
