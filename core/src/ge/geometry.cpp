@@ -87,12 +87,14 @@ TextureInfo texture_info(const GeRegisters &regs) {
 namespace {
 
 // Component reader over a host pointer to one vertex (little endian).
-float read_component(const std::uint8_t *p, std::uint32_t format, bool signed_value, float scale8, float scale16) {
+// scale8/scale16 are 1, 128 or 32768: powers of two, so multiplying by the
+// reciprocal gives exactly the quotient (and avoids a division per component).
+inline float read_component(const std::uint8_t *p, std::uint32_t format, bool signed_value, float scale8, float scale16) {
     switch (format) {
-    case 1: return signed_value ? static_cast<std::int8_t>(p[0]) / scale8 : p[0] / scale8;
+    case 1: return (signed_value ? static_cast<float>(static_cast<std::int8_t>(p[0])) : static_cast<float>(p[0])) * (1.0f / scale8);
     case 2: {
         const std::uint16_t raw = static_cast<std::uint16_t>(p[0] | (p[1] << 8));
-        return signed_value ? static_cast<std::int16_t>(raw) / scale16 : raw / scale16;
+        return (signed_value ? static_cast<float>(static_cast<std::int16_t>(raw)) : static_cast<float>(raw)) * (1.0f / scale16);
     }
     case 3: { float f; std::memcpy(&f, p, 4); return f; }
     default: return 0.0f;
@@ -107,7 +109,7 @@ Rgba read_color(const std::uint8_t *p, std::uint32_t format) {
 // One morph target of one vertex. Weights: u8 0x80 and u16 0x8000 are 1.0
 // [INFERRED from the s8/s16 position scaling]; normals scale like positions
 // (they are normalised before lighting).
-void decode_one(const std::uint8_t *p, const VertexLayout &l, ModelVertex &v) {
+inline void decode_one(const std::uint8_t *p, const VertexLayout &l, ModelVertex &v) {
     const auto pe = component_size(l.pos_format, 1, 2, 4);
     if (l.through) {
         // Through mode: s16/float screen coordinates (x, y), u16 z; integer texel UVs.

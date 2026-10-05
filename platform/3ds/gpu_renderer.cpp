@@ -670,6 +670,18 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     timed_ = (++timed_seq_ & 15u) == 0u;
     auto tick = [this] { return timed_ ? svcGetSystemTick() : 0u; };
     auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_ && to - from > tick_cost_) acc += (to - from - tick_cost_) * 16u; };
+    // Fast path: no state-changing GE command since the previous model draw
+    // (state_version), same GPU frame and target: the draw joins the pending
+    // batch without looking up its texture or building its signature.
+    const bool triangles = prim == ge::Prim::Triangles || prim == ge::Prim::TriangleStrip || prim == ge::Prim::TriangleFan;
+    if (triangles && batch_active_ && fast_valid_ && regs.state_version == fast_version_ && frame_ == fast_frame_ && in_frame_ &&
+        bound_ == fast_target_ && !bound_screen_ && fast_target_->cpu_seq <= fast_target_->gpu_seq &&
+        index_used_ + static_cast<std::uint32_t>(batch_indices_.size()) * 2u + (count * 3u + 1u) * 2u <= kIndexBytes) {
+        fast_target_->gpu_seq = ++seq_;
+        ++gpu_stats_.fast_draws;
+        draw_model(memory, regs, fast_layout_, prim, count, vertex_address, index_address, false, fast_textured_, fast_su_, fast_sv_);
+        return;
+    }
     const u64 prep_start = tick();
     begin_frame();
     if (command_buffer_fill() > kCmdBufFlushUsage) {
@@ -755,6 +767,14 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
         const u64 vertex_start = tick();
         add(gpu_stats_.prep_ticks, prep_start, vertex_start);
         draw_model(memory, regs, layout, prim, count, vertex_address, index_address, !join, tex != nullptr, su, sv);
+        fast_valid_ = true;
+        fast_version_ = regs.state_version;
+        fast_frame_ = frame_;
+        fast_target_ = target;
+        fast_layout_ = layout;
+        fast_textured_ = tex != nullptr;
+        fast_su_ = su;
+        fast_sv_ = sv;
         return;
     }
 

@@ -25,6 +25,10 @@ struct GeRegisters {
     // Hash of the loaded CLUT words, updated with them (LOADCLUT): texture
     // cache keys use it instead of rehashing the palette on every draw.
     std::uint64_t clut_hash{};
+    // Incremented by every command that can change render state (anything but
+    // vertex/index address, PRIM and list control): a renderer may reuse what
+    // it derived for the previous draw while this is unchanged.
+    std::uint64_t state_version{};
 };
 
 enum class Prim : std::uint32_t { Points = 0, Lines = 1, LineStrip = 2, Triangles = 3, TriangleStrip = 4, TriangleFan = 5, Sprites = 6 };

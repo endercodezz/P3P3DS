@@ -42,6 +42,7 @@ struct GpuStats {
     // why frames were submitted early: command buffer or vertex arena full.
     std::uint64_t command_words{}, counted_draws{}, command_flushes{}, arena_flushes{};
     std::uint64_t model_batches{}; // GPU draws that model draws were merged into
+    std::uint64_t fast_draws{};    // model draws that joined a batch on the fast path
     std::uint32_t textures{}, targets{};
 };
 
@@ -162,6 +163,13 @@ private:
     Layout batch_layout_{Layout::Model};
     bool batch_active_{};
     std::uint32_t index_used_{}; // bytes of the index area (after the vertex arena) used this GPU frame
+    // The last model draw that went through the full path: its GE state
+    // version and what was derived from it (fast path in draw()).
+    bool fast_valid_{}, fast_textured_{};
+    std::uint64_t fast_version_{}, fast_frame_{};
+    Target *fast_target_{};
+    ge::VertexLayout fast_layout_{};
+    float fast_su_{1.0f}, fast_sv_{1.0f};
     // Step timing samples every 16th draw (svcGetSystemTick is a system call).
     std::uint32_t timed_seq_{};
     bool timed_{};

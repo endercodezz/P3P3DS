@@ -210,6 +210,11 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
     const auto op=word>>24, arg=word&0xFFFFFF;
     auto &mem=rt.memory();
     regs_.reg[op]=arg;
+    switch(op) { // list control, VADDR, IADDR, PRIM, BASE, OFFSET, ORIGIN leave the render state
+    case 0x00: case 0x01: case 0x02: case 0x04: case 0x08: case 0x09: case 0x0A: case 0x0B: case 0x0C:
+    case 0x0E: case 0x0F: case 0x10: case 0x13: case 0x14: break;
+    default: ++regs_.state_version; break;
+    }
     state_.registers[op]=arg;
     auto target=[&](std::uint32_t a){ return state_.relative(a)&~3u; };
     switch(op) {
