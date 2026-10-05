@@ -2,6 +2,24 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## Battle speed: per-draw GPU work cut, 5.8 -> 9.9 fps in Azahar (2026-10-06)
+
+Measured by the maintainer in Azahar (New 3DS mode), Evoker scene of the first battle, "last 10 s" of the bottom-screen report; the maintainer finds Azahar close to the console. [UNVERIFIED] on hardware.
+
+| Build | Change | fps | speed | GE share |
+|---|---|---|---|---|
+| 72bd103 | (culling fix, baseline) | 5.8-5.9 | 19 % | 66 % |
+| 3c1f54c | only changed state sent per draw | (not measured separately) | | |
+| cea9aae | uniforms rebuilt only on change; one-pass vertex unpack | 6.5-6.6 | 22 % | 62 % |
+| 03c2aec | consecutive model draws with identical state batched | 7.7-7.8 | 24-25 % | 55 % |
+| 65d261b | fast path for draws with unchanged GE state | 9.9 | 33 % | 42 % |
+
+- [VERIFIED] (Azahar) Before: each of about 2,000 draws per frame re-sent the vertex buffer configuration (about 40 command words), texture unit, TexEnv, blend/depth/cull and scissor; the command buffer filled about four times per frame. After 3c1f54c: no early submits in battle, about 25-33 command words per screen draw.
+- [VERIFIED] (Azahar) Batching: 2.07 M model draws became 55 k GPU draws (PC draw log: 4,076 draws in two battle frames form about 100 runs of identical state). Fast path: 1.81 M of the 2.07 M draws.
+- Remaining split in battle (65d261b, Azahar): aot 29, hle 19, ge 42 (vertex unpack 26.5, preparation 4.4, uniforms 1.0, submit 0.5), idle 8 %. The game's own code (aot + hle, 48 % of the time at 33 % speed) alone limits the battle to roughly 70 % speed; next targets: vertex unpack per draw (cache unpacked models across frames) and the AOT/HLE cost.
+- Report on the bottom screen: line `draw:` (prep, vtx, unif, sub: % of time per draw step, sampled every 16th draw with the cost of the tick call removed), `flush cmd/arena` (early submits), `w/draw` (command words per screen draw), `merge Nk>Mk fKk` (model draws > GPU batches, fast-path draws).
+- Unattended runs: `sdmc:/p3p3ds/autotest/` (input.txt route, savedata.txt slot, stop.txt vblank, dump_every.txt, ms0/), for measurements without anyone at the controls.
+
 ## Hardware run of build 72bd103: first battle renders correctly, 5-7.5 fps (2026-10-05)
 
 Maintainer, New 2DS XL, 572 s wall, quit with START+SELECT in the battle; three photos (Evoker scene, protagonist on the roof).
