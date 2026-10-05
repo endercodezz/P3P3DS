@@ -4,15 +4,15 @@
 
 ---
 
-## Status: NOT PLAYABLE YET (New 3DS: first days at 21-30 fps, saves work, no sound; battles render wrong and slow)
+## Status: NOT PLAYABLE YET (New 3DS: first days at 21-30 fps, saves work, no sound; battles slow)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle starts; since the vertex shader (build 029f3c8) the characters are drawn lit, but distorted, and the surroundings stay black, at 7-11 fps (see Known issues below). The opening movie is skipped automatically (no video decoder yet).
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle starts at 7-11 fps. Its "inside-out" models and black surroundings came from a back-face culling rule that was inverted for 3D draws; fixed after 0.2.6 (the PC renderer now draws the whole first battle correctly, a hardware test is pending; see Known issues below). The opening movie is skipped automatically (no video decoder yet).
 
 ### Known issues (New 3DS, maintainer's tests on a New 2DS XL)
 
 | Issue | Where | State |
 |---|---|---|
-| Battle: surroundings black, characters lit but distorted ("exploded" limbs, missing face) | first Shadow battle | vertex shader new in 029f3c8; cause not yet known |
+| Battle: surroundings black, characters distorted ("exploded" limbs, missing face) | first Shadow battle (0.2.6) | cause found: 3D culling kept the back faces; fixed after 0.2.6, to be confirmed on hardware |
 | Battle: 7-11 fps, 19-26 % of real time; graphics work on the CPU takes about 65 % of the time | first Shadow battle | next optimisation target (goal: 20 fps at 100 % speed) |
 | Dorm: 21-26 fps on the floors (30 in the own room), 89-91 % speed | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |

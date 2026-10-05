@@ -251,8 +251,13 @@ void SoftwareRenderer::draw(psprecomp::GuestMemory &memory, const GeRegisters &r
         const float area = (b.x - a.x) * (d.y - a.y) - (b.y - a.y) * (d.x - a.x);
         if (area == 0.0f) return;
         if (c.enabled(0x1D)) { // back-face culling: CULL register selects the kept winding
+            // Screen-space winding (y down). Transform mode keeps the opposite
+            // winding to through mode [VERIFIED, first battle: with the
+            // through-mode rule the faces turned to the camera were culled and
+            // the back faces drawn: inside-out models, black surroundings].
             const bool ccw = area > 0.0f;
-            if (ccw == ((c.r(0x9B) & 1u) != 0u)) return;
+            const bool culled_ccw = ((c.r(0x9B) & 1u) != 0u) == layout.through;
+            if (ccw == culled_ccw) return;
         }
         const auto minx = std::max<std::int32_t>(target.x1, static_cast<std::int32_t>(std::floor(std::min({a.x, b.x, d.x}))));
         const auto maxx = std::min<std::int32_t>(target.x2, static_cast<std::int32_t>(std::ceil(std::max({a.x, b.x, d.x}))));

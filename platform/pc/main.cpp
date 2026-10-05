@@ -24,9 +24,9 @@ namespace psprecomp {void register_generated_functions(Runtime &); void apply_ge
 int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
-            ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path, sample_path;
+            ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path, sample_path, draw_log_path;
         std::string savedata_policy="latest";
-        std::uint64_t frame_every=30, render_from=0, sample_from=0;
+        std::uint64_t frame_every=30, render_from=0, sample_from=0, draw_log_from=0;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
         std::optional<std::uint32_t> expected;
@@ -52,6 +52,8 @@ int main(int argc,char **argv) {
             else if(a=="--profile") profile=true;
             else if(a=="--sample") sample_path=value();
             else if(a=="--sample-from") sample_from=std::stoull(value());
+            else if(a=="--draw-log") draw_log_path=value();
+            else if(a=="--draw-log-from") draw_log_from=std::stoull(value());
             else if(a=="--savedata") savedata_policy=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--render-from") render_from=std::stoull(value()); // debug fast-forward: no pixels before that vblank
@@ -69,6 +71,7 @@ int main(int argc,char **argv) {
                          <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n"
                          <<"--sample <file> (statistical profile: instruction pointer every ~1 ms; tools/profile_symbols.py)\n"
                          <<"--sample-from <vblank> (start sampling at that vblank)\n"
+                         <<"--draw-log <file> --draw-log-from <frame> (one line per GE draw of the 2 displayed frames after that frame index)\n"
                          <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
@@ -204,6 +207,15 @@ int main(int argc,char **argv) {
                 const auto rgb=p3p3ds::framebuffer_rgb(rt.memory(),static_cast<std::uint32_t>(f.at("address")),
                     static_cast<std::uint32_t>(f.at("stride")),static_cast<std::uint32_t>(f.at("format")));
                 const auto index=frames_shown++;
+                // --draw-log: the draws that build displayed frames index+1 and index+2.
+                if(!draw_log_path.empty()) {
+                    auto &log=kernel.ge().draw_log;
+                    if(index==draw_log_from) {
+                        log=std::fopen(draw_log_path.string().c_str(),"w");
+                        if(log) std::fprintf(log,"# after displayed frame %llu\n",static_cast<unsigned long long>(index));
+                    } else if(log && index==draw_log_from+1) std::fprintf(log,"# displayed frame %llu\n",static_cast<unsigned long long>(index));
+                    else if(log && index>=draw_log_from+2) { std::fclose(log); log=nullptr; }
+                }
                 std::uint64_t nonblack=0; for(std::size_t i=0;i<rgb.size();i+=3) nonblack+=(rgb[i]|rgb[i+1]|rgb[i+2])!=0;
                 if(!frames_dir.empty() && index%frame_every==0) {
                     std::filesystem::create_directories(frames_dir);

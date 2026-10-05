@@ -1,11 +1,12 @@
 // SoftwareRenderer unit tests: through-mode sprites, CLUT + swizzled textures,
-// alpha blending, clear mode, scissor and block transfer. Expected values are
+// alpha blending, clear mode, scissor, block transfer and transform-mode culling. Expected values are
 // derived from the PSPSDK pspgu.h register semantics (see renderer.hpp).
 #include "p3p3ds/ge/renderer.hpp"
 #include "psprecomp/guest_memory.hpp"
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 using namespace p3p3ds::ge;
 
@@ -137,6 +138,35 @@ int main() {
         g.reg[0xEE] = 3u | (2u << 10);                     // 4x3
         r.transfer(m, g);
         check(pixel(m, 100, 5) == 0xA0000000u + 10u && pixel(m, 103, 7) == 0xA0000000u + 29u, "block transfer rectangle");
+    }
+    // 6. Transform-mode culling: CULL (0x9B) = 1 keeps the triangles that are
+    // counter-clockwise on screen (y down) and culls the others; measured in
+    // P3P's first battle (the opposite rule drew the models inside out).
+    for (int order = 0; order < 2; ++order) {
+        psprecomp::GuestMemory m; SoftwareRenderer r; auto g = base_regs();
+        fill_fb(m, 0xFF000000u);
+        constexpr std::uint32_t kVtype = (7u << 2) | (3u << 7); // colour 8888, float xyz, transform mode
+        g.reg[0x12] = kVtype;
+        for (int i = 0; i < 12; ++i) g.world[i] = g.view[i] = (i % 4 == 0) ? 1.0f : 0.0f; // 4x3 identity
+        for (int i = 0; i < 16; ++i) g.proj[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+        auto ge = [](float f) { std::uint32_t b; std::memcpy(&b, &f, 4); return b >> 8; };
+        g.reg[0x42] = ge(100.0f); g.reg[0x43] = ge(-100.0f); g.reg[0x44] = ge(0.0f);
+        g.reg[0x45] = ge(2048.0f + 240.0f); g.reg[0x46] = ge(2048.0f + 136.0f); g.reg[0x47] = ge(0.0f);
+        g.reg[0x4C] = 2048u << 4; g.reg[0x4D] = 2048u << 4;
+        g.reg[0x1D] = 1; g.reg[0x9B] = 1;
+        // Screen (190,186), (290,186), (240,86): clockwise on screen; swapped: counter-clockwise.
+        const float pts[3][2] = {{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.0f, 0.5f}};
+        const int idx[2][3] = {{0, 1, 2}, {0, 2, 1}};
+        const auto l = vertex_layout(kVtype);
+        for (int k = 0; k < 3; ++k) {
+            const auto v = kVerts + l.size * static_cast<std::uint32_t>(k);
+            float xyz[3] = {pts[idx[order][k]][0], pts[idx[order][k]][1], 0.0f};
+            for (int c = 0; c < 3; ++c) { std::uint32_t b; std::memcpy(&b, &xyz[c], 4); m.store32(v + l.pos_offset + 4u * static_cast<std::uint32_t>(c), b); }
+            m.store32(v + l.color_offset, 0xFF00FF00u);
+        }
+        r.draw(m, g, Prim::Triangles, 3, kVerts, 0);
+        const bool drawn = (pixel(m, 240, 150) & 0xFFFFFFu) == 0x00FF00u;
+        check(drawn == (order == 1), order ? "transform mode keeps the counter-clockwise triangle" : "transform mode culls the clockwise triangle");
     }
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "PASS", failures);
     return failures ? 1 : 0;

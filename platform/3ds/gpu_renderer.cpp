@@ -603,10 +603,12 @@ void GpuRenderer::apply_fragment_state(const ge::GeRegisters &regs, bool texture
                   static_cast<GPU_WRITEMASK>(mask));
 
     // Culling (0x1D): CULL bit 0 selects the culled winding; see the software
-    // renderer. [UNVERIFIED] mapping to PICA winding, checked on 3D scenes.
-    // Measured in Azahar: this mapping draws the logos and title screen; the
-    // opposite one culled them all. [UNVERIFIED] on 3D scenes.
-    if (on(regs, 0x1D)) C3D_CullFace((r24(regs, 0x9B) & 1u) ? GPU_CULL_FRONT_CCW : GPU_CULL_BACK_CCW);
+    // renderer. Through mode: measured in Azahar, this mapping draws the logos
+    // and title screen (the opposite one culled them all). Transform mode culls
+    // the opposite winding [VERIFIED on the PC renderer, first battle: the
+    // through-mode mapping culled the faces turned to the camera].
+    const bool through = (r24(regs, 0x12) & (1u << 23)) != 0u;
+    if (on(regs, 0x1D)) C3D_CullFace(((r24(regs, 0x9B) & 1u) != 0u) == through ? GPU_CULL_FRONT_CCW : GPU_CULL_BACK_CCW);
     else C3D_CullFace(GPU_CULL_NONE);
 }
 

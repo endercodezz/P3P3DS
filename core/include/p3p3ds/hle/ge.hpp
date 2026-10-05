@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cstdio>
 #include <cstdint>
 #include <map>
 #include <deque>
@@ -60,6 +61,9 @@ public:
     // Debug fast-forward (PC runner --render-from): display lists still run
     // (state, vertex pointers, callbacks), but no pixels are produced.
     bool skip_rasterization{};
+    // Debug (PC runner --draw-log): one line per PRIM with its state and
+    // screen bounds while set; null in normal runs.
+    std::FILE *draw_log{};
     // Per-PRIM census of the GE state the game uses (feature -> draw count),
     // to prioritise renderer work by observed workload. A dozen string-keyed
     // map updates per draw: off in the production runtime (3DS).
@@ -79,6 +83,7 @@ private:
     std::map<int,GeListInfo> lists_;
     std::map<std::string, std::uint64_t> features_;
     void count_features(std::uint32_t prim_type);
+    void log_draw(psprecomp::GuestMemory &mem, std::uint32_t prim_type, std::uint32_t count);
     std::map<int,GeCallback> callbacks_;
     std::deque<int> queue_;
     int next_id_{1}, next_callback_{0};

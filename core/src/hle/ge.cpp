@@ -1,8 +1,10 @@
 #include "p3p3ds/hle/ge.hpp"
+#include "p3p3ds/ge/geometry.hpp"
 #include "p3p3ds/profile.hpp"
 #include "p3p3ds/kernel_state.hpp"
 #include "psprecomp/runtime.hpp"
 #include "psprecomp/common.hpp"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -117,6 +119,41 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     if (!rt.stopped() && rt.frontier_diagnostics) std::cout << "[GE CALLBACK COMPLETE] id=" << l.callback_id
                                  << " token=" << l.finish_token << " end=" << psprecomp::hex32(end_pc) << "\n";
 }
+// Debug draw log: vertex type, texture, fragment state and the screen bounds
+// of the transformed vertices (registers as in count_features).
+void GeManager::log_draw(psprecomp::GuestMemory &mem, std::uint32_t prim_type, std::uint32_t count) {
+    const auto &r=regs_.reg;
+    std::vector<ge::ScreenVertex> v;
+    ge::decode_screen_vertices(mem,regs_,count,state_.vertex,state_.index,v);
+    float x0=1e9f,y0=1e9f,x1=-1e9f,y1=-1e9f; unsigned clipped=0;
+    for(const auto &s:v) {
+        if(s.clipped) { ++clipped; continue; }
+        x0=std::min(x0,s.x); y0=std::min(y0,s.y); x1=std::max(x1,s.x); y1=std::max(y1,s.y);
+    }
+    const auto tex=(r[0xA0]&0xFFFFF0u)|((r[0xA8]>>16)&0xFFu)<<24;
+    std::fprintf(draw_log,"prim=%u n=%u vtype=%06X fb=%06X tex=%s%08X %ux%u fmt=%u clut=%06X tfunc=%06X blend=%u:%06X atest=%u:%06X "
+        "ztest=%u:%u zmask=%u light=%u fog=%u cull=%u:%u bbox=%.0f,%.0f-%.0f,%.0f clipped=%u\n",
+        prim_type,count,r[0x12]&0xFFFFFFu,r[0x9C]&0xFFFFFFu,(r[0x1E]&1u)?"":"off:",tex,1u<<(r[0xB8]&0xFu),1u<<((r[0xB8]>>8)&0xFu),
+        r[0xC3]&0xFu,r[0xC5]&0xFFFFFFu,r[0xC9]&0xFFFFFFu,r[0x21]&1u,r[0xDF]&0xFFFFFFu,r[0x22]&1u,r[0xDB]&0xFFFFFFu,
+        r[0x23]&1u,r[0xDE]&7u,r[0xE7]&0xFFFFFFu,r[0x17]&1u,r[0x1F]&1u,r[0x1D]&1u,r[0x9B]&1u,x0,y0,x1,y1,clipped);
+    const auto layout=ge::vertex_layout(r[0x12]);
+    if(layout.weights==0u || layout.through) return;
+    // Skinned draws: the bone matrices, then per vertex the weights and the screen position.
+    for(std::uint32_t b=0;b<layout.weights;++b) {
+        std::fprintf(draw_log,"  bone%u",b);
+        for(std::uint32_t k=0;k<12u;++k) std::fprintf(draw_log," %.4f",regs_.bone[b*12u+k]);
+        std::fprintf(draw_log,"\n");
+    }
+    for(std::uint32_t i=0;i<count;++i) {
+        ge::ModelVertex m;
+        if(!ge::decode_model_vertex(mem,regs_,layout,state_.vertex,ge::vertex_index(mem,layout,state_.index,i),m)) continue;
+        float sum=0.0f;
+        std::fprintf(draw_log,"  v%u w=",i);
+        for(std::uint32_t k=0;k<layout.weights;++k) { std::fprintf(draw_log,"%.3f ",m.weights[k]); sum+=m.weights[k]; }
+        std::fprintf(draw_log,"sum=%.3f pos=%.4f,%.4f,%.4f screen=%.0f,%.0f%s\n",sum,m.pos[0],m.pos[1],m.pos[2],v[i].x,v[i].y,v[i].clipped?" clipped":"");
+    }
+}
+
 // Enable bits and modes: PSPSDK pspge.h / pspgu.h command list.
 void GeManager::count_features(std::uint32_t prim_type) {
     const auto &r=regs_.reg;
@@ -152,7 +189,12 @@ void GeManager::count_features(std::uint32_t prim_type) {
         const auto fmt=r[0xC3]&0xFu; ++features_[fmt<11u?kFormats[fmt]:"tex_other"];
         if((r[0xC6]&0x0101u)!=0u) ++features_["tex_filter_linear"];
         if((r[0xC6]&0x4u)!=0u) ++features_["tex_mipmap_filter"]; // min filter 4..7
-        if(!layout.through && (r[0xC0]&3u)!=0u) ++features_["texgen"];
+        if(!layout.through && (r[0xC0]&3u)!=0u) {
+            ++features_["texgen"];
+            // TEXTURE_MAP_MODE: bits 0-1 mode (1 texture matrix, 2 environment map), bits 8-9 matrix source
+            std::snprintf(key,sizeof key,"texgen_mode%u_src%u",static_cast<unsigned>(r[0xC0]&3u),static_cast<unsigned>((r[0xC0]>>8)&3u));
+            ++features_[key];
+        }
         if((r[0xC2]&0xFF0000u)!=0u) ++features_["tex_levels"];
         const auto tex=(r[0xA0]&0xFFFFF0u)|((r[0xA8]>>16)&0xFFu)<<24;
         if((tex&0x0F000000u)==0x04000000u) {
@@ -179,6 +221,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         if(census) count_features(type);
         const ProfileScope timer(host_profile().render_ns, host_profile().render_calls);
         if(!skip_rasterization) renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
+        if(draw_log) log_draw(mem,type,count);
         const auto layout=ge::vertex_layout(regs_.reg[0x12]);
         if(layout.index_format) state_.index+=count*(layout.index_format==1?1u:2u);
         else state_.vertex+=count*layout.size;

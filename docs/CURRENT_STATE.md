@@ -2,6 +2,15 @@
 
 This is the current source of truth. Historical audits describe their stated base commits, not today's runtime. Evidence below concerns ULUS-10512 on the PC host unless a section says otherwise; no 3DS hardware result is claimed.
 
+## First battle on the PC; inside-out models were a culling bug (2026-10-05)
+
+- PC route through the first battle: the maintainer's 4/9 evening save, own room, cursor on the bed right of the pillow, "Sleep", then CROSS through the Dark Hour scenes, the Evoker, Orpheus and the battle to the hospital (local, ignored: `profiles/p3p/input/local/first_battle.txt`; about 55 M dispatches to the Evoker scene).
+- [VERIFIED] GE census of that run: 7.8 M transform-mode draws, all lit; 2.0 M skinned (u8 weights, 1-6 per vertex; weight sums 1.000 in every logged vertex); no morphing, no texture-coordinate generation; fog on 7.2 M draws. The dorm field before it is through mode only (2.7 M draws): the battle is the first use of transform, skinning and lighting.
+- [VERIFIED] The PC software renderer (CPU reference) showed the same picture as the 3DS photos of build 029f3c8: spiky collar and sleeves, a face without eyes, black surroundings. So the shader was not the cause.
+- [VERIFIED] Cause: back-face culling. The eye mesh (texture with the eyes, one bone) projects onto the face but every one of its triangles was culled. With the culled winding inverted for transform mode (through mode unchanged: its rule was measured on the logos in Azahar) the PC frames show the face with eyes, the hair and uniform without spikes, and the roof, sky, moon, the Shadow, Orpheus and Thanatos. The old rule drew the back faces of closed models (inside out) and culled the walls and floor turned to the camera.
+- Fixed in both renderers: software renderer and PICA `C3D_CullFace` (`platform/3ds/gpu_renderer.cpp`). Unit test `test_ge_renderer` case 6: CULL = 1 keeps triangles counter-clockwise on screen (y down) in transform mode; it fails with the old rule. [UNVERIFIED] on hardware until the next test.
+- PC runner `--draw-log <file> --draw-log-from <frame>`: one line per GE draw (vertex type, framebuffer, texture, blend, alpha and depth test, culling, screen bounds) for the two displayed frames after that frame index, and for skinned draws the bone matrices and per vertex the weights and screen position.
+
 ## Hardware run of build 029f3c8: shader draws characters, battle still wrong and slow (2026-10-04)
 
 Maintainer, New 2DS XL, 448 s wall, quit during the first battle; two photos of the Evoker scene.

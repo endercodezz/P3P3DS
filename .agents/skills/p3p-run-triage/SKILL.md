@@ -73,6 +73,8 @@ Must print `REPLAY IDENTICAL`. Record the event-dump SHA-256 in `docs/CURRENT_ST
 
 ## 5a. Where host time goes (speed work)
 
+Per-draw state of one frame: `--draw-log <file> --draw-log-from <frame index>` (index as in the `frame_N.bmp` names) logs every GE draw of the next two displayed frames (texture, blend, depth, culling, screen bounds; bones and weights for skinned draws). To find which draw paints a region, compare the bounds; to see a texture, decode it with `ge::decode_texture` in a throwaway patch. The first battle route needs the maintainer's 4/9 save (`profiles/p3p/input/local/first_battle.txt`, header explains it).
+
 Profile the shipped configuration, not the diagnostic one: configure `build/prod` with `-DP3P_PRODUCTION_RUNTIME=ON "-DP3P_AOT_OPT=-Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2"` (no events, no census, like the 3DS build), build `p3p_pc_bootstrap`, then run a scripted route with `--render-from 9999999 --sample .tmp/prof/s.txt --sample-from <vblank>` and map it with `python tools/profile_symbols.py build/prod/p3p_pc_bootstrap.exe .tmp/prof/s.txt 40 --nm <mingw nm.exe>`. Compare host time of the same route (`[SAMPLE WINDOW]` line, whole-run wall time) before and after, and check the run ends at the same guest PC. Sample counts are not a time measure (Windows may ignore the 1 ms timer request). On the 3DS, the bottom-screen report splits the last 10 s into aot / hle / ge / present / idle.
 
 ## 6. Guest data hygiene
