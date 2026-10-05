@@ -281,7 +281,7 @@ std::string gpu_text() {
         "         tex %lu up %llu hit %llu rtt %llu\n"
         "         present gpu %llu cpu %llu same %llu\n"
         "         flush cmd %llu arena %llu w/draw %llu\n"
-        "movie  : skip presses %llu  cpu->rtt %llu\n",
+        "movie  : skip %llu cpu->rtt %llu merge %lluk>%lluk\n",
         static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
         static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
         static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
@@ -289,7 +289,8 @@ std::string gpu_text() {
         static_cast<unsigned long long>(g.cpu_presents), static_cast<unsigned long long>(g.skipped_presents),
         static_cast<unsigned long long>(g.command_flushes), static_cast<unsigned long long>(g.arena_flushes),
         static_cast<unsigned long long>(g.counted_draws != 0u ? g.command_words / g.counted_draws : 0u),
-        static_cast<unsigned long long>(g_skip_presses), static_cast<unsigned long long>(g.cpu_to_target));
+        static_cast<unsigned long long>(g_skip_presses), static_cast<unsigned long long>(g.cpu_to_target),
+        static_cast<unsigned long long>(g.model_draws / 1000u), static_cast<unsigned long long>(g.model_batches / 1000u));
     return buf;
 }
 

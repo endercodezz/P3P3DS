@@ -41,6 +41,7 @@ struct GpuStats {
     // GPU command words added by draws (frames not flushed in between), and
     // why frames were submitted early: command buffer or vertex arena full.
     std::uint64_t command_words{}, counted_draws{}, command_flushes{}, arena_flushes{};
+    std::uint64_t model_batches{}; // GPU draws that model draws were merged into
     std::uint32_t textures{}, targets{};
 };
 
@@ -116,9 +117,11 @@ private:
     void set_matrix(int loc, const C3D_Mtx &m);
     void set_bool(int loc, bool value);
     void use_screen_vertices(float scale_u, float scale_v);
-    bool draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout, ge::Prim prim,
-                    std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address, bool textured,
+    void draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout, ge::Prim prim,
+                    std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address, bool start, bool textured,
                     float scale_u, float scale_v);
+    void set_model_uniforms(const ge::GeRegisters &regs, const ge::VertexLayout &layout, bool textured, float scale_u, float scale_v);
+    void flush_batch();
     void evict_textures(std::uint32_t needed);
 
     ge::DrawStats draw_stats_;
@@ -150,6 +153,18 @@ private:
     const C3D_Tex *bound_tex_{};
     C3D_Tex bound_tex_copy_{};
     bool state_valid_{};
+    // Batching: consecutive model draws whose state, uniforms included, is
+    // identical (batch_sig_) become one indexed triangle-list draw. The
+    // pending draw is submitted before anything else touches the GPU.
+    std::vector<std::uint32_t> sig_, batch_sig_;
+    std::vector<std::uint16_t> batch_indices_;
+    const Target *batch_target_{};
+    Layout batch_layout_{Layout::Model};
+    bool batch_active_{};
+    std::uint32_t index_used_{}; // bytes of the index area (after the vertex arena) used this GPU frame
+    // Step timing samples every 16th draw (svcGetSystemTick is a system call).
+    std::uint32_t timed_seq_{};
+    bool timed_{};
     // Model draws: the screen matrix and the lighting setup with the GE
     // registers they were built from (rebuilt only when those change).
     std::array<std::uint32_t, 36> screen_key_{};

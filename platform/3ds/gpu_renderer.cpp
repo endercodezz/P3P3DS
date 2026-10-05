@@ -22,6 +22,7 @@ constexpr std::uint32_t kTargetSize = 512;          // PSP framebuffers: stride 
 constexpr std::uint32_t kMaxTargets = 4;            // 1 MiB of VRAM each
 constexpr std::uint32_t kVertexBytes = 1u << 20;    // vertices and indices per GPU frame
 static_assert(kVertexBytes / 28u < 0x10000u, "u16 indices count vertices from the arena start");
+constexpr std::uint32_t kIndexBytes = 256u << 10; // batched model indices per GPU frame, after the vertices
 constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded textures
 constexpr std::uint32_t kCommandBufferBytes = 0xC0000; // C3D_Init
 // Submit the queued frame when the citro3d command buffer (kCommandBufferBytes)
@@ -53,6 +54,13 @@ constexpr std::uint32_t kTransferFlags =
 
 std::uint32_t r24(const ge::GeRegisters &g, std::uint32_t i) { return g.reg[i] & 0xFFFFFFu; }
 bool on(const ge::GeRegisters &g, std::uint32_t i) { return (g.reg[i] & 1u) != 0u; }
+
+// Texture filter (0xC6) and wrap (0xC7) of the draw.
+void set_texture_params(C3D_Tex *tex, const ge::GeRegisters &regs) {
+    const auto filter_reg = r24(regs, 0xC6), wrap_reg = r24(regs, 0xC7);
+    C3D_TexSetFilter(tex, (filter_reg >> 8) & 1u ? GPU_LINEAR : GPU_NEAREST, filter_reg & 1u ? GPU_LINEAR : GPU_NEAREST);
+    C3D_TexSetWrap(tex, wrap_reg & 1u ? GPU_CLAMP_TO_EDGE : GPU_REPEAT, (wrap_reg >> 8) & 1u ? GPU_CLAMP_TO_EDGE : GPU_REPEAT);
+}
 
 // Memory row holding image row y of a texture h rows tall (see kTargetYSign).
 std::uint32_t tiled_row(std::uint32_t y, std::uint32_t h) { return h - 1u - y; }
@@ -191,7 +199,7 @@ GpuRenderer::GpuRenderer() {
         f->x = f->y = f->z = f->w = 0.0f;
     }
 
-    arena_ = static_cast<std::uint8_t *>(linearAlloc(kVertexBytes));
+    arena_ = static_cast<std::uint8_t *>(linearAlloc(kVertexBytes + kIndexBytes));
     if (FILE *f = std::fopen("sdmc:/p3p3ds/cpu_vertices.txt", "r")) { cpu_vertices_ = true; std::fclose(f); }
 
     for (int i = 1; i < 6; ++i) C3D_TexEnvInit(C3D_GetTexEnv(i));
@@ -222,6 +230,7 @@ void GpuRenderer::begin_frame() {
     in_frame_ = true;
     arena_used_ = 0;
     last_alloc_ = 0;
+    index_used_ = 0;
     bound_ = nullptr;
     bound_screen_ = false;
     for (auto &t : deferred_free_) C3D_TexDelete(&t);
@@ -233,7 +242,9 @@ void GpuRenderer::begin_frame() {
 // they are written (C3D_TexFlush), so only this frame's vertices need it;
 // GX_CMDLIST_FLUSH makes citro3d flush just the command list.
 void GpuRenderer::end_frame() {
+    flush_batch();
     if (arena_used_ != 0u) GSPGPU_FlushDataCache(arena_, arena_used_);
+    if (index_used_ != 0u) GSPGPU_FlushDataCache(arena_ + kVertexBytes, index_used_);
     C3D_FrameEnd(GX_CMDLIST_FLUSH);
     in_frame_ = false;
 }
@@ -383,6 +394,7 @@ void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen
     std::uint32_t first = 0;
     Vertex *v = alloc_vertices(6, first);
     if (v == nullptr) return;
+    flush_batch();
     state_valid_ = false; // the state below is not the GE's
     set_matrix(u_.screen, to_screen ? screen_projection() : target_projection());
     use_screen_vertices(1.0f / kTargetSize, 1.0f / kTargetSize);
@@ -422,20 +434,12 @@ void GpuRenderer::evict_textures(std::uint32_t needed) {
 
 const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v) {
     const auto info = ge::texture_info(regs);
-    const auto filter_reg = r24(regs, 0xC6), wrap_reg = r24(regs, 0xC7);
-    const GPU_TEXTURE_FILTER_PARAM mag = (filter_reg >> 8) & 1u ? GPU_LINEAR : GPU_NEAREST;
-    const GPU_TEXTURE_FILTER_PARAM min = filter_reg & 1u ? GPU_LINEAR : GPU_NEAREST;
-    const GPU_TEXTURE_WRAP_PARAM wrap_u = wrap_reg & 1u ? GPU_CLAMP_TO_EDGE : GPU_REPEAT;
-    const GPU_TEXTURE_WRAP_PARAM wrap_v = (wrap_reg >> 8) & 1u ? GPU_CLAMP_TO_EDGE : GPU_REPEAT;
-
     // Render-to-texture: a texture that starts at a GPU-drawn framebuffer.
     const std::uint32_t canonical = psprecomp::GuestMemory::canonical(info.address);
     if ((canonical & 0x0F000000u) == 0x04000000u) {
         for (auto &t : targets_)
             if (t.address == canonical && t.gpu_seq > t.cpu_seq) {
                 scale_u = scale_v = 1.0f / kTargetSize;
-                C3D_TexSetFilter(&t.tex, mag, min);
-                C3D_TexSetWrap(&t.tex, wrap_u, wrap_v);
                 ++gpu_stats_.target_textures;
                 return &t.tex;
             }
@@ -502,8 +506,6 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
     gpu_stats_.textures = static_cast<std::uint32_t>(textures_.size());
     scale_u = 1.0f / static_cast<float>(it->second.width);
     scale_v = 1.0f / static_cast<float>(it->second.height);
-    C3D_TexSetFilter(&it->second.tex, mag, min);
-    C3D_TexSetWrap(&it->second.tex, wrap_u, wrap_v);
     return &it->second.tex;
 }
 
@@ -635,6 +637,22 @@ void GpuRenderer::set_scissor(const ge::GeRegisters &regs) {
     else C3D_SetScissor(GPU_SCISSOR_NORMAL, x1, kTargetSize - 1u - y2, x2 + 1u, kTargetSize - y1);
 }
 
+// Submit the pending batch of model draws (one triangle list).
+void GpuRenderer::flush_batch() {
+    if (!batch_active_) return;
+    batch_active_ = false;
+    if (batch_indices_.empty()) return;
+    const auto count = static_cast<std::uint32_t>(batch_indices_.size());
+    auto *dst = reinterpret_cast<std::uint16_t *>(arena_ + kVertexBytes + index_used_); // room reserved when appending
+    std::memcpy(dst, batch_indices_.data(), count * 2u);
+    index_used_ += (count * 2u + 3u) & ~3u;
+    batch_indices_.clear();
+    use_buffer(batch_layout_);
+    C3D_DrawElements(GPU_TRIANGLES, static_cast<int>(count), C3D_UNSIGNED_SHORT, dst);
+    ++gpu_stats_.draws;
+    ++gpu_stats_.model_batches;
+}
+
 void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, ge::Prim prim, std::uint32_t count,
                        std::uint32_t vertex_address, std::uint32_t index_address) {
     ++draw_stats_.prims;
@@ -643,7 +661,10 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const std::uint32_t color_address = 0x04000000u | (r24(regs, 0x9C) & 0x1FFFF0u);
     const std::uint32_t stride = r24(regs, 0x9D) & 0x7FCu;
     if (stride == 0u) return;
-    const u64 prep_start = svcGetSystemTick();
+    timed_ = (++timed_seq_ & 15u) == 0u;
+    auto tick = [this] { return timed_ ? svcGetSystemTick() : 0u; };
+    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_) acc += (to - from) * 16u; };
+    const u64 prep_start = tick();
     begin_frame();
     if (command_buffer_fill() > kCmdBufFlushUsage) {
         ++gpu_stats_.command_flushes;
@@ -651,6 +672,7 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     }
     Target *target = target_for(color_address, r24(regs, 0xD2) & 3u, true);
     if (target == nullptr) { ++gpu_stats_.skipped_prims; return; }
+    if (batch_active_ && target != batch_target_) flush_batch();
     if (bound_ != target || bound_screen_) bind_target(*target);
     if (target->cpu_seq > target->gpu_seq) {
         // The guest wrote this framebuffer since the GPU last drew it: start from its contents.
@@ -668,20 +690,76 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const bool textured = ge::draw_is_textured(regs, layout);
 
     float su = 1.0f, sv = 1.0f;
-    const C3D_Tex *tex = textured ? bind_texture(memory, regs, su, sv) : nullptr;
-    // Fragment state from the GE registers it depends on; unchanged state is not set again.
+    C3D_Tex *tex = textured ? const_cast<C3D_Tex *>(bind_texture(memory, regs, su, sv)) : nullptr;
     const bool sprites = prim == ge::Prim::Sprites;
     const std::array<std::uint32_t, 20> key = {
         r24(regs, 0xC9), r24(regs, 0xCA), regs.reg[0x22] & 1u, r24(regs, 0xDB), regs.reg[0x21] & 1u, r24(regs, 0xDF),
         r24(regs, 0xE0), r24(regs, 0xE1), r24(regs, 0xE8), regs.reg[0x23] & 1u, r24(regs, 0xDE), r24(regs, 0xE7),
         regs.reg[0x1D] & 1u, r24(regs, 0x9B), layout.through ? 1u : 0u, r24(regs, 0xD3), tex != nullptr ? 1u : 0u,
-        sprites ? 1u : 0u, 0u, 0u};
+        sprites ? 1u : 0u, r24(regs, 0xD4), r24(regs, 0xD5)};
+
+    // Transform-mode triangles go through the vertex shader and are batched:
+    // a draw whose state and uniforms equal the pending batch's only adds
+    // its vertices and indices.
+    const bool model = !layout.through && !clear_mode && !sprites && !cpu_vertices_ &&
+                       (prim == ge::Prim::Triangles || prim == ge::Prim::TriangleStrip || prim == ge::Prim::TriangleFan);
+    if (model) {
+        sig_.clear();
+        sig_.push_back(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(target)));
+        sig_.push_back(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(tex)));
+        sig_.insert(sig_.end(), key.begin(), key.end());
+        sig_.push_back(r24(regs, 0x12));
+        for (std::uint32_t r : {0x42u, 0x43u, 0x44u, 0x45u, 0x46u, 0x47u, 0x48u, 0x49u, 0x4Au, 0x4Bu, 0x4Cu, 0x4Du, 0xC6u, 0xC7u})
+            sig_.push_back(r24(regs, r));
+        auto floats = [this](const float *f, std::size_t n) {
+            const std::size_t at = sig_.size();
+            sig_.resize(at + n);
+            std::memcpy(&sig_[at], f, n * sizeof(float));
+        };
+        floats(regs.view.data(), 12);
+        floats(regs.proj.data(), 16);
+        floats(regs.world.data(), 12);
+        if (layout.weights != 0u) floats(regs.bone.data(), 12u * std::min<std::uint32_t>(layout.weights, 8u));
+        for (std::uint32_t i = 0; i < 5; ++i) sig_.push_back(regs.reg[0x17 + i]);
+        for (std::uint32_t i = 0; i < 0x4B; ++i) sig_.push_back(regs.reg[0x50 + i]);
+        // Index room: a pending batch that cannot take this draw is submitted;
+        // a full index area submits the GPU frame.
+        const std::uint32_t need = (count * 3u + 1u) * 2u;
+        if (batch_active_ && index_used_ + static_cast<std::uint32_t>(batch_indices_.size()) * 2u + need > kIndexBytes) flush_batch();
+        if (index_used_ + need > kIndexBytes) {
+            if (need > kIndexBytes) { ++gpu_stats_.skipped_prims; return; }
+            flush_frame();
+        }
+        const bool join = batch_active_ && sig_ == batch_sig_;
+        if (!join) {
+            flush_batch();
+            if (tex != nullptr) set_texture_params(tex, regs);
+            if (!state_valid_ || key != frag_key_) {
+                apply_fragment_state(regs, tex != nullptr, clear_mode, sprites);
+                frag_key_ = key;
+            }
+            if (tex != nullptr && (!state_valid_ || tex != bound_tex_ || std::memcmp(tex, &bound_tex_copy_, sizeof(C3D_Tex)) != 0)) {
+                C3D_TexBind(0, tex);
+                bound_tex_ = tex;
+                std::memcpy(&bound_tex_copy_, tex, sizeof(C3D_Tex));
+            }
+            set_scissor(regs);
+            state_valid_ = true;
+        }
+        const u64 vertex_start = tick();
+        add(gpu_stats_.prep_ticks, prep_start, vertex_start);
+        draw_model(memory, regs, layout, prim, count, vertex_address, index_address, !join, tex != nullptr, su, sv);
+        return;
+    }
+
+    flush_batch();
+    if (tex != nullptr) set_texture_params(tex, regs);
     if (!state_valid_ || key != frag_key_) {
         apply_fragment_state(regs, tex != nullptr, clear_mode, sprites);
         frag_key_ = key;
     }
     if (tex != nullptr && (!state_valid_ || tex != bound_tex_ || std::memcmp(tex, &bound_tex_copy_, sizeof(C3D_Tex)) != 0)) {
-        C3D_TexBind(0, const_cast<C3D_Tex *>(tex));
+        C3D_TexBind(0, tex);
         bound_tex_ = tex;
         std::memcpy(&bound_tex_copy_, tex, sizeof(C3D_Tex));
     }
@@ -690,24 +768,8 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     u32 *cmd_base = nullptr;
     u32 cmd_size = 0, cmd_before = 0;
     GPUCMD_GetBuffer(&cmd_base, &cmd_size, &cmd_before);
-    const u64 vertex_start = svcGetSystemTick();
-    gpu_stats_.prep_ticks += vertex_start - prep_start;
-    auto count_commands = [&] {
-        u32 *b = nullptr;
-        u32 s = 0, after = 0;
-        GPUCMD_GetBuffer(&b, &s, &after);
-        if (b == cmd_base && after >= cmd_before) {
-            gpu_stats_.command_words += after - cmd_before;
-            ++gpu_stats_.counted_draws;
-        }
-    };
-
-    // Transform-mode triangles: the vertex shader transforms, skins and lights.
-    if (!layout.through && !clear_mode && !sprites && !cpu_vertices_ &&
-        draw_model(memory, regs, layout, prim, count, vertex_address, index_address, tex != nullptr, su, sv)) {
-        count_commands();
-        return;
-    }
+    const u64 vertex_start = tick();
+    add(gpu_stats_.prep_ticks, prep_start, vertex_start);
 
     ge::decode_screen_vertices(memory, regs, count, vertex_address, index_address, screen_);
 
@@ -764,92 +826,31 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
         break;
     }
     arena_used_ = last_alloc_ + emitted * static_cast<std::uint32_t>(sizeof(Vertex)); // return the unused tail
-    const u64 uniform_start = svcGetSystemTick();
-    gpu_stats_.vertex_ticks += uniform_start - vertex_start;
+    const u64 uniform_start = tick();
+    add(gpu_stats_.vertex_ticks, vertex_start, uniform_start);
     if (emitted == 0u) return;
     set_matrix(u_.screen, target_projection());
     use_screen_vertices(su, sv);
-    const u64 submit_start = svcGetSystemTick();
-    gpu_stats_.uniform_ticks += submit_start - uniform_start;
+    const u64 submit_start = tick();
+    add(gpu_stats_.uniform_ticks, uniform_start, submit_start);
     use_buffer(Layout::Screen);
     C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(first), static_cast<int>(emitted));
-    gpu_stats_.submit_ticks += svcGetSystemTick() - submit_start;
-    count_commands();
+    add(gpu_stats_.submit_ticks, submit_start, tick());
+    u32 *b = nullptr;
+    u32 s = 0, after = 0;
+    GPUCMD_GetBuffer(&b, &s, &after);
+    if (b == cmd_base && after >= cmd_before) {
+        gpu_stats_.command_words += after - cmd_before;
+        ++gpu_stats_.counted_draws;
+    }
     ++gpu_stats_.draws;
     gpu_stats_.triangles += emitted / 3u;
 }
 
-// Transform-mode triangles through the vertex shader (shaders/ge.v.pica): the
-// CPU only unpacks the referenced vertices (morph targets blended) and the
-// indices; transform, skinning and lighting run on the PICA200 with the GE
-// matrices and light registers as uniforms. Returns false for a draw it
-// cannot take (the caller then uses the CPU transform).
-bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
-                             ge::Prim prim, std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address,
-                             bool textured, float scale_u, float scale_v) {
-    GPU_Primitive_t primitive;
-    switch (prim) {
-    case ge::Prim::Triangles: primitive = GPU_TRIANGLES; break;
-    case ge::Prim::TriangleStrip: primitive = GPU_TRIANGLE_STRIP; break;
-    case ge::Prim::TriangleFan: primitive = GPU_TRIANGLE_FAN; break;
-    default: return false;
-    }
-    if (count < 3u) return true;
-
-    // Referenced vertex range; indices read through one pointer when the
-    // index buffer is in guest memory.
-    const u64 vertex_start = svcGetSystemTick();
-    const std::uint32_t isize = layout.index_format == 1u ? 1u : layout.index_format == 2u ? 2u : 0u;
-    const std::uint8_t *ip = isize != 0u ? memory.raw_pointer(index_address, count * isize) : nullptr;
-    auto index_at = [&](std::uint32_t i) -> std::uint32_t {
-        if (ip != nullptr) return isize == 1u ? ip[i] : static_cast<std::uint32_t>(ip[2u * i] | (ip[2u * i + 1u] << 8));
-        return ge::vertex_index(memory, layout, index_address, i);
-    };
-    std::uint32_t lo = 0, hi = count - 1u;
-    if (isize != 0u) {
-        lo = ~0u; hi = 0u;
-        for (std::uint32_t i = 0; i < count; ++i) {
-            const auto index = index_at(i);
-            lo = std::min(lo, index);
-            hi = std::max(hi, index);
-        }
-    }
-    const std::uint32_t n = hi - lo + 1u;
-    if (n > 0xFFFFu) return false;
-    const bool skinned = layout.weights != 0u;
-    const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
-    const std::uint32_t vertex_bytes = n * stride; // stride is a multiple of 4
-    const std::uint32_t index_bytes = isize != 0u ? count * 2u : 0u;
-    auto *block = static_cast<std::uint8_t *>(alloc_linear(vertex_bytes + index_bytes, stride));
-    if (block == nullptr) return false;
-    // Index of the first vertex from arena_ (the attribute buffer base); the
-    // arena holds fewer than 0x10000 vertices of any layout.
-    const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
-
-    if (model_.size() < n) model_.resize(n);
-    if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
-        for (std::uint32_t k = 0; k < n; ++k)
-            if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
-    ShaderVertex s;
-    for (std::uint32_t k = 0; k < n; ++k) {
-        const ge::ModelVertex &m = model_[k];
-        s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
-        s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
-        s.u = m.uv[0]; s.v = m.uv[1];
-        s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
-        std::memcpy(s.w, m.weights, sizeof s.w);
-        std::memcpy(block + k * stride, &s, stride);
-    }
-    std::uint16_t *indices = nullptr;
-    if (index_bytes != 0u) {
-        indices = reinterpret_cast<std::uint16_t *>(block + vertex_bytes);
-        for (std::uint32_t i = 0; i < count; ++i) indices[i] = static_cast<std::uint16_t>(first + index_at(i) - lo);
-    }
-    const u64 uniform_start = svcGetSystemTick();
-    gpu_stats_.vertex_ticks += uniform_start - vertex_start;
-
-    // Uniforms are rebuilt only when the GE registers they come from change
-    // (consecutive draws of one model share most of them).
+// Shader uniforms of a model draw (start of a batch): screen matrix and
+// lighting rebuilt only when their GE registers change.
+void GpuRenderer::set_model_uniforms(const ge::GeRegisters &regs, const ge::VertexLayout &layout, bool textured, float scale_u,
+                                     float scale_v) {
     // screen = target projection x viewport x PROJ x VIEW (see the shader
     // header): the screen mapping of decode_screen_vertices as a matrix.
     {
@@ -890,6 +891,7 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
                     ge::ge_float(r24(regs, 0x4A)) * tw, ge::ge_float(r24(regs, 0x4B)) * th);
     }
 
+    const bool skinned = layout.weights != 0u;
     set_bool(u_.skin, skinned);
     if (skinned) {
         for (std::uint32_t b = 0; b < layout.weights && b < 8u; ++b) {
@@ -941,18 +943,99 @@ bool GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     set_bool(u_.light, light_.enabled);
     if (light_.enabled)
         for (int i = 0; i < 4; ++i) set_bool(u_.lights[i], light_.lights[i].enabled);
+}
 
-    const u64 submit_start = svcGetSystemTick();
-    gpu_stats_.uniform_ticks += submit_start - uniform_start;
-    use_buffer(skinned ? Layout::Skinned : Layout::Model);
-    if (indices != nullptr) C3D_DrawElements(primitive, static_cast<int>(count), C3D_UNSIGNED_SHORT, indices);
-    else C3D_DrawArrays(primitive, static_cast<int>(first), static_cast<int>(count));
-    gpu_stats_.submit_ticks += svcGetSystemTick() - submit_start;
-    ++gpu_stats_.draws;
+// Transform-mode triangles through the vertex shader (shaders/ge.v.pica): the
+// CPU only unpacks the referenced vertices (morph targets blended) into the
+// arena and appends triangle-list indices to the batch; transform, skinning
+// and lighting run on the PICA200 with the GE matrices and light registers
+// as uniforms (set when the draw starts a batch).
+void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
+                             ge::Prim prim, std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address,
+                             bool start, bool textured, float scale_u, float scale_v) {
+    if (count < 3u) return;
+    auto tick = [this] { return timed_ ? svcGetSystemTick() : 0u; };
+    auto add = [this](std::uint64_t &acc, u64 from, u64 to) { if (timed_) acc += (to - from) * 16u; };
+    const u64 vertex_start = tick();
+    // Referenced vertex range; indices read through one pointer when the
+    // index buffer is in guest memory.
+    const std::uint32_t isize = layout.index_format == 1u ? 1u : layout.index_format == 2u ? 2u : 0u;
+    const std::uint8_t *ip = isize != 0u ? memory.raw_pointer(index_address, count * isize) : nullptr;
+    auto index_at = [&](std::uint32_t i) -> std::uint32_t {
+        if (ip != nullptr) return isize == 1u ? ip[i] : static_cast<std::uint32_t>(ip[2u * i] | (ip[2u * i + 1u] << 8));
+        return ge::vertex_index(memory, layout, index_address, i);
+    };
+    std::uint32_t lo = 0, hi = count - 1u;
+    if (isize != 0u) {
+        lo = ~0u; hi = 0u;
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const auto index = index_at(i);
+            lo = std::min(lo, index);
+            hi = std::max(hi, index);
+        }
+    }
+    const std::uint32_t n = hi - lo + 1u;
+    const bool skinned = layout.weights != 0u;
+    const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
+    if (n * stride > kVertexBytes) { ++gpu_stats_.skipped_prims; return; }
+    // A full vertex arena submits the GPU frame (and with it the pending
+    // batch); the GPU state stays, so the batch simply continues.
+    auto *block = static_cast<std::uint8_t *>(alloc_linear(n * stride, stride));
+    if (block == nullptr) { ++gpu_stats_.skipped_prims; return; }
+    // Index of the first vertex from arena_ (the attribute buffer base); the
+    // arena holds fewer than 0x10000 vertices of any layout.
+    const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
+
+    if (model_.size() < n) model_.resize(n);
+    if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
+        for (std::uint32_t k = 0; k < n; ++k)
+            if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
+    ShaderVertex s;
+    for (std::uint32_t k = 0; k < n; ++k) {
+        const ge::ModelVertex &m = model_[k];
+        s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
+        s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
+        s.u = m.uv[0]; s.v = m.uv[1];
+        s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
+        std::memcpy(s.w, m.weights, sizeof s.w);
+        std::memcpy(block + k * stride, &s, stride);
+    }
+    // Triangle list (strips and fans unrolled with the software renderer's
+    // winding: odd strip triangles swap their first two vertices).
+    auto vtx = [&](std::uint32_t i) { return static_cast<std::uint16_t>(first + index_at(i) - lo); };
+    auto tri = [this](std::uint16_t a, std::uint16_t b, std::uint16_t c) {
+        batch_indices_.push_back(a);
+        batch_indices_.push_back(b);
+        batch_indices_.push_back(c);
+    };
+    const std::size_t before = batch_indices_.size();
+    switch (prim) {
+    case ge::Prim::Triangles:
+        for (std::uint32_t i = 0; i + 2 < count; i += 3) tri(vtx(i), vtx(i + 1), vtx(i + 2));
+        break;
+    case ge::Prim::TriangleStrip:
+        for (std::uint32_t i = 0; i + 2 < count; ++i)
+            (i & 1u) ? tri(vtx(i + 1), vtx(i), vtx(i + 2)) : tri(vtx(i), vtx(i + 1), vtx(i + 2));
+        break;
+    default: // TriangleFan
+        for (std::uint32_t i = 1; i + 1 < count; ++i) tri(vtx(0), vtx(i), vtx(i + 1));
+        break;
+    }
+    const u64 uniform_start = tick();
+    add(gpu_stats_.vertex_ticks, vertex_start, uniform_start);
+    if (start || !batch_active_) {
+        // Starts a batch (also when a full arena submitted the previous one
+        // while this draw was joining it: the state is still set).
+        if (start) set_model_uniforms(regs, layout, textured, scale_u, scale_v);
+        batch_active_ = true;
+        batch_sig_ = sig_;
+        batch_target_ = bound_;
+        batch_layout_ = skinned ? Layout::Skinned : Layout::Model;
+    }
+    add(gpu_stats_.uniform_ticks, uniform_start, tick());
     ++gpu_stats_.model_draws;
     gpu_stats_.model_vertices += n;
-    gpu_stats_.triangles += primitive == GPU_TRIANGLES ? count / 3u : count - 2u;
-    return true;
+    gpu_stats_.triangles += static_cast<std::uint64_t>(batch_indices_.size() - before) / 3u;
 }
 
 void GpuRenderer::transfer(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs) {
@@ -992,6 +1075,7 @@ void GpuRenderer::present(psprecomp::GuestMemory &memory, const hle::DisplayFram
         return;
     }
     begin_frame();
+    flush_batch(); // before the top screen becomes the render target
     last_present_cpu_ = cpu;
     if (cpu) {
         // Movie frames and other CPU-written pictures: convert only when changed.
