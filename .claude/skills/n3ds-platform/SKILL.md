@@ -46,9 +46,11 @@ Always initialize New 3DS speedup mode at startup and measure thread scheduling 
 gfxInitDefault();
 archiveMountSdmc();
 osSetSpeedupEnable(true);       // Boost CPU to 804 MHz and enable L2 cache
-// Evaluate Core 2 CPU quota if using multi-threaded worker architecture:
-// APT_SetAppCpuTimeLimit(percentage);
+// APT_SetAppCpuTimeLimit(percentage) unlocks one thread on Core 1 (system
+// core), not Core 2. Core 2 needs exheader kernel flag 0x2000 or the BASE
+// memory region (libctru thread.h, threadCreate notes).
 ```
+`osSetSpeedupEnable` fails silently when `ptm:sysm` cannot be opened; check that the clock is really raised before trusting speed measurements.
 
 ### 3.2. Memory Allocation Rules
 - **Linear Memory (`linearAlloc`):** Use for buffers accessed by GPU DMA / display transfer (Citro3D command buffers, dynamic vertex arrays, texture surfaces).
@@ -58,7 +60,7 @@ osSetSpeedupEnable(true);       // Boost CPU to 804 MHz and enable L2 cache
 ### 3.3. Threading Architecture
 - Profile and test thread core affinity before binding threads.
 - Test whether worker tasks (display list processing, audio, or I/O) benefit from running on Core 2 via `threadCreate(..., prio, coreId, ...)` or if cooperative scheduling on the main core has lower synchronization overhead.
-- Always check return codes of `threadCreate()` and join threads cleanly upon exit.
+- Always check return codes of `threadCreate()` (NULL when the core is not available: fall back to Core 0) and join threads cleanly upon exit.
 
 ### 3.4. PICA200 GPU Rendering & Texture Format
 - Verify actual texture upload and swizzling requirements directly against `3ds/citro3d` (`C3D_TexUpload`, `C3D_SyncDisplayTransfer`) and `3ds/libctru`.

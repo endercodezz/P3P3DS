@@ -2,6 +2,40 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Code review: open defects and hypotheses (2026-10-08)
+
+Read-only review of HEAD `fa45224`; nothing in the runtime changed. Repro programs and notes are local (`.tmp/review_{codegen,hle,3ds,tests}/`, not committed). None of these is fixed yet; README "Known issues" lists the user-visible ones.
+
+Correctness (ranked by likely impact):
+- [VERIFIED] New PSP threads start with VFPU prefixes 0 instead of `0xE4`: `core/src/hle/threadman.cpp` `start_thread` assigns `AllegrexContext{}`, whose `vfpu_ctrl` is zero (`allegrex_context.hpp`). Prefix 0 makes every lane read X, so the first prefixed VFPU operation of each thread reads a broadcast X (host demo: C000.q reads `1 1 1 1` instead of `1 2 3 4`). The value on hardware is [INFERRED] from PPSSPP (`sceKernelThread.cpp`, thread context reset: S/T prefix `0xE4`, CC `0x3F`, fcr31 `0xE00`). `test_interpreter_diff` sets `0xE4` by hand and cannot see it. [UNVERIFIED] which P3P threads are affected.
+- [VERIFIED] A retry wait is skipped when the thread is preempted right after being dispatched: `ThreadManager::resume_pc` treats "pc is an import stub" as "inside an HLE call, resume at `$ra`", but a thread woken from a retry wait also sits at the stub and must re-run the call. Repro: a priority-40 thread in `sceAudioOutputBlocking` resumes at `$ra` with a stale `$v0` when a priority-32 thread's `sceKernelDelayThread(0)` expires in the same post-import hook. Affects `sceAudioOutputBlocking`/`OutputPannedBlocking`, `sceIoWaitAsync` (stale result, op left pending), `sceCtrlRead*`, module start waits. Must be fixed before NDSP audio.
+- [INFERRED] Back-face culling: since `72bd103` through mode and transform mode use opposite rules (`software_renderer.cpp`, `gpu_renderer.cpp`); PPSSPP uses one screen-space rule from the CULL bit in both modes (`GPU/GLES/StateMappingGLES.cpp`, `GPU/Software/TransformUnit.cpp`). The split may compensate an unidentified Y flip. Test: count through-mode draws with CULL on in `--draw-log`, then compare frame hashes of the input scripts with one uniform rule.
+- [VERIFIED] SysMem and thread stacks: stacks bump down from `0x09FF0000` with no check against the SysMem heap growing up to `0x09FF0000` (repro: heap block `08ED0000..09FF0000` and a new stack `09FEC000..09FF0000` overlap); stacks are never reclaimed (255 create/delete cycles of 64 KiB stacks fail with `0x80020190`); `sceKernelStartModule` leaks a 256 KiB stack; `free_partition_memory` never reuses space; `Addr` allocations do not check overlap; `High` is allocated low. [UNVERIFIED] P3P's own peak and alloc/free pattern.
+- [VERIFIED] Mutexes (and lwmutexes) are not released when the owning thread exits (repro: deadlock); PPSSPP releases them.
+- [VERIFIED] Event flag `outBits`: not written on a real timeout and written on a zero timeout; hardware does the opposite (`pspautotests/tests/threads/events/wait/wait.expected`).
+- [VERIFIED] `sceIoOpenAsync` returns open errors synchronously; uOFW reports them through the async result (`iofilemgr.c`, `open_iob`).
+- [VERIFIED] GE: finish callbacks run inside `sceGeListEnQueue`/`UpdateStallAddr` instead of later; SIGNAL handlers are never called; `EnQueueHead` runs the list at once.
+- [VERIFIED] FPU/VFPU: `vsin`/`vcos`/`vrot` use the host `sinf`/`cosf` (`vcos(1.0)` = -4.37e-8 instead of 0); `sqrt.s`/`div.s` NaN sign follows the host; the 3DS runs with flush-to-zero and default NaN (libctru `syscalls.c`), the PC does not, so PC runs are not a bit-exact reference for denormals and NaN; `divu` by zero gives LO `0xFFFFFFFF` where hardware gives `0x0000FFFF` for dividends up to `0xFFFF` (the 4 `cpu_div` lines in the autotest baseline); `madd`/`msub` accumulate in signed 64-bit (undefined on overflow; GCC wraps in practice); `round.w.s` rounds half away from zero (P3P has none); `vdot` zero sign differs between interpreter and AOT.
+- [VERIFIED] `sceUtilitySavedata` builds host paths from guest strings without checks (`..`, `/`, empty names); delete modes call `remove_all`, and an empty game+save name would remove every save.
+
+Speed and memory (3DS):
+- [VERIFIED] Only Core 0 is used; GE work runs synchronously on the main thread. Core 2 needs exheader flag `0x2000` (see `3DS_PLATFORM.md` section 3; the old claim about `APT_SetAppCpuTimeLimit` is [WRONG]).
+- [VERIFIED] The profiling timers are always on (`platform/3ds/main.cpp`): two `steady_clock::now()` (an SVC plus 64-bit divisions) per HLE call and per GE PRIM. [INFERRED] 1-5 % of the time, and they inflate the hle/ge shares.
+- [VERIFIED] AOT guest memory access: a `lw` is 10 ARM instructions with 4 loads (view base and limit reloaded after every guest store through possible aliasing); a local copy of the fast view cuts unit 0049 by 2.7 %, `PSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH` by 1.1 %. AOT units build with `-Os -fno-schedule-insns2`; only size, never run time, was measured for these flags.
+- [INFERRED] Vertex unpack: the battle's main vertex types (`0x00015A`: s16 position/normal, u16 UV, 4444 colour; skinned `0x014342`: u8 weights) are formats the PICA200 reads natively except u16 (sign fix-up in the shader) and packed colours. Copying the raw bytes and folding the scale factors into the matrices may remove most of the 26.5 % instead of caching unpacked vertices. Time the steps inside the `vtx` bucket on hardware first.
+- [INFERRED] `Runtime::functions_` holds about 170,000 entries, each with a 16-character `std::string` (one past the short-string limit, so a heap allocation each): roughly 10 MiB of the 10.7 MiB of free heap could be freed by storing a unit index.
+- [INFERRED] Field drops: every file read, including `ms0:` and SD mods, holds the caller for 200 us + 0.5 us per byte of virtual time (UMD speed, `IoManager::transfer_us`), and the 3DS pacing then sleeps that difference. At 89-91 % speed, 30 fps would show as 27, but the dorm shows 21-26, so frames are lost in virtual time too. Test: dorm route on the PC runner with near-zero read latency, compare game frames per virtual second.
+- [INFERRED] Virtual-time policy: guest code costs 0 us, so slow scenes play in slow motion (never frame-skipped), and a future NDSP output fed by the virtual clock will underrun; a thread spinning on memory without HLE calls never lets deadlines expire (hang risk; the PSP would preempt).
+
+Tests and CI:
+- [VERIFIED] `release.yml` publishes packages without running CTest and does not depend on `ci.yml`.
+- [VERIFIED] Without `references/pspautotests` or the game, `test_sascore` (0 of 53 curves), `test_hle_graphics` and `test_psp_eboot` skip their main checks but report Passed; `test_mpeg` returns 77 before its reference-free ring-buffer tables run. CI's "3 skipped" hides 3 partial skips.
+- [VERIFIED] `tools/run_autotests.py` baseline: 10 entries already have mismatches equal to their expected line count and cannot get worse; a change of stop reason is not detected; `--update` records regressions.
+- [VERIFIED] `verify_p3p_decoder` and `p3p_analysis_comparison` compare against the implementation's own earlier output (change detectors, not correctness checks). `replay_check.sh` (skill `p3p-run-triage`) ignores the runner's exit status, so two identical early crashes print "REPLAY IDENTICAL".
+- [VERIFIED] Game-specific values outside `profiles/p3p/config/` (CLAUDE.md section 8): unit count 237, load base and unit span in `platform/pc/builder/pipeline.cpp`; mod prefix `ms0:/PSP/P3P` in both runners.
+- [VERIFIED] `recomp/PSPRecomp/profiles/vcs/**` (227 files, FFmpeg headers) and `profiles/p3p/config/frontier_checkpoint.json` are not used by the build.
+- Running CTest from Git Bash picks MSYS `/usr/bin/ctest`, which mangles the paths (all BAD_COMMAND); use the `CMAKE_CTEST_COMMAND` from `build/CMakeCache.txt` (27/27 pass that way).
+
 ## Battle speed: per-draw GPU work cut, 5.8 -> 9.9 fps in Azahar (2026-10-06)
 
 Measured by the maintainer in Azahar (New 3DS mode), Evoker scene of the first battle, "last 10 s" of the bottom-screen report; the maintainer finds Azahar close to the console. [UNVERIFIED] on hardware.
@@ -251,7 +285,7 @@ Immediate blocker: missing `ModuleMgrForUser::sceKernelLoadModule` (`0x977DE386`
 - [VERIFIED] Scheduling: strict priority, FIFO within a level, immediate preemption when a waker readies a higher-priority thread. Virtual clock: +1 us per HLE call (`kSyscallCostUs`, [INFERRED] policy), idle jumps to the earliest deadline, deadlock (all threads waiting without a deadline) stops with a named list. VBlank waits use a 16,683 us period on that clock; `sceAudioOutputBlocking` follows uOFW's one-queued-buffer model and retries at the stub when the slot frees; `sceUmdActivate` notifies the registered UMD callback (hardware: `pspautotests/tests/umd/callbacks/umd.expected`; argument `0x32` is [INFERRED]).
 - [VERIFIED] `test_threadman_sync` (CTest `p3p_threadman_sync`) covers each primitive's errors, blocking/wake/preemption, timeouts (zero and elapsed, remaining written back), delete-wakes, lwmutex handover and `numWaitThreads`, recursion/overflow, sleep/wakeup counting, wait-end status, callback frames (check + CB wait, non-zero return deletes), deadlock detection and blocking audio retry.
 - [VERIFIED] 14/14 CTest, `--verify-bootstrap` PASS. Two `--run-until-blocker --max-dispatches 5000000` replays are byte-identical, SHA-256 `BA99ED613474E6633FA5DB90D04C1C17BDF34A1FDF3D5C56EF816FF84D2D97DD`. The game now passes the old audio blocker, delivers the UMD callback, and initializes CRI middleware: threads `SceWaveMain` (7), `CriThread` x3 (10/14/17), `CRI ADX Audio` (28), `CRI ADX File` (29), `CRI Wave out` (30). UIDs moved because semaphores/flags now take real UIDs.
-- [INFERRED] Thread stacks still bump down from `0x09FF0000` outside SysMem (which grows up from `0x08ED0000`); they can only collide if both regions meet.
+- [INFERRED] Thread stacks still bump down from `0x09FF0000` outside SysMem (which grows up from `0x08ED0000`); they can only collide if both regions meet. [WRONG] as a safety statement: nothing checks that they meet (code review 2026-10-08, top of this file).
 
 Immediate blocker: missing `sceAudio::0x95FD0C2D` (`sceAudioChangeChannelConfig`), caller `0x08B64F90`, `user_main` UID 2.
 
@@ -278,7 +312,7 @@ Default build is now `P3P_AOT_MODE=AUTO`: `psp_recomp --auto` lowers the whole a
 
 - [VERIFIED] `build/generated/p3p_generated.cpp` (derived from the proprietary EBOOT) is no longer tracked; CMake regenerates it (`CMakeLists.txt` `P3P_GENERATED_CPP`). It remains in history since `62edefb`; purging requires a maintainer-run `git filter-repo`, not done here.
 - [VERIFIED] `logs/p3p_bootstrap_latest.log` and `profiles/p3p/config/frontier_checkpoint.json` contain only addresses/counters/hashes, no game bytes.
-- [VERIFIED] No top-level LICENSE exists. Vendored third-party trees are tracked in-repo, including `recomp/PSP-recompilation-project/font/jpn0.pgf` (a PSP firmware font) and `recomp/PSP-recompilation-project/SDL3.dll`; they were not modified.
+- [VERIFIED] at the time: no top-level LICENSE existed and `recomp/PSP-recompilation-project` (with `font/jpn0.pgf`, a PSP firmware font, and `SDL3.dll`) was tracked. Both changed later: LICENSE (MIT) was added in `55c4f31` and the research trees were untracked in `b322cfd`. `p3p_generated.cpp` (`62edefb`..`f9c9216`), `jpn0.pgf` and `SDL3.dll` remain in the pushed history; removing them needs a maintainer-run history rewrite (agents may not, CLAUDE.md section 17). `logs/` is ignored, so the log cited above is a local file.
 
 ## Older entries
 

@@ -60,7 +60,7 @@ Option C: Hybrid Architecture (Recommended Implementation)
 | Evaluation Criteria | Option A: Pure Static Recompilation | Option B: Specialized Emulator | Option C: Hybrid Architecture (Recommended) |
 | :--- | :--- | :--- | :--- |
 | **Architectural Model** | Offline MIPS→C++ AOT + static runtime | Dynamic binary interpretation / ARM11 JIT + HLE | MIPS→C++ AOT + Modular HLE + Native 3DS Drivers |
-| **CPU Performance on New 3DS (ARM11 @ 804MHz)** | **High (estimated ~90-100% native execution speed [INFERRED])**. No JIT overhead, compiler optimizes register allocation directly to ARM registers. Requires physical hardware benchmarking. | **Poor to Mediocre (estimated ~20-45% speed [INFERRED])**. ARM11 has in-order execution; JIT compilation overhead and cache invalidation on 3DS are severe. | **High (estimated ~90-100% native execution speed [INFERRED])**. All game code runs as native ARM machine code; only OS calls execute via lightweight C dispatch. |
+| **CPU Performance on New 3DS (ARM11 @ 804MHz)** | **High (estimated ~90-100% native execution speed: [WRONG] as measured, 18-33 % of real time in the first battle and about 90 % in the field, see CURRENT_STATE.md)**. No JIT overhead, compiler optimizes register allocation directly to ARM registers. Requires physical hardware benchmarking. | **Poor to Mediocre (estimated ~20-45% speed [INFERRED])**. ARM11 has in-order execution; JIT compilation overhead and cache invalidation on 3DS are severe. | **High (estimated ~90-100% native execution speed: [WRONG] as measured, 18-33 % of real time in the first battle and about 90 % in the field, see CURRENT_STATE.md)**. All game code runs as native ARM machine code; only OS calls execute via lightweight C dispatch. |
 | **Executable Memory / JIT Restrictions** | **None**. Binary is fully signed/packaged ahead of time. Works on homebrew (.3dsx) and installed CIA without special JIT service permissions. | **High Risk**. Requires executable heap memory (`svcControlMemory` with `MEMOP_PROT` or CSND service access). | **None**. Pure native code execution; no dynamic executable page generation required. |
 | **Binary & RAM Footprint** | **Large Binary / Low RAM Overhead**. Recompiled C++ code can result in a 25–45 MB ELF executable. Fits in 256 MB New 3DS FCRAM easily. | **Small Binary / High JIT RAM**. Small loader executable, but requires dedicated JIT translation cache (16–32 MB) + guest RAM. | **Balanced**. Recompiled code split into translation units + ~34 MB guest memory arena (32 MB RAM + 2 MB VRAM). |
 | **GPU / PICA200 Translation** | Requires mapping PSP GE display list processor to PICA200 via `citro3d`. Must run asynchronously on secondary core. | Requires synchronous or buffered GE interpretation within emulator frame loop. High CPU overhead. | Hardware-matched: GE display list interpreted by a dedicated worker thread (Core 2) submitting commands to `citro3d`. |
@@ -78,12 +78,12 @@ Option C: Hybrid Architecture (Recommended Implementation)
 ### 3.1. CPU: ARM11 MPCore @ 804 MHz vs. Allegrex MIPS @ 333 MHz
 The New Nintendo 3DS features a quad-core ARM11 MPCore processor:
 - **Core 0 (App Core):** Available for the main game thread.
-- **Core 1 (System Core):** Reserved for Nintendo 3DS Horizon OS services.
-- **Core 2 (Worker / Extra Core):** Available for user applications when unlocked via `APT_SetAppCpuTimeLimit(30)` or higher (up to 80%).
-- **Core 3 (System Core):** Reserved for OS background operations.
+- **Core 1 (System Core):** Horizon OS services; one application thread after `APT_SetAppCpuTimeLimit`.
+- **Core 2 (Extra Core):** needs exheader kernel flag `0x2000` or the BASE memory region (`3ds/libctru/libctru/include/3ds/thread.h`). [WRONG] earlier text: "unlocked via `APT_SetAppCpuTimeLimit`"; that call concerns Core 1. Not used by the runtime yet ([3DS_PLATFORM.md](3DS_PLATFORM.md) section 3).
+- **Core 3:** not available to applications.
 
 **Why JIT (Option B) Fails on 3DS:**
-The ARM1176JZF-S is an ARMv6 architecture processor with an in-order, 8-stage pipeline. It possesses very limited branch prediction and small L1 caches (16KB instruction / 16KB data per core); while New 3DS adds an L2 cache controller enabled in speedup mode (`osSetSpeedupEnable`), in-flight dynamic recompilation (JIT) incurs severe instruction-cache invalidation penalties (`svcFlushProcessDataCache`), pipeline stalls, and constant context switching. DaedalusX64-3DS achieves playable framerates only for select N64 titles with aggressive assembly hand-tuning. Emulating the PSP's 333 MHz Allegrex (with its 128-bit VFPU vector pipe) through a JIT on an 804 MHz ARM11 would struggle to sustain playable framerates [INFERRED].
+The ARM11 MPCore (ARMv6K, compiled for with `-march=armv6k -mtune=mpcore`) is an ARMv6 architecture processor with an in-order, 8-stage pipeline. It possesses very limited branch prediction and small L1 caches (16KB instruction / 16KB data per core); while New 3DS adds an L2 cache controller enabled in speedup mode (`osSetSpeedupEnable`), in-flight dynamic recompilation (JIT) incurs severe instruction-cache invalidation penalties (`svcFlushProcessDataCache`), pipeline stalls, and constant context switching. DaedalusX64-3DS achieves playable framerates only for select N64 titles with aggressive assembly hand-tuning. Emulating the PSP's 333 MHz Allegrex (with its 128-bit VFPU vector pipe) through a JIT on an 804 MHz ARM11 would struggle to sustain playable framerates [INFERRED].
 
 **Why Static Recompilation (Option A/C) Succeeds:**
 Ahead-of-Time compilation lets GCC 14+ (via devkitARM) optimize basic blocks globally:
@@ -149,9 +149,9 @@ Does P3P have dynamic code generation or anti-recompilation quirks?
 ### Recommended Winner: Architecture C (Hybrid Static Recompilation)
 
 **Why Architecture C is the decisive choice:**
-1. **Performance:** Only Ahead-of-Time static recompilation guarantees 30/60 fps on the 3DS ARM11 processor. Emulation via JIT is doomed to unplayable framerates.
+1. **Performance:** Ahead-of-Time static recompilation is the most promising route on the 3DS ARM11 [INFERRED]; it does not guarantee 30 fps (measured: 21-30 fps in the field, about 10 fps in the first battle, CURRENT_STATE.md).
 2. **Modding Independence:** Keeping the HLE runtime and asset loader separate from the recompiled game code ensures that mods, translations (русификатор), custom scripts (`.flow`), and modded CPKs (`mod.cpk`) can be swapped on the SD card at runtime without recompiling the executable!
 3. **Multi-Core Exploitation:**
    - **Core 0:** Runs the recompiled P3P game logic and scripts.
-   - **Core 2 (Worker Core):** Runs the GE display list parser, texture swizzling, and NDSP audio streaming concurrently.
+   - **Core 2 (Worker Core):** planned for NDSP audio and the GE back end [UNVERIFIED]; needs exheader flag `0x2000` (3DS_PLATFORM.md section 3); not used yet.
 4. **Development Phasing:** We can compile and verify the recompiled code on PC first (using SDL3/OpenGL or software rendering as in `PSPRecomp` / `sal063`), achieve 100% logic and HLE stability, and then compile against devkitARM and link `citro3d` / `libctru` for New 3DS!

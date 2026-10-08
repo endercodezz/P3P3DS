@@ -18,6 +18,19 @@
 | Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
 | Saves stored in their own format | `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` | not compatible with PSP or PPSSPP saves |
 
+Defects found in the code review of 2026-10-08, not fixed yet (evidence and tests: [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md), "Code review"):
+
+| Issue | Effect | State |
+|---|---|---|
+| New game threads start with the wrong VFPU prefix state (0 instead of `0xE4`) | the first vector-math instruction of each thread can compute a wrong result | confirmed in code; effect on P3P not yet traced |
+| A blocking call that must be retried can be skipped when the thread is preempted right after waking | rare lost audio buffer or a stuck asynchronous file read | reproduced in a unit test; must be fixed before 3DS sound |
+| Back-face culling uses opposite rules for 2D and 3D draws (PPSSPP uses one rule) | may hide another orientation bug; risk for scenes not yet seen | suspected |
+| Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
+| Mutexes are not released when their owner thread exits; event-flag result bits differ from the PSP on timeouts | possible deadlock or wrong wake-up | reproduced in a unit test |
+| Every file read, also from the SD card and mods, is slowed to UMD speed in game time | longer loads; a candidate cause of the dorm frame drops | suspected; test on the PC route planned |
+| Only one of the New 3DS CPU cores is used; profiling timers always on | speed left unused | confirmed in code |
+| Save names from the game are not checked before building SD card paths | a corrupted or modded name could write or delete outside the save folder | confirmed in code |
+
 Reports help: the bottom screen and `sdmc:/p3p3ds/report.txt` show the build, speed and where the time goes.
 
 On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8.3 and 8.5):
@@ -26,17 +39,17 @@ On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8
 |---|---|
 | `.3dsx` build | devkitARM, 44 MB of recompiled ARM code (cut from 77 MB), clean build in about 9 minutes |
 | Boot | logos, title screen and main menu, drawn by the PICA200; logo positions pixel-identical to the PC renderer; the opening movie is skipped (no video decoder yet) |
-| Speed | about 30 game frames/s in the dorm and at school (drops to 25), 15 at the first Shadow; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps) |
+| Speed | about 30 game frames/s in the own room and at school, 21-26 on the dorm floors; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps); first battle 5-7.5 fps (0.2.7, hardware), about 10 fps (0.2.8, Azahar) |
 | Saves | save and load at the dorm desk and from LOAD GAME, menu on the bottom screen |
-| First battle | starts since 0.2.5 (crash at the first Shadow fixed); scene black except the gun and the Shadow (no lighting/skinning yet), 5-10 fps |
-| Memory | 59 MB of a 79 MB heap in use during the opening |
+| First battle | starts since 0.2.5; transform, skinning and lighting on the GPU since 0.2.6; renders correctly since 0.2.7 (culling fix); slow (see Known issues) |
+| Memory | heap 71,220 KiB with 60,284 KiB in use (hardware, 2026-10-02; 12 MiB linear heap); about 10.7 MiB free |
 | Screens | top: the game; bottom: authorship and debug data (fps, speed, where the time went over the last 10 s, memory), also saved to `sdmc:/p3p3ds/report.txt` |
 
 Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)):
 
 | Milestone | Result |
 |---|---|
-| Whole `.text` statically recompiled | 237 C++ units, 751,453 instruction PCs; leftovers run through an interpreter fallback (0 mismatches vs AOT on 1,200 differential cases) |
+| Whole `.text` statically recompiled | 237 C++ units, 751,674 instruction PCs; leftovers run through an interpreter fallback (0 mismatches vs AOT on 1,200 differential cases) |
 | Boot | ThreadMan, SysMem, IoFileMgr (UMD ISO + memory stick + the community mod chain), ModuleMgr, UMD, Display services drive the game through CRI middleware startup |
 | First rendered frames | ATLUS and CRIWARE logos drawn by the GE display-list executor + software renderer |
 | Opening movie | 100 s PSMF movie demultiplexed by `sceMpeg` (on the pspautotests sample movie, container behaviour matches PSP hardware output line for line); picture and movie audio are placeholders (black / silence) |
@@ -69,7 +82,8 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] P3P3DS Builder: ISO -> `.3dsx` on the user's PC (Windows wizard)
 - [x] Runs on a real New 3DS (about 30 fps in the first days)
 - [x] Savedata on hardware (bottom-screen menu)
-- [ ] Battles rendered correctly (lighting, skinning) and at full speed, sound (ndsp), movie decoding
+- [x] Battles rendered correctly (lighting, skinning on the GPU)
+- [ ] Battles at full speed, sound (ndsp), movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
 - [ ] Playable game on New Nintendo 3DS hardware
 
@@ -191,7 +205,7 @@ Decrypted P3P Executable (Allegrex MIPS ELF) + community CWCheat patches
 This project targets the **New Nintendo 3DS / New 3DS XL / New 2DS XL** exclusively (Old 3DS / 2DS is not supported yet; planned for much later):
 - **CPU:** Quad-core ARM11 MPCore @ 804 MHz with L2 cache enabled via `osSetSpeedupEnable(true)` (vs 268 MHz on Old 3DS).
 - **RAM:** 256 MB FCRAM (vs 128 MB on Old 3DS). The `.3dsx` currently holds 44 MB of recompiled code plus the 32 MB guest RAM and the runtime; a `.cia` can request a larger memory mode.
-- **Worker Core:** Core 2 is available for multithreaded worker tasks (display list processing, audio mixing, or file streaming).
+- **Worker Core:** Core 2 needs exheader kernel flag `0x2000` (libctru `thread.h`); whether the `.3dsx` can use it under the Homebrew Launcher is not yet tested. The runtime currently uses only Core 0 (`docs/3DS_PLATFORM.md` section 3).
 
 ---
 
@@ -369,7 +383,7 @@ bash experiments/p3p-analysis/reproduce_analysis.sh
 
 ## License
 
-The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party code in this repository is only what the build uses: `recomp/PSPRecomp` (MIT) and `p3p/p3p-patches` (community CWCheat list); both keep their own licenses. The research sources (`references/`, `psp/`, `3ds/`, the other recompilers in `recomp/`, the asset tools in `tools/`, the P3P mod menu) are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
+The original P3P3DS code and documentation are released under the [MIT License](LICENSE). Third-party code in this repository: `recomp/PSPRecomp` (MIT) and `p3p/p3p-patches` (community CWCheat list); both keep their own licenses. `recomp/PSPRecomp/profiles/vcs/` (another game's profile, with FFmpeg headers) is part of the upstream PSPRecomp tree and is not used by this build. The research sources (`references/`, `psp/`, `3ds/`, the other recompilers in `recomp/`, the asset tools in `tools/`, the P3P mod menu) are not part of the repository: `python tools/fetch_references.py` clones them from their upstreams (the build does not need them; the tests that compare against pspautotests skip without it). Game data is never part of the repository.
 
 ---
 

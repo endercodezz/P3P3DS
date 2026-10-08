@@ -37,11 +37,12 @@ void platform_init(void) {
     // 2. Enable New 3DS CPU clock boost (804 MHz + L2 cache)
     osSetSpeedupEnable(true);
     
-    // 3. Request CPU time on Core 2 (Worker core) for GE / audio tasks
-    // Allows user code to use up to 80% of Core 2
-    APT_SetAppCpuTimeLimit(80);
+    // 3. (Optional) APT_SetAppCpuTimeLimit(n) unlocks one thread on Core 1
+    //    (the system core), NOT Core 2 -- see section 3.
 }
 ```
+
+[VERIFIED] `osSetSpeedupEnable(true)` is called in `platform/3ds/main.cpp`. It does nothing, without an error, if `ptm:sysm` cannot be opened (`3ds/libctru/libctru/source/os.c`); the runtime does not yet check that the 804 MHz clock is really active. [UNVERIFIED] that it is active under the Homebrew Launcher.
 
 ### 2.2. Memory Layout & Allocation Strategy
 New 3DS provides separate memory allocators in `libctru`:
@@ -75,18 +76,21 @@ New 3DS provides separate memory allocators in `libctru`:
 
 ## 3. Multithreading & Core Allocation
 
-Horizon OS on New 3DS exposes two distinct cores for user applications:
-- **Core 0 (App Core):** Runs the main game loop, recompiled Allegrex MIPS code, and Atlus `.bf` script VM.
-- **Core 2 (System/User Core):** Runs background tasks:
-  1. **GE Command Processor:** Parses PSP display lists and dispatches Citro3D rendering commands.
-  2. **Audio Worker Thread:** Streams ATRAC3+ / ADPCM audio buffers to NDSP.
-  3. **File I/O Streamer:** Background reading of `.cpk` chunks from SDMC.
+Core availability, from `3ds/libctru/libctru/include/3ds/thread.h` (`threadCreate` documentation) [VERIFIED]:
+- **Core 0 (application core):** always available.
+- **Core 1 (system core):** one application thread, only after `APT_SetAppCpuTimeLimit`.
+- **Core 2 (New 3DS only):** needs exheader kernel flag `0x2000` or the BASE memory region. `APT_SetAppCpuTimeLimit` does **not** unlock it ([WRONG]: earlier versions of this document and `VERIFICATION.md` said it did).
+- **Core 3:** not available to applications.
 
-Thread creation using `libctru`:
+Current state [VERIFIED, `platform/3ds`, `core/src`]: everything runs on Core 0. There is no `threadCreate`; GE lists run synchronously inside `sceGeListEnQueue` / `sceGeListUpdateStallAddr` (`core/src/hle/ge.cpp`, `pump`), including vertex unpack and citro3d calls.
+
+Design target (not implemented, [UNVERIFIED]):
+1. **Audio mixing to NDSP** first: low risk, and it shows whether Core 2 can be used at all. DaedalusX64-3DS creates a Core 2 thread from a `.3dsx` (`references/DaedalusX64-3DS/Source/SysCTR/HLEAudio/AudioPluginCTR.cpp`); whether this works for our `.3dsx` under the Homebrew Launcher is [UNVERIFIED]. `threadCreate` returns NULL on failure, so a Core 0 fallback is required.
+2. **GE back end:** list parsing, registers, `sceGeGetCmd`/`GetMtx` and callbacks stay on the main thread; draws (pointers plus a state snapshot) are queued to a Core 2 worker that does vertex copy, texture decode and citro3d calls. The main thread blocks at sync points, callback delivery and CPU writes into render targets. Measure first on the PC how much guest time passes between enqueue and sync.
+
 ```c
-Thread ge_thread;
-s32 prio = 0x30;
-ge_thread = threadCreate(ge_worker_entry, NULL, 0x8000, prio, 2 /* Core 2 */, false);
+Thread worker = threadCreate(worker_entry, NULL, 0x8000, 0x30, 2 /* Core 2 */, false);
+if (worker == NULL) { /* Core 2 not available: run the work on Core 0 */ }
 ```
 
 ---

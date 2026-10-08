@@ -16,14 +16,15 @@ Updated 2026-10-06. What is done and measured lives in [`CURRENT_STATE.md`](CURR
 2. **Cache unpacked model vertices across frames**: vertex unpack is 26 % of battle time. Verify: `vtx` share and fps; frames unchanged on the PC renderer.
 3. **The game's own cost**: aot + hle are about 48 % of the time at 33 % speed, which alone caps the battle near 70 % speed. Profile a battle window on the PC production build (`--sample`, `tools/profile_symbols.py`) and on hardware (`profile_seconds.txt`); candidates: hot guest functions compiled with full optimisation, cheaper paths for the hottest HLE calls.
 4. **Do not wait for the GPU every frame** if GPU wait becomes visible on hardware (Azahar shows none).
+5. Candidates from the code review of 2026-10-08 (`CURRENT_STATE.md`, "Code review"), each to be measured before it is kept: profiling timers on raw ticks instead of `steady_clock`; raw PSP vertex bytes as PICA200 attributes (alternative to step 2); a local copy of the AOT memory view and `PSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH`; `-O2` with instruction scheduling for the hottest units; a Core 2 worker (first check that a `.3dsx` can create a thread there).
 
 ## 2. Field at a stable 100 %
 
-Field draws are through mode (2D) and still take the CPU path; dorm floors run at 21-26 fps, 89-91 % speed. Verify: hardware report in the dorm.
+Field draws are through mode (2D) and still take the CPU path; dorm floors run at 21-26 fps, 89-91 % speed. Verify: hardware report in the dorm. At 90 % speed 30 fps would show as 27, so frames are also lost in game time: test first whether the UMD-speed read latency applied to every file (`IoManager::transfer_us`) causes it (dorm route on the PC runner with near-zero latency).
 
 ## 3. Sound
 
-The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers.
+The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers. Before that: fix the skipped retry of `sceAudioOutputBlocking` after a preemption (`CURRENT_STATE.md`, "Code review"), and decide what the output does when the game runs below 100 % speed (the virtual clock then runs slower than the DSP).
 
 ## Later
 

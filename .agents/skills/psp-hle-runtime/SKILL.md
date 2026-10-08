@@ -34,7 +34,7 @@ Do not copy or line-by-line translate PPSSPP implementation code. Record source 
 
 Other implementation examples (not replacements for PSP contract research):
 
-- `recomp/PSPRecomp/profiles/vcs/host/vcs_profile.cpp` — Proven minimal HLE host implementation.
+- `recomp/PSPRecomp/profiles/vcs/host/vcs_profile.cpp` — another game's HLE host in the upstream PSPRecomp tree; not used by the P3P3DS build. The project's HLE is `core/src/hle/`.
 - `recomp/PSP-recompilation-project/src/rt/hle.c` — Clean, lightweight pure C HLE dispatch table.
 
 ---

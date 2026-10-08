@@ -170,7 +170,7 @@ Generic modding support and arbitrary localization packages are first-class arch
 
 ## 11. Maintainer-Local Requirements
 
-If `.Codex/LOCAL.md` exists, the agent is **obligated to read it immediately after `AGENTS.md`**.
+If `.claude/LOCAL.md` exists, the agent is **obligated to read it immediately after `AGENTS.md`**.
 
 - `LOCAL.md` is personal to the local maintainer and contains local development preferences, personal project goals, specific translation targets, UX preferences, and experimental priorities.
 - **Precedence Rule:** `LOCAL.md` **cannot override** correctness, verification rules, repository containment, licensing rules, or architectural boundaries defined in `AGENTS.md`.
@@ -230,7 +230,7 @@ After completing a well-defined user task or milestone, the agent must automatic
 2. All regression, verification, and smoke tests have passed cleanly;
 3. There is no explicit instruction from the user forbidding commits.
 
-Never stage temporary files, `.Codex/LOCAL.md`, credentials or game assets. The procedure and its pre/post-commit check scripts are in the `p3p3ds-commit` skill.
+Never stage temporary files, `.claude/LOCAL.md`, credentials or game assets. The procedure and its pre/post-commit check scripts are in the `p3p3ds-commit` skill.
 
 **Allowed remote operations** (maintainer decision, 2026-10-04): `git fetch`, `git pull` (fast-forward or merge, never rebase), `git push origin <branch>` of verified commits, creating branches and pull requests (e.g. contributors' work). GitHub lists contributors by commit author, so pushing does not add the agent as one; section 15 keeps it that way.
 
