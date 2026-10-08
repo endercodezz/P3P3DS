@@ -3,6 +3,7 @@
 // shift/mask/start; texture_hash must change with texture bytes and palette; decode_model_vertices
 // must equal decode_model_vertex for every vertex type.
 #include "p3p3ds/ge/geometry.hpp"
+#include "p3p3ds/ge/vertex_cache.hpp"
 #include "psprecomp/guest_memory.hpp"
 
 #include <cstdio>
@@ -56,6 +57,97 @@ void compare_case(psprecomp::GuestMemory &m, std::uint32_t format, std::uint32_t
     check(same, what);
 }
 } // namespace
+
+// VertexCache: reuse only for identical guest bytes, volatile sources left
+// uncached, budget with eviction of sources not used recently, and the cached
+// conversion of real decoded vertices equal to a fresh one after a CPU write.
+void vertex_cache_checks(psprecomp::GuestMemory &m) {
+    constexpr std::uint32_t kSrc = 0x08930000u;
+    constexpr std::size_t kRaw = 18u * 6u, kOut = 36u * 6u;
+    for (std::uint32_t i = 0; i < 0x1000u; ++i) m.store8(kSrc + i, static_cast<std::uint8_t>(rng()));
+    int converts = 0;
+    auto convert_from = [&](std::uint32_t address) {
+        return [&m, &converts, address](std::uint8_t *out) {
+            ++converts;
+            for (std::size_t i = 0; i < kOut; ++i) out[i] = static_cast<std::uint8_t>(m.load8(address + static_cast<std::uint32_t>(i % kRaw)) ^ 0xA5u);
+        };
+    };
+    auto expected = [&](std::uint32_t address, const std::uint8_t *got) {
+        for (std::size_t i = 0; i < kOut; ++i)
+            if (got[i] != static_cast<std::uint8_t>(m.load8(address + static_cast<std::uint32_t>(i % kRaw)) ^ 0xA5u)) return false;
+        return true;
+    };
+    VertexCache cache(1u << 20);
+    const VertexCacheKey key{kSrc, 0x15Au, 0, 6, 0};
+    const std::uint8_t *raw = m.raw_pointer(kSrc, kRaw);
+    check(raw != nullptr, "raw_pointer of guest RAM");
+    const std::uint8_t *a = cache.get(key, raw, kRaw, kOut, 1, convert_from(kSrc));
+    check(a != nullptr && converts == 1 && expected(kSrc, a), "vertex cache: first use converts");
+    const std::uint8_t *b = cache.get(key, raw, kRaw, kOut, 2, convert_from(kSrc));
+    check(b != nullptr && converts == 1 && expected(kSrc, b) && cache.stats().hits == 1u, "vertex cache: unchanged bytes hit");
+    m.store8(kSrc + 7u, static_cast<std::uint8_t>(m.load8(kSrc + 7u) ^ 0x01u));
+    const std::uint8_t *c = cache.get(key, raw, kRaw, kOut, 3, convert_from(kSrc));
+    check(c != nullptr && converts == 2 && expected(kSrc, c), "vertex cache: a changed byte converts again");
+    VertexCacheKey other = key;
+    other.material = 0x336699u;
+    check(cache.get(other, raw, kRaw, kOut, 3, convert_from(kSrc)) != nullptr && converts == 3, "vertex cache: material is part of the key");
+
+    // Changes on kVolatileAfter uses in a row: uncached for kVolatileFrames.
+    std::uint64_t frame = 4;
+    check(cache.get(key, raw, kRaw, kOut, frame++, convert_from(kSrc)) != nullptr, "vertex cache: hit resets the change count");
+    const std::uint8_t *v = nullptr;
+    for (std::uint32_t i = 0; i < VertexCache::kVolatileAfter; ++i) {
+        m.store8(kSrc + 3u, static_cast<std::uint8_t>(m.load8(kSrc + 3u) + 1u));
+        v = cache.get(key, raw, kRaw, kOut, frame++, convert_from(kSrc));
+    }
+    check(v == nullptr && cache.stats().volatile_skips == 1u, "vertex cache: a source changing every use becomes volatile");
+    check(cache.get(key, raw, kRaw, kOut, frame, convert_from(kSrc)) == nullptr, "vertex cache: volatile source stays uncached");
+    const int before = converts;
+    const std::uint8_t *back = cache.get(key, raw, kRaw, kOut, frame + VertexCache::kVolatileFrames, convert_from(kSrc));
+    check(back != nullptr && converts == before + 1 && expected(kSrc, back), "vertex cache: cached again after the volatile window");
+
+    // Budget: room for two sources; a third in the same frame is refused, and
+    // admitted once the others were not used for two frames.
+    VertexCache small(2u * (kRaw + kOut + VertexCache::kEntryOverhead));
+    const VertexCacheKey k1{kSrc, 1, 0, 6, 0}, k2{kSrc, 2, 0, 6, 0}, k3{kSrc, 3, 0, 6, 0};
+    check(small.get(k1, raw, kRaw, kOut, 10, convert_from(kSrc)) != nullptr, "vertex cache budget: first source");
+    check(small.get(k2, raw, kRaw, kOut, 10, convert_from(kSrc)) != nullptr, "vertex cache budget: second source");
+    check(small.get(k3, raw, kRaw, kOut, 10, convert_from(kSrc)) == nullptr && small.stats().full == 1u, "vertex cache budget: full");
+    check(small.get(k3, raw, kRaw, kOut, 12, convert_from(kSrc)) != nullptr && small.stats().entries == 1u,
+          "vertex cache budget: stale sources evicted");
+
+    // Real conversion: decoded model vertices through the cache equal a fresh
+    // decode, also after the game rewrites one vertex.
+    GeRegisters r;
+    r.reg[0x55] = 0x336699u; r.reg[0x58] = 0x80u;
+    const auto layout = vertex_layout(0x00015Au); // battle models: s16 position/normal, u16 UV, 4444 colour
+    constexpr std::uint32_t kN = 9;
+    constexpr std::size_t kPacked = 16u * sizeof(float) + 4u; // like the 3DS shader vertex
+    const std::size_t raw_size = layout.size * kN, out_size = kN * kPacked;
+    VertexCache models(1u << 20);
+    auto decode_into = [&](std::uint8_t *out) {
+        std::vector<ModelVertex> tmp(kN);
+        decode_model_vertices(m, r, layout, kSrc, 0, kN, tmp.data());
+        for (const auto &mv : tmp) {
+            std::memcpy(out, mv.pos, sizeof mv.pos);
+            std::memcpy(out + 12, mv.normal, sizeof mv.normal);
+            std::memcpy(out + 24, mv.uv, sizeof mv.uv);
+            std::memcpy(out + 32, mv.weights, sizeof mv.weights);
+            std::memcpy(out + 64, mv.color.data(), 4);
+            out += kPacked;
+        }
+    };
+    bool equal = true;
+    for (int round = 0; round < 3; ++round) {
+        if (round == 2) m.store16(kSrc + layout.pos_offset, static_cast<std::uint16_t>(m.load16(kSrc + layout.pos_offset) + 0x100u));
+        const std::uint8_t *got = models.get({kSrc, 0x15Au, 0, kN, 0}, m.raw_pointer(kSrc, raw_size), raw_size, out_size,
+                                             static_cast<std::uint64_t>(20 + round), decode_into);
+        std::vector<std::uint8_t> fresh(out_size);
+        decode_into(fresh.data());
+        equal &= got != nullptr && std::memcmp(got, fresh.data(), out_size) == 0;
+    }
+    check(equal && models.stats().hits == 1u && models.stats().misses == 2u, "vertex cache: cached decode equals fresh decode");
+}
 
 int main() {
     psprecomp::GuestMemory m;
@@ -115,6 +207,8 @@ int main() {
                             }
         check(same && layouts > 0, "decode_model_vertices equals decode_model_vertex");
     }
+
+    vertex_cache_checks(m);
 
     if (failures == 0) std::printf("test_ge_geometry: all checks passed\n");
     return failures == 0 ? 0 : 1;

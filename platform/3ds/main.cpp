@@ -119,6 +119,8 @@ double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM1
 struct TimeSample {
     u64 wall{}, present{}, idle{}, ui{}, hash{}, upload{}, wait{};
     u64 prep{}, vertex{}, uniform{}, submit{}; // GPU renderer steps (GpuStats)
+    u64 fill{};                                // model vertices into the arena (part of vertex)
+    double vc_hits{}, vc_uses{};               // vertex cache hits / model draws that asked it
     double guest_us{}, hle_ns{}, render_ns{}, io_ns{}, io_bytes{}, hle_calls{};
     std::uint64_t vblanks{}, game_frames{};
 };
@@ -332,7 +334,13 @@ std::string gpu_text() {
         static_cast<unsigned long long>(g_skip_presses), static_cast<unsigned long long>(g.cpu_to_target),
         static_cast<unsigned long long>(g.model_draws / 1000u), static_cast<unsigned long long>(g.model_batches / 1000u),
         static_cast<unsigned long long>(g.fast_draws / 1000u));
-    return buf;
+    const auto &c = g_gpu->vertex_cache_stats();
+    char vc[128];
+    std::snprintf(vc, sizeof vc, "vcache : %lu KiB %lu src hit %lluk\n         miss %lluk vol %lluk full %lluk\n",
+                  static_cast<unsigned long>(c.bytes / 1024u), static_cast<unsigned long>(c.entries),
+                  static_cast<unsigned long long>(c.hits / 1000u), static_cast<unsigned long long>(c.misses / 1000u),
+                  static_cast<unsigned long long>(c.volatile_skips / 1000u), static_cast<unsigned long long>(c.full / 1000u));
+    return std::string(buf) + vc;
 }
 
 TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
@@ -350,6 +358,10 @@ TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
         t.vertex = g.vertex_ticks;
         t.uniform = g.uniform_ticks;
         t.submit = g.submit_ticks;
+        t.fill = g.fill_ticks;
+        const auto &c = g_gpu->vertex_cache_stats();
+        t.vc_hits = static_cast<double>(c.hits);
+        t.vc_uses = static_cast<double>(c.hits + c.misses + c.volatile_skips + c.full);
     }
     t.guest_us = static_cast<double>(guest_us);
     t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns);
@@ -399,6 +411,14 @@ std::string split_text(const char *label, const TimeSample &a, const TimeSample 
     if (draws) {
         std::snprintf(buf, sizeof buf, " draw: prep %.1f vtx %.1f unif %.1f sub %.1f\n", pct(ticks_to_s(b.prep - a.prep)),
                       pct(ticks_to_s(b.vertex - a.vertex)), pct(ticks_to_s(b.uniform - a.uniform)), pct(ticks_to_s(b.submit - a.submit)));
+        text += buf;
+        // fill: model vertices into the arena (cache copy or unpack), part of vtx.
+        const double uses = b.vc_uses - a.vc_uses;
+        if (g_gpu != nullptr && !g_gpu->vertex_cache_enabled())
+            std::snprintf(buf, sizeof buf, " vtx: fill %.1f cache off\n", pct(ticks_to_s(b.fill - a.fill)));
+        else
+            std::snprintf(buf, sizeof buf, " vtx: fill %.1f cache hit %.0f%%\n", pct(ticks_to_s(b.fill - a.fill)),
+                          uses > 0 ? 100.0 * (b.vc_hits - a.vc_hits) / uses : 0.0);
         text += buf;
     }
     return text;

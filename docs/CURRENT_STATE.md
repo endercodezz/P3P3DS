@@ -2,6 +2,16 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Model vertex cache for battle speed (2026-10-08)
+
+For the battle's vertex unpack (26.5 % of time in Azahar, 0.2.8). Not yet measured in Azahar or on hardware.
+
+- `core/include/p3p3ds/ge/vertex_cache.hpp`: converted model vertices kept across frames, keyed by vertex address, vertex type (GE 0x12), referenced index range and, for vertices without a colour, the material colour (0x55/0x58). An entry holds a copy of the exact guest bytes and is used only while they are identical (`memcmp`, no hash), so CPU writes to vertex buffers are always seen. A source that changes on 3 uses in a row (vertices animated by the game's CPU code) is left uncached for 120 frames. Budget 2 MiB of the main heap; over budget, sources unused in the current and previous frame are dropped (at most once per frame), otherwise the draw is unpacked as before.
+- `platform/3ds/gpu_renderer.cpp` `draw_model`: a hit is one `memcpy` of the shader vertices into the frame's vertex arena instead of `decode_model_vertices` plus the repack loop; batching, the arena and GPU data lifetime are unchanged (the GPU reads only this frame's arena). Morphing draws are never cached.
+- Measuring: bottom-screen line `vtx: fill F cache hit H%` (F: share of time getting model vertices into the arena, part of `vtx`; H: hits over the last 10 s); SD report line `vcache` (KiB, sources, hits, misses, volatile, full). An empty `sdmc:/p3p3ds/no_vertex_cache.txt` turns the cache off for A/B runs.
+- [VERIFIED] `test_ge_geometry`: reuse only for identical bytes, reconversion after a one-byte change, material in the key, volatile window, budget refusal and eviction, and cached decoded vertices of the battle type `0x00015A` equal to a fresh decode after a vertex is rewritten. CTest 27/27. 3DS objects build with devkitARM.
+- [UNVERIFIED] the speed gain; [INFERRED] most battle models are static in guest memory (skinning is done by the shader from bone matrices, the census found no morphing), so a high hit rate is expected.
+
 ## Fixed: VFPU prefixes of new threads, retry lost after preemption (2026-10-08)
 
 The first two defects of the code review below.

@@ -207,6 +207,7 @@ GpuRenderer::GpuRenderer() {
         tick_cost_ = (t - t0) / 64u;
     }
     if (FILE *f = std::fopen("sdmc:/p3p3ds/cpu_vertices.txt", "r")) { cpu_vertices_ = true; std::fclose(f); }
+    if (FILE *f = std::fopen("sdmc:/p3p3ds/no_vertex_cache.txt", "r")) { vertex_cache_enabled_ = false; std::fclose(f); }
 
     for (int i = 1; i < 6; ++i) C3D_TexEnvInit(C3D_GetTexEnv(i));
     shared_depth_ = vramAlloc(C3D_CalcDepthBufSize(kTargetSize, kTargetSize, GPU_RB_DEPTH24_STENCIL8));
@@ -1012,20 +1013,38 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     // arena holds fewer than 0x10000 vertices of any layout.
     const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
 
-    if (model_.size() < n) model_.resize(n);
-    if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
-        for (std::uint32_t k = 0; k < n; ++k)
-            if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
-    ShaderVertex s;
-    for (std::uint32_t k = 0; k < n; ++k) {
-        const ge::ModelVertex &m = model_[k];
-        s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
-        s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
-        s.u = m.uv[0]; s.v = m.uv[1];
-        s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
-        std::memcpy(s.w, m.weights, sizeof s.w);
-        std::memcpy(block + k * stride, &s, stride);
+    const u64 fill_start = tick();
+    auto unpack = [&](std::uint8_t *out) {
+        if (model_.size() < n) model_.resize(n);
+        if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
+            for (std::uint32_t k = 0; k < n; ++k)
+                if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
+        ShaderVertex s;
+        for (std::uint32_t k = 0; k < n; ++k) {
+            const ge::ModelVertex &m = model_[k];
+            s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
+            s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
+            s.u = m.uv[0]; s.v = m.uv[1];
+            s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
+            std::memcpy(s.w, m.weights, sizeof s.w);
+            std::memcpy(out + k * stride, &s, stride);
+        }
+    };
+    // Unchanged guest vertices drawn again (most models, every frame) are
+    // copied from the vertex cache instead of being unpacked. Morphing blends
+    // with GE weight registers, so it is always unpacked.
+    const std::uint32_t raw_size = n * layout.size;
+    const std::uint8_t *raw = vertex_cache_enabled_ && layout.morphs <= 1u ? memory.raw_pointer(vertex_address + lo * layout.size, raw_size)
+                                                                            : nullptr;
+    const std::uint8_t *cached = nullptr;
+    if (raw != nullptr) {
+        const std::uint32_t material = layout.color_format >= 4u ? 0u : (r24(regs, 0x55) | ((r24(regs, 0x58) & 0xFFu) << 24));
+        cached = vertex_cache_.get(ge::VertexCacheKey{vertex_address, r24(regs, 0x12), lo, n, material}, raw, raw_size, n * stride, frame_,
+                                   unpack);
     }
+    if (cached != nullptr) std::memcpy(block, cached, n * stride);
+    else unpack(block);
+    add(gpu_stats_.fill_ticks, fill_start, tick());
     // Triangle list (strips and fans unrolled with the software renderer's
     // winding: odd strip triangles swap their first two vertices).
     auto vtx = [&](std::uint32_t i) { return static_cast<std::uint16_t>(first + index_at(i) - lo); };

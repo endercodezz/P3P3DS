@@ -15,6 +15,7 @@
 // target, colour masks are per channel.
 #include "p3p3ds/ge/geometry.hpp"
 #include "p3p3ds/ge/renderer.hpp"
+#include "p3p3ds/ge/vertex_cache.hpp"
 #include "p3p3ds/hle/display.hpp"
 
 #include <citro3d.h>
@@ -38,6 +39,9 @@ struct GpuStats {
     // vertex unpack or CPU transform (vertex), shader uniforms (uniform),
     // citro3d state emission and the draw command (submit).
     std::uint64_t prep_ticks{}, vertex_ticks{}, uniform_ticks{}, submit_ticks{};
+    // Part of vertex_ticks for model draws: getting the shader vertices into
+    // the arena (vertex cache lookup and copy, or unpacking).
+    std::uint64_t fill_ticks{};
     // GPU command words added by draws (frames not flushed in between), and
     // why frames were submitted early: command buffer or vertex arena full.
     std::uint64_t command_words{}, counted_draws{}, command_flushes{}, arena_flushes{};
@@ -67,6 +71,8 @@ public:
     bool read_top_screen(std::vector<std::uint8_t> &rgb);
 
     [[nodiscard]] const GpuStats &gpu_stats() const { return gpu_stats_; }
+    [[nodiscard]] const ge::VertexCacheStats &vertex_cache_stats() const { return vertex_cache_.stats(); }
+    [[nodiscard]] bool vertex_cache_enabled() const { return vertex_cache_enabled_; }
     // The last presented picture came from guest memory (CPU-written, e.g. a movie frame).
     [[nodiscard]] bool last_present_from_cpu() const { return last_present_cpu_; }
 
@@ -183,6 +189,10 @@ private:
     ge::LightingSetup light_{};
     bool light_valid_{};
     bool cpu_vertices_{}; // sdmc:/p3p3ds/cpu_vertices.txt: every draw through the CPU transform
+    // Shader vertices of model draws kept across frames while their guest
+    // bytes stay the same (main heap; sdmc:/p3p3ds/no_vertex_cache.txt turns it off).
+    ge::VertexCache vertex_cache_{2u << 20};
+    bool vertex_cache_enabled_{true};
     C3D_RenderTarget *top_{};
     void *shared_depth_{};
     C3D_Tex fallback_{}; // CPU-converted guest framebuffer (512x512 RGBA8, linear memory)
