@@ -24,7 +24,7 @@ Field draws are through mode (2D) and still take the CPU path; dorm floors run a
 
 ## 3. Sound
 
-The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers. Before that: fix the skipped retry of `sceAudioOutputBlocking` after a preemption (`CURRENT_STATE.md`, "Code review"), and decide what the output does when the game runs below 100 % speed (the virtual clock then runs slower than the DSP).
+The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers. Before that (the skipped retry of `sceAudioOutputBlocking` after a preemption is fixed), decide what the output does when the game runs below 100 % speed (the virtual clock then runs slower than the DSP).
 
 ## Later
 

@@ -338,7 +338,13 @@ std::int32_t ThreadManager::change_current_thread_attr(std::uint32_t clear_attr,
 // ---------------------------------------------------------------------------
 
 std::uint32_t ThreadManager::resume_pc(const psprecomp::AllegrexContext &ctx) const noexcept {
-    return import_stubs_.contains(ctx.pc) ? ctx.gpr[31] : ctx.pc;
+    // A pc at an import stub means "inside that call, continue at $ra" only for
+    // the thread that made the call. A thread loaded during the call (no switch
+    // generation match) resumes at its saved pc: a retry wait saved the stub
+    // itself and must re-run the call.
+    const bool caller_still_inside = psprecomp::runtime_thread_switch_generation_matches(
+        psprecomp::runtime_import_entry_generation());
+    return caller_still_inside && import_stubs_.contains(ctx.pc) ? ctx.gpr[31] : ctx.pc;
 }
 
 bool ThreadManager::runnable(const ThreadControlBlock &t) const noexcept {

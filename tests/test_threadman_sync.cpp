@@ -293,6 +293,49 @@ void audio_blocking() {
     CHECK(env.call("sceAudio", 0x136CAF51u, {ch, 0x8000u, kScratch}) == 1024u); // retry succeeds
     CHECK(env.k.audio().channel_state(ch).buffers == 3u);
 }
+
+// A thread woken from a retry wait and preempted in the same post-import hook
+// (its wake and a higher-priority thread's deadline 1 us apart) must still
+// resume at the stub and retry, not at $ra with a stale $v0.
+void retry_survives_preemption() {
+    int preempted_after_wake = 0;
+    for (std::int64_t offset = -4; offset <= 4; ++offset) {
+        Env env;
+        env.b = env.spawn(40);
+        const auto ch = env.call("sceAudio", 0x5EC81C55u, {0xFFFFFFFFu, 1024u, 0u});
+        env.call("sceAudio", 0x136CAF51u, {ch, 0x8000u, kScratch}); // A: plays now
+        env.call("sceAudio", 0x136CAF51u, {ch, 0x8000u, kScratch}); // A: queued
+        // A (prio 32) delays until about when the slot frees; B (prio 40) runs.
+        const auto free_at = static_cast<std::int64_t>(env.k.audio().channel_state(ch).slot_free_at);
+        const auto now = static_cast<std::int64_t>(env.k.threads().now());
+        const auto delay = free_at + static_cast<std::int64_t>(ThreadManager::kSyscallCostUs) + offset - now;
+        if (delay <= 0) continue;
+        env.tm(0xCEADEB47u, {static_cast<std::uint32_t>(delay)});
+        CHECK(env.current() == env.b);
+        env.call("sceAudio", 0x136CAF51u, {ch, 0x8000u, kScratch}); // B: slot busy -> retry wait
+        CHECK(env.k.audio().channel_state(ch).buffers == 2u);
+        if (env.current() == env.a && env.k.threads().get_thread(env.b)->status == InternalThreadState::Ready)
+            ++preempted_after_wake;
+        if (env.current() == env.a) env.tm(0x9ACE131Eu, {}); // A sleeps -> B continues
+        CHECK(env.current() == env.b);
+        CHECK(env.rt.cpu().pc == kStub);                     // retry, not $ra
+        env.call("sceAudio", 0x136CAF51u, {ch, 0x8000u, kScratch}); // retry succeeds
+        // A's delay may expire right after it and preempt B: read B's own result.
+        const auto &b_ctx = env.current() == env.b ? env.rt.cpu() : env.k.threads().get_thread(env.b)->context;
+        CHECK(b_ctx.gpr[2] == 1024u && b_ctx.pc == kRet);
+        CHECK(env.k.audio().channel_state(ch).buffers == 3u);
+    }
+    CHECK(preempted_after_wake > 0); // the scenario was really exercised
+}
+
+// New threads start with identity VFPU source/target prefixes (0xE4).
+void new_thread_vfpu_prefixes() {
+    Env env;
+    env.b = env.spawn(40);
+    const auto *t = env.k.threads().get_thread(env.b);
+    CHECK(t->context.vfpu_ctrl[0] == 0xE4u && t->context.vfpu_ctrl[1] == 0xE4u && t->context.vfpu_ctrl[2] == 0u);
+    CHECK(env.rt.cpu().vfpu_ctrl[0] == 0xE4u && env.rt.cpu().vfpu_ctrl[1] == 0xE4u);
+}
 } // namespace
 
 namespace { void audio_contracts(); }
@@ -305,6 +348,8 @@ int main() {
     thread_end_status();
     callbacks();
     audio_blocking();
+    retry_survives_preemption();
+    new_thread_vfpu_prefixes();
     audio_contracts();
     std::cout << "threadman sync failures=" << failures << "\n";
     return failures == 0 ? 0 : 1;

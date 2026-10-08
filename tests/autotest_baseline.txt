@@ -21,17 +21,17 @@ cpu/icache/icache.prx	2	2	stop:Missing HLE import UtilsForKernel::0xC2DF770E
 cpu/lsu/cacheop.prx	4	11	exit
 cpu/lsu/llsc.prx	17	17	stop:Unsupported Allegrex instruction 0xE0620000 at 0x08800690: unknown not lowered yet
 cpu/lsu/lsu.prx	0	59	exit
-cpu/vfpu/callout.prx	3	5	exit
+cpu/vfpu/callout.prx	0	5	exit
 cpu/vfpu/colors.prx	4	5	stop:Unsupported Allegrex instruction 0xD480000C at 0x08800460: vfpu not lowered yet
 cpu/vfpu/convert.prx	107	108	stop:Unsupported Allegrex instruction 0xD480000C at 0x08801850: vfpu not lowered yet
-cpu/vfpu/convert_scaled.prx	1	128	exit
-cpu/vfpu/exact.prx	367	371	exit
+cpu/vfpu/convert_scaled.prx	0	128	exit
+cpu/vfpu/exact.prx	366	371	exit
 cpu/vfpu/gum.prx	43	45	stop:Missing HLE import sceRtc::0x3F7AD767
 cpu/vfpu/matrix.prx	0	50	exit
-cpu/vfpu/minmax.prx	1	17	exit
+cpu/vfpu/minmax.prx	0	17	exit
 cpu/vfpu/minmax_tie.prx	0	60	exit
-cpu/vfpu/minmax_zero.prx	5	12	exit
-cpu/vfpu/overlap.prx	44	62	stop:Unsupported Allegrex instruction 0x67040080 at 0x08800B5C: vfpu1 not lowered yet
+cpu/vfpu/minmax_zero.prx	4	12	exit
+cpu/vfpu/overlap.prx	43	62	stop:Unsupported Allegrex instruction 0x67040080 at 0x08800B5C: vfpu1 not lowered yet
 cpu/vfpu/overlap_vcrsp.prx	3	5	exit
 cpu/vfpu/prefix_branch.prx	1	10	exit
 cpu/vfpu/prefix_consume.prx	65	84	stop:Unsupported Allegrex instruction 0xD0438480 at 0x08801B94: vfpu4 not lowered yet

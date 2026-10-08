@@ -22,8 +22,6 @@ Defects found in the code review of 2026-10-08, not fixed yet (evidence and test
 
 | Issue | Effect | State |
 |---|---|---|
-| New game threads start with the wrong VFPU prefix state (0 instead of `0xE4`) | the first vector-math instruction of each thread can compute a wrong result | confirmed in code; effect on P3P not yet traced |
-| A blocking call that must be retried can be skipped when the thread is preempted right after waking | rare lost audio buffer or a stuck asynchronous file read | reproduced in a unit test; must be fixed before 3DS sound |
 | Back-face culling uses opposite rules for 2D and 3D draws (PPSSPP uses one rule) | may hide another orientation bug; risk for scenes not yet seen | suspected |
 | Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
 | Mutexes are not released when their owner thread exits; event-flag result bits differ from the PSP on timeouts | possible deadlock or wrong wake-up | reproduced in a unit test |

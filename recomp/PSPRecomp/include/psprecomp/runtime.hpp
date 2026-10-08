@@ -456,6 +456,11 @@ void set_runtime_post_chained_call_hook(RuntimePostChainedCallHook hook) noexcep
 // P3P3DS: runs after every HLE import that did not stop the runtime.
 using RuntimePostImportHook = void (*)(Runtime &, AllegrexContext &);
 void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept;
+// P3P3DS: thread-switch generation at the entry of the innermost import call
+// still running. The post-import hook compares it with the current one to tell
+// the calling thread (still inside its call) from a thread loaded during the
+// call, which resumes at its own saved pc (e.g. a retry wait at the stub).
+[[nodiscard]] std::uint64_t runtime_import_entry_generation() noexcept;
 // P3P3DS: optional wall-time accounting of HLE calls (runner --profile).
 struct RuntimeProfile {
     bool enabled{};

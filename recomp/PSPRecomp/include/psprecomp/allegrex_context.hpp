@@ -28,7 +28,11 @@ struct alignas(16) AllegrexContext {
     // VFPU is represented as 128 scalar lanes for now. The physical PSP
     // register views overlap; the final lowering layer will provide S/V/M views.
     std::array<float, 128> vfpu{};
-    std::array<std::uint32_t, 16> vfpu_ctrl{};
+    // P3P3DS: a new PSP thread starts with identity source/target prefixes
+    // (0xE4) and no destination prefix; all-zero prefixes make every lane read
+    // X. [VERIFIED] pspautotests cpu/vfpu callout, convert_scaled and minmax
+    // now match hardware exactly (tests/autotest_baseline.txt).
+    std::array<std::uint32_t, 16> vfpu_ctrl{0xE4u, 0xE4u};
 
 
     [[nodiscard]] PSPRECOMP_CONTEXT_FORCEINLINE std::uint32_t fpr_bits(std::uint32_t index) const noexcept {

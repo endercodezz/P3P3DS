@@ -72,7 +72,7 @@ void randomize(AllegrexContext &ctx, std::mt19937 &rng, std::uint32_t gp) {
     ctx.hi = rng(); ctx.lo = rng();
     for (auto &f : ctx.fpr) f = static_cast<float>(static_cast<std::int32_t>(rng() % 2001u) - 1000) / 7.0f;
     for (auto &v : ctx.vfpu) v = static_cast<float>(static_cast<std::int32_t>(rng() % 2001u) - 1000) / 13.0f;
-    ctx.vfpu_ctrl[0] = ctx.vfpu_ctrl[1] = 0x000000E4u; // identity source prefixes
+    // Source prefixes come from the context default (identity 0xE4, as a new PSP thread).
 }
 
 bool same_cpu(const AllegrexContext &a, const AllegrexContext &b, std::string &why) {
