@@ -4,7 +4,9 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 
 ## Runs of contiguous model draws (2026-10-10)
 
-For the per-draw cost of the battle (about 2,000 model draws per frame, median 4 vertices). Not yet measured in Azahar or on hardware.
+For the per-draw cost of the battle (about 2,000 model draws per frame, median 4 vertices).
+
+- [VERIFIED] (Azahar, maintainer, build 988c0af): the protagonist's Evoker scene 15.8-16 fps / 52-53 % speed (was 14-15 fps / 45-48 %), Yukari's Evoker 38 % speed (was 31 %); `sceGeListEnQueue` 25.7 ms per frame in the battle (was 32.4 ms), `vtx` 9.6 % (was 30.1 %); `runs : 2117k draws in 62k runs` (34 draws per run), vertex cache 202 sources, 100 % hits. Screenshots show the models intact. `hle` rose from 11 to 20 % because filling a run now happens in `sync()` at the end of the list, outside the renderer's sampled scope. [UNVERIFIED] on hardware. Released as 0.2.9.
 
 - Azahar run of the cheaper-profiling build (maintainer, 2026-10-10): Yukari's Evoker 11.3 fps / 31 % speed (10.9 / 29 % before), hle 21 -> 11 %; the protagonist's Evoker 14-15 fps / 45-48 %, ge 40, aot 40, idle 7; `draw: prep 6.6 vtx 30.1`, `fill 15.6`. Per second (`profile_seconds.csv`): one `sceGeListEnQueue` costs a median 6.1 ms where ge < 15 % and 33.1 ms where ge >= 35 % (correlation with ge 0.75): list execution is synchronous, so the renderer's per-draw work is inside it, and on the PSP it would overlap the CPU. [INFERRED] the fine `draw:` shares are inflated in Azahar (every timing read is an SVC, which the emulator may use for its own events); fps and speed are the reliable figures.
 - [VERIFIED] PC draw log: consecutive non-indexed model draws read consecutive guest memory (vertex address +72 bytes = 4 vertices x 18 per draw).

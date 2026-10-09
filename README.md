@@ -6,13 +6,13 @@
 
 ## Status: NOT PLAYABLE YET (New 3DS: first days at 21-30 fps, saves work, no sound; battles slow)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle renders correctly since 0.2.7 (faces, roof, sky, the Shadow; before, a back-face culling rule inverted for 3D draws turned the models inside out and the surroundings black), but runs slowly: 5-7.5 fps on hardware in 0.2.7, about 10 fps in Azahar since 0.2.8 (see Known issues below). The opening movie is skipped automatically (no video decoder yet).
+> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle renders correctly since 0.2.7 (faces, roof, sky, the Shadow; before, a back-face culling rule inverted for 3D draws turned the models inside out and the surroundings black), but runs slowly: 5-7.5 fps on hardware in 0.2.7, about 16 fps in Azahar in 0.2.9 (see Known issues below). The opening movie is skipped automatically (no video decoder yet).
 
 ### Known issues (New 3DS, maintainer's tests on a New 2DS XL)
 
 | Issue | Where | State |
 |---|---|---|
-| Battle: slow. 0.2.7 on hardware: 5-7.5 fps, 18-25 % of real time. 0.2.8 in Azahar: about 10 fps, 33 % (per-draw GPU work cut; not yet measured on hardware) | first Shadow battle | next optimisation target (goal: 20 fps first, then the game's full 30 fps) |
+| Battle: slow. 0.2.7 on hardware: 5-7.5 fps, 18-25 % of real time. 0.2.9 in Azahar: about 16 fps, 52 % in the Evoker scene (was 10 fps, 33 % in 0.2.8: vertex cache, merged model draws, cheaper profiling; not yet measured on hardware) | first Shadow battle | next optimisation target (goal: 20 fps first, then the game's full 30 fps) |
 | Dorm: 21-26 fps on the floors (30 in the own room), 89-91 % speed | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
 | Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
@@ -37,7 +37,7 @@ On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8
 |---|---|
 | `.3dsx` build | devkitARM, 44 MB of recompiled ARM code (cut from 77 MB), clean build in about 9 minutes |
 | Boot | logos, title screen and main menu, drawn by the PICA200; logo positions pixel-identical to the PC renderer; the opening movie is skipped (no video decoder yet) |
-| Speed | about 30 game frames/s in the own room and at school, 21-26 on the dorm floors; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps); first battle 5-7.5 fps (0.2.7, hardware), about 10 fps (0.2.8, Azahar) |
+| Speed | about 30 game frames/s in the own room and at school, 21-26 on the dorm floors; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps); first battle 5-7.5 fps (0.2.7, hardware), about 16 fps (0.2.9, Azahar) |
 | Saves | save and load at the dorm desk and from LOAD GAME, menu on the bottom screen |
 | First battle | starts since 0.2.5; transform, skinning and lighting on the GPU since 0.2.6; renders correctly since 0.2.7 (culling fix); slow (see Known issues) |
 | Memory | heap 71,220 KiB with 60,284 KiB in use (hardware, 2026-10-02; 12 MiB linear heap); about 10.7 MiB free |
