@@ -901,11 +901,11 @@ std::string direct_unit_chain_expression(
         if (found != direct_entry_ids->end() && found->second != 0u) {
             return "rt.invoke_chained_direct<&" + generated_unit_cpp_entry_name(unit) + ", " +
                 std::to_string(unit) + "u, " + std::to_string(found->second) + "u, " +
-                psprecomp::hex32(target) + "u>(ctx, &aot_mem)";
+                psprecomp::hex32(target) + "u>(ctx, &aot_mem_ref)";
         }
     }
     return "rt.invoke_chained_direct<&" + generated_unit_cpp_name(unit) + ", " +
-        std::to_string(unit) + "u>(ctx, &aot_mem)";
+        std::to_string(unit) + "u>(ctx, &aot_mem_ref)";
 }
 
 void emit_target(std::ostringstream &body, std::uint32_t target,
@@ -947,7 +947,7 @@ void emit_target(std::ostringstream &body, std::uint32_t target,
              << "; return;\n";
     } else {
         body << indent << "ctx.pc = " << psprecomp::hex32(target)
-             << "u; (void)rt.invoke_chained_call(ctx, &aot_mem); return;\n";
+             << "u; (void)rt.invoke_chained_call(ctx, &aot_mem_ref); return;\n";
     }
 }
 
@@ -998,7 +998,11 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
         }
         body << "\n};\n";
 
-        body << "void " << cpp_name << "_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {\n"
+        body << "void " << cpp_name << "_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem_ref) {\n"
+             // P3P3DS: a local copy of the view (address never taken): guest stores through
+             // uint8_t* cannot alias it, so its base and limits can stay in registers instead
+             // of being reloaded after every store. Chained calls still get the shared view.
+             << "    const GuestMemory::AotFastView aot_mem = aot_mem_ref;\n"
              << "    std::uint32_t jump_target = 0u;\n"
              << "    std::uint32_t local_transfers = 0u;\n"
              << "    std::uint32_t local_pc = ctx.pc;\n"
@@ -1029,7 +1033,11 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
              << "    }\n"
              << "    }\n";
     } else {
-        body << "void " << cpp_name << "_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem) {\n"
+        body << "void " << cpp_name << "_entry(Runtime &rt, AllegrexContext &ctx, std::uint16_t direct_entry_id, GuestMemory::AotFastView &aot_mem_ref) {\n"
+             // P3P3DS: a local copy of the view (address never taken): guest stores through
+             // uint8_t* cannot alias it, so its base and limits can stay in registers instead
+             // of being reloaded after every store. Chained calls still get the shared view.
+             << "    const GuestMemory::AotFastView aot_mem = aot_mem_ref;\n"
              << "    (void)direct_entry_id;\n"
              << "    std::uint32_t jump_target = 0u;\n"
              << "    std::uint32_t local_pc = ctx.pc;\n"
@@ -1152,14 +1160,14 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                             if (direct_unit)
                                 body << direct_unit_chain_expression(target_unit, target, function.direct_entry_ids);
                             else
-                                body << "rt.invoke_chained_call(ctx, &aot_mem)";
+                                body << "rt.invoke_chained_call(ctx, &aot_mem_ref)";
                             body << " && ctx.pc == " << psprecomp::hex32(return_pc)
                                  << "u) goto L_" << psprecomp::hex32(return_pc).substr(2) << ";\n";
                         } else {
                             if (direct_unit)
                                 body << "    (void)" << direct_unit_chain_expression(target_unit, target, function.direct_entry_ids) << ";\n";
                             else
-                                body << "    (void)rt.invoke_chained_call(ctx, &aot_mem);\n";
+                                body << "    (void)rt.invoke_chained_call(ctx, &aot_mem_ref);\n";
                         }
                         body << "    return;\n";
                     }
@@ -1179,11 +1187,11 @@ std::string emit_function_source(const GeneratedFunctionInput &function,
                         const std::uint32_t return_pc = pc + 8u;
                         body << "    ctx.pc = jump_target;\n";
                         if (function.entry_labels.contains(return_pc)) {
-                            body << "    if (rt.invoke_chained_call(ctx, &aot_mem) && ctx.pc == "
+                            body << "    if (rt.invoke_chained_call(ctx, &aot_mem_ref) && ctx.pc == "
                                  << psprecomp::hex32(return_pc) << "u) goto L_"
                                  << psprecomp::hex32(return_pc).substr(2) << ";\n";
                         } else {
-                            body << "    (void)rt.invoke_chained_call(ctx, &aot_mem);\n";
+                            body << "    (void)rt.invoke_chained_call(ctx, &aot_mem_ref);\n";
                         }
                         body << "    return;\n";
                     } else {

@@ -306,6 +306,7 @@ void GeManager::pump(psprecomp::Runtime &rt) {
             if((l.pc&3) || !mem.contains(l.pc,4)) {rt.stop("GE invalid command fetch at "+psprecomp::hex32(l.pc));return;}
             const auto word=mem.aot_load32(l.pc), op=word>>24;
             ++l.commands;
+            ++host_profile().ge_commands;
             if(op==0x0C) { // END (after FINISH: completion; after SIGNAL: continue)
                 l.pc+=4;
                 if(l.previous==0x0E) { l.previous=op; continue; }

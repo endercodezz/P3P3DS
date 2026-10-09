@@ -251,7 +251,7 @@ int main(int argc,char **argv) {
                     sampler.active=true; window_start=std::chrono::steady_clock::now(); window_vblank=vblank;
                     if(profile) { // --profile then covers the sampled window only
                         auto &h=psprecomp::runtime_profile(); h.hle_ns=h.hle_calls=0; h.imports.clear();
-                        auto &p=p3p3ds::host_profile(); p.render_ns=p.render_calls=p.interpreter_ns=p.interpreter_entries=p.io_ns=p.io_calls=0;
+                        auto &p=p3p3ds::host_profile(); p.render_ns=p.render_calls=p.interpreter_ns=p.interpreter_entries=p.io_ns=p.io_calls=p.ge_commands=0;
                         run_start=window_start;
                     }
                 }
@@ -283,6 +283,7 @@ int main(int argc,char **argv) {
             std::printf("[PROFILE] wall=%.2fs hle=%.2fs (%.1f%%, %llu calls) render=%.2fs (%.1f%%, %llu draws/transfers) interpreter=%.3fs (%.2f%%, %llu entries)\n",
                 wall/1e9,h.hle_ns/1e9,pct(h.hle_ns),static_cast<unsigned long long>(h.hle_calls),p.render_ns/1e9,pct(p.render_ns),
                 static_cast<unsigned long long>(p.render_calls),p.interpreter_ns/1e9,pct(p.interpreter_ns),static_cast<unsigned long long>(p.interpreter_entries));
+            std::printf("[PROFILE] ge commands=%llu\n",static_cast<unsigned long long>(p.ge_commands));
             // The HLE imports with the most time (inclusive: GE rendering, waits and file reads they start).
             std::vector<const psprecomp::RuntimeProfile::Import*> top;
             for(const auto &[key,import]:h.imports) top.push_back(&import);

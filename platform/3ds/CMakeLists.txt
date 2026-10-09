@@ -44,7 +44,10 @@ include("${P3P_ROOT}/cmake/p3p3ds_sources.cmake")
 # out chain counters and frontier diagnostics, keep cross-unit chains out of
 # line. These change Runtime's layout, so they apply to every target.
 add_compile_definitions(PSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 PSPRECOMP_NO_FRONTIER_DIAGNOSTICS=1
-                        PSPRECOMP_CHAIN_NOINLINE=1)
+                        PSPRECOMP_CHAIN_NOINLINE=1
+                        # No PSPRECOMP_WATCH_WRITE debugging (getenv is always empty on 3DS):
+                        # guest RAM stores skip the watch flag test.
+                        PSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH=1)
 
 # ---- AOT generation (host tool), without per-transfer diagnostics ----------
 set(GEN_DIR "${CMAKE_BINARY_DIR}/generated/auto")

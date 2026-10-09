@@ -722,11 +722,13 @@ static void test_automatic_cross_unit_tail_chaining() {
         std::ifstream generated(generated_dir / "generated_unit_0000.cpp");
         text.assign((std::istreambuf_iterator<char>(generated)), std::istreambuf_iterator<char>());
     }
-    require(text.find("(void)rt.invoke_chained_direct<&recomp_unit_0001_entry, 1u, 1u, 0x08804040u>(ctx, &aot_mem); return;") != std::string::npos,
+    // P3P3DS: units take the shared view as aot_mem_ref and work on a local copy (aot_mem).
+    require(text.find("(void)rt.invoke_chained_direct<&recomp_unit_0001_entry, 1u, 1u, 0x08804040u>(ctx, &aot_mem_ref); return;") != std::string::npos,
             "Automatic codegen did not emit a direct-entry native chain across AOT units");
     require(text.find("ctx.pc = 0x08804040u; (void)rt.invoke_chained_direct") == std::string::npos,
             "Direct-entry chain still dirties ctx.pc on its successful hot path");
-    require(text.find("GuestMemory::AotFastView &aot_mem)") != std::string::npos &&
+    require(text.find("GuestMemory::AotFastView &aot_mem_ref)") != std::string::npos &&
+            text.find("const GuestMemory::AotFastView aot_mem = aot_mem_ref;") != std::string::npos &&
             text.find("_entry(rt, ctx, 0u, aot_mem)") != std::string::npos,
             "Shared AOT memory was not threaded across generated-unit direct chains");
     // The register-cache lowering passes were removed: generated units must

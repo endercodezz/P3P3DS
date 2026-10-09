@@ -43,7 +43,8 @@ constexpr const char *kUnitSpan = "16384";
 constexpr const char *kCompileFlags =
     "-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -mword-relocations -ffunction-sections "
     "-D__3DS__ -DNDEBUG -std=gnu++20 -Os -fno-gcse -fno-schedule-insns -fno-schedule-insns2 "
-    "-DPSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 -DPSPRECOMP_NO_FRONTIER_DIAGNOSTICS=1 -DPSPRECOMP_CHAIN_NOINLINE=1";
+    "-DPSPRECOMP_AOT_PRODUCTION_FASTPATHS=1 -DPSPRECOMP_NO_FRONTIER_DIAGNOSTICS=1 -DPSPRECOMP_CHAIN_NOINLINE=1 "
+    "-DPSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH=1";
 constexpr const char *kArchFlags = "-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -mword-relocations";
 #ifdef _WIN32
 constexpr const char *kExe = ".exe";

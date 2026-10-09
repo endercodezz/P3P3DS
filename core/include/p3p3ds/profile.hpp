@@ -18,6 +18,7 @@ struct HostProfile {
     std::uint64_t interpreter_ns{}, interpreter_entries{};
     std::uint64_t render_ns{}, render_calls{};
     std::uint64_t io_ns{}, io_calls{}, io_bytes{};
+    std::uint64_t ge_commands{}; // GE display-list commands executed (counted always, one add per command)
     std::uint32_t render_sample{}; // sampled render scopes (SampledProfileScope)
 };
 

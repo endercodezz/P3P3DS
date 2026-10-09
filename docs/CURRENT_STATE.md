@@ -2,6 +2,14 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Game code: local AOT memory view (2026-10-10)
+
+The game's own code (`aot`) is the largest share of the battle (45 % in Azahar, 0.2.9) and stays on the main thread whatever happens to the GE.
+
+- [VERIFIED] GE list parsing is not worth optimising: the battle window (vblank 22165-32165, PC production build) executes 26.4 M GE commands = about 5,300 per frame, about 49 us per frame on the PC (9 ns per command); [INFERRED] about 1-2 % of the time on the 3DS, not 8 % as estimated from `sceGeListEnQueue` minus `ge` (that difference is mostly run filling in `sync()` and the finish callback's guest code). New: `[PROFILE] ge commands=` on the PC runner (`HostProfile::ge_commands`).
+- Generated units took the AOT memory view by reference and the compiler reloaded its base and limits after every guest store (a store through `uint8_t*` may alias it). Now each unit entry copies it into a local (`const GuestMemory::AotFastView aot_mem = aot_mem_ref;`, minimal patch in `recomp/PSPRecomp/tools/codegen_main.cpp`; chained calls still pass the shared view). 3DS, the Builder's compile flags and the PC production build also define `PSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH` (the `PSPRECOMP_WATCH_WRITE` debug watch reads an environment variable, always empty on the 3DS; VRAM stores keep their observer on the slow path).
+- [VERIFIED] 3DS ELF `.text` 44,567,648 -> 40,914,544 bytes (-8.2 %, about 3.5 MiB more free memory). PC production battle window 4.31 / 3.94 s -> 3.83 / 3.67 s (two runs each, noisy). `new_game.txt` 60M replay unchanged (events `055626D9...`, WAV `22532254...`), `--verify-bootstrap` PASS, CTest 27/27 (`psprecomp_tests` expects the new parameter name). [UNVERIFIED] speed on the 3DS.
+
 ## Second CPU core: availability probe (2026-10-10)
 
 Before moving the GE back end to another core (estimate: at most about 1.6x in battle, since the game code and GE list parsing stay on the main thread [INFERRED]), the runner checks at start whether the `.3dsx` can create a thread on core 2 (else core 1 with `APT_SetAppCpuTimeLimit(30)`) and whether it really runs in parallel: the same busy loop alone, then on both threads at once; `parallel = 2 x alone / together` (2.0: a real second core, 1.0: time-shared, as an emulator may do). Shown as `cores :` in the report and on the loading screen. [UNVERIFIED] the result on hardware and in Azahar.
