@@ -14,6 +14,7 @@
 // render-to-texture only for a texture that starts exactly at a render
 // target, colour masks are per channel.
 #include "p3p3ds/ge/geometry.hpp"
+#include "p3p3ds/ge/model_batch.hpp"
 #include "p3p3ds/ge/renderer.hpp"
 #include "p3p3ds/ge/vertex_cache.hpp"
 #include "p3p3ds/hle/display.hpp"
@@ -47,6 +48,8 @@ struct GpuStats {
     std::uint64_t command_words{}, counted_draws{}, command_flushes{}, arena_flushes{};
     std::uint64_t model_batches{}; // GPU draws that model draws were merged into
     std::uint64_t fast_draws{};    // model draws that joined a batch on the fast path
+    std::uint64_t model_runs{};    // vertex blocks filled for runs of contiguous model draws
+    std::uint64_t run_draws{};     // model draws that went into such a run
     std::uint32_t textures{}, targets{};
 };
 
@@ -60,6 +63,7 @@ public:
     void draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, ge::Prim prim, std::uint32_t count,
               std::uint32_t vertex_address, std::uint32_t index_address) override;
     void transfer(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs) override;
+    void sync() override { close_run(); } // read the open run's vertices before the CPU runs
     [[nodiscard]] const ge::DrawStats &stats() const override { return draw_stats_; }
 
     // CPU store into guest EDRAM (GuestMemory::vram_write_observer).
@@ -128,6 +132,12 @@ private:
                     std::uint32_t count, std::uint32_t vertex_address, std::uint32_t index_address, bool start, bool textured,
                     float scale_u, float scale_v);
     void set_model_uniforms(const ge::GeRegisters &regs, const ge::VertexLayout &layout, bool textured, float scale_u, float scale_v);
+    // Shader vertices lo .. lo + n - 1 of the guest buffer into `out` (vertex
+    // cache copy or unpack).
+    void fill_model_vertices(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
+                             std::uint32_t vertex_address, std::uint32_t lo, std::uint32_t n, std::uint8_t *out);
+    // Fills the open run's block and returns its unused tail to the arena.
+    void close_run();
     void flush_batch();
     void evict_textures(std::uint32_t needed);
 
@@ -192,6 +202,15 @@ private:
     // Shader vertices of model draws kept across frames while their guest
     // bytes stay the same (main heap; sdmc:/p3p3ds/no_vertex_cache.txt turns it off).
     ge::VertexCache vertex_cache_{2u << 20};
+    // Non-indexed model draws whose vertices follow each other in guest
+    // memory share one arena block, filled once when the run ends (the first
+    // battle: about 2,000 draws per frame of 4 vertices). While a run is open
+    // nothing else is allocated from the arena (alloc_linear closes it).
+    ge::ModelRun run_;
+    ge::VertexLayout run_layout_{};
+    ge::GeRegisters run_regs_{};                 // material colour registers of the run (0x55, 0x58)
+    psprecomp::GuestMemory *run_memory_{};
+    std::uint32_t run_offset_{};                 // arena offset of the run's block
     bool vertex_cache_enabled_{true};
     C3D_RenderTarget *top_{};
     void *shared_depth_{};

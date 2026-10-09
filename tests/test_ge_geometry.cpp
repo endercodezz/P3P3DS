@@ -3,9 +3,11 @@
 // shift/mask/start; texture_hash must change with texture bytes and palette; decode_model_vertices
 // must equal decode_model_vertex for every vertex type.
 #include "p3p3ds/ge/geometry.hpp"
+#include "p3p3ds/ge/model_batch.hpp"
 #include "p3p3ds/ge/vertex_cache.hpp"
 #include "psprecomp/guest_memory.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -149,6 +151,60 @@ void vertex_cache_checks(psprecomp::GuestMemory &m) {
     check(equal && models.stats().hits == 1u && models.stats().misses == 2u, "vertex cache: cached decode equals fresh decode");
 }
 
+// ModelRun + append_triangles: draws merged into runs (one reserved block per
+// run, filled when the run ends) give the same triangles, corner by corner in
+// guest memory, as converting every draw on its own.
+void model_run_checks() {
+    constexpr std::uint32_t kSize = 18u, kBase = 0x08940000u, kCapacity = 64u;
+    struct Draw { Prim prim; std::uint32_t count, address; };
+    std::vector<Draw> draws;
+    std::uint32_t address = kBase;
+    for (int i = 0; i < 400; ++i) {
+        if (rng() % 7u == 0u) address = kBase + (rng() % 2000u) * kSize; // a VADDR command: the run breaks
+        const Prim prims[3] = {Prim::Triangles, Prim::TriangleStrip, Prim::TriangleFan};
+        const Draw d{prims[rng() % 3u], 3u + rng() % 9u, address};
+        draws.push_back(d);
+        address += d.count * kSize; // non-indexed draws advance the vertex address
+    }
+    std::vector<std::uint32_t> reference;
+    for (const auto &d : draws)
+        append_triangles(d.prim, d.count, [&](std::uint32_t i) { return d.address + i * kSize; },
+                         [&](std::uint32_t a, std::uint32_t b, std::uint32_t c) { reference.insert(reference.end(), {a, b, c}); });
+
+    std::vector<std::uint32_t> list; // list slot -> guest address of the vertex converted there
+    std::vector<std::uint32_t> indices;
+    ModelRun run;
+    int runs = 0;
+    auto close = [&] {
+        if (!run.active) return;
+        for (std::uint32_t k = 0; k < run.count; ++k) list[run.first + k] = run.address + k * kSize;
+        list.resize(run.first + run.count); // unused reserved tail returned
+        run.active = false;
+    };
+    for (const auto &d : draws) {
+        if (!run.continues(d.address, 0x15Au, 0u, d.count)) {
+            close();
+            run = ModelRun{true, d.address, kSize, 0x15Au, 0u, 0u, std::max(kCapacity, d.count), static_cast<std::uint32_t>(list.size())};
+            list.resize(list.size() + run.capacity, 0u);
+            ++runs;
+        }
+        const std::uint32_t base = run.append(d.count);
+        append_triangles(d.prim, d.count, [&](std::uint32_t i) { return base + i; },
+                         [&](std::uint32_t a, std::uint32_t b, std::uint32_t c) { indices.insert(indices.end(), {a, b, c}); });
+    }
+    close();
+    std::vector<std::uint32_t> resolved;
+    for (const auto i : indices) resolved.push_back(i < list.size() ? list[i] : 0u);
+    check(!reference.empty() && resolved == reference, "model runs: same triangles as per-draw conversion");
+    check(runs > 0 && runs < static_cast<int>(draws.size()) / 2, "model runs: contiguous draws are merged");
+    ModelRun other{true, kBase, kSize, 0x15Au, 0u, 4u, 8u, 0u};
+    check(other.continues(kBase + 4u * kSize, 0x15Au, 0u, 4u), "model run continues at its end address");
+    check(!other.continues(kBase + 4u * kSize, 0x15Au, 0u, 5u), "model run: no room beyond its capacity");
+    check(!other.continues(kBase + 4u * kSize, 0x14342u, 0u, 4u), "model run: another vertex type breaks it");
+    check(!other.continues(kBase + 4u * kSize, 0x15Au, 0x336699u, 4u), "model run: another material breaks it");
+    check(!other.continues(kBase + 5u * kSize, 0x15Au, 0u, 2u), "model run: a gap breaks it");
+}
+
 int main() {
     psprecomp::GuestMemory m;
     for (std::uint32_t format = 0; format < 8; ++format)
@@ -209,6 +265,7 @@ int main() {
     }
 
     vertex_cache_checks(m);
+    model_run_checks();
 
     if (failures == 0) std::printf("test_ge_geometry: all checks passed\n");
     return failures == 0 ? 0 : 1;

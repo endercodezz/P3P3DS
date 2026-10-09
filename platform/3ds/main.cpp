@@ -337,11 +337,12 @@ std::string gpu_text() {
         static_cast<unsigned long long>(g.model_draws / 1000u), static_cast<unsigned long long>(g.model_batches / 1000u),
         static_cast<unsigned long long>(g.fast_draws / 1000u));
     const auto &c = g_gpu->vertex_cache_stats();
-    char vc[128];
-    std::snprintf(vc, sizeof vc, "vcache : %lu KiB %lu src hit %lluk\n         miss %lluk vol %lluk full %lluk\n",
+    char vc[192];
+    std::snprintf(vc, sizeof vc, "vcache : %lu KiB %lu src hit %lluk\n         miss %lluk vol %lluk full %lluk\nruns   : %lluk draws in %lluk runs\n",
                   static_cast<unsigned long>(c.bytes / 1024u), static_cast<unsigned long>(c.entries),
                   static_cast<unsigned long long>(c.hits / 1000u), static_cast<unsigned long long>(c.misses / 1000u),
-                  static_cast<unsigned long long>(c.volatile_skips / 1000u), static_cast<unsigned long long>(c.full / 1000u));
+                  static_cast<unsigned long long>(c.volatile_skips / 1000u), static_cast<unsigned long long>(c.full / 1000u),
+                  static_cast<unsigned long long>(g.run_draws / 1000u), static_cast<unsigned long long>(g.model_runs / 1000u));
     return std::string(buf) + vc;
 }
 

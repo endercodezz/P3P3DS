@@ -2,6 +2,15 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Runs of contiguous model draws (2026-10-10)
+
+For the per-draw cost of the battle (about 2,000 model draws per frame, median 4 vertices). Not yet measured in Azahar or on hardware.
+
+- Azahar run of the cheaper-profiling build (maintainer, 2026-10-10): Yukari's Evoker 11.3 fps / 31 % speed (10.9 / 29 % before), hle 21 -> 11 %; the protagonist's Evoker 14-15 fps / 45-48 %, ge 40, aot 40, idle 7; `draw: prep 6.6 vtx 30.1`, `fill 15.6`. Per second (`profile_seconds.csv`): one `sceGeListEnQueue` costs a median 6.1 ms where ge < 15 % and 33.1 ms where ge >= 35 % (correlation with ge 0.75): list execution is synchronous, so the renderer's per-draw work is inside it, and on the PSP it would overlap the CPU. [INFERRED] the fine `draw:` shares are inflated in Azahar (every timing read is an SVC, which the emulator may use for its own events); fps and speed are the reliable figures.
+- [VERIFIED] PC draw log: consecutive non-indexed model draws read consecutive guest memory (vertex address +72 bytes = 4 vertices x 18 per draw).
+- `core/include/p3p3ds/ge/model_batch.hpp`: `append_triangles` (strip/fan unrolling shared by both paths) and `ModelRun`. `gpu_renderer.cpp`: a non-indexed, non-morph model draw whose vertices start where the open run ends (same vertex type and material) only appends its indices; the run's block (up to 1,024 vertices reserved) is filled once when the run ends, through the vertex cache (one lookup and one copy per run). A run ends at the next draw that does not continue it, before any other arena allocation, when the batch is submitted, before a block transfer, and when GE execution returns to the guest (new `GeRenderer::sync()`, called at the end of `GeManager::pump` and before a finish callback), so vertices are read before the CPU can change them. Indexed and morphing draws keep the per-draw path. Report: `runs : N draws in M runs`.
+- [VERIFIED] `test_ge_geometry`: 400 random draws (lists, strips, fans; random breaks of the vertex address) give, corner by corner in guest memory, the same triangles through runs as converted one by one, with fewer than half as many runs as draws; `ModelRun::continues` checks end address, room, vertex type and material.
+
 ## Battle: what the vertex cache did, cheaper profiling, where HLE time goes (2026-10-09)
 
 Maintainer's Azahar run of the vertex-cache build (first Shadow battle, report "last 10 s"): 7-10 fps, speed 29-31 %, aot 33 hle 21 ge 36 idle 8; draw: prep 6.6 vtx 23.7 unif 1.3 sub 0.5; `vtx: fill 12.6 cache hit 100%`; vcache 1,727 KiB, 3,442 sources, 941k hits, 4k misses, 0 volatile. Dorm 18-21 fps (cache not involved: through mode, hit 0 %; no Azahar dorm figure of 0.2.8 to compare with).

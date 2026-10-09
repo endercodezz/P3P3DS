@@ -23,6 +23,7 @@ constexpr std::uint32_t kMaxTargets = 4;            // 1 MiB of VRAM each
 constexpr std::uint32_t kVertexBytes = 1u << 20;    // vertices and indices per GPU frame
 static_assert(kVertexBytes / 28u < 0x10000u, "u16 indices count vertices from the arena start");
 constexpr std::uint32_t kIndexBytes = 256u << 10; // batched model indices per GPU frame, after the vertices
+constexpr std::uint32_t kRunVertices = 1024;      // vertices reserved for a run of contiguous model draws
 constexpr std::uint32_t kTextureBudget = 6u << 20;  // linear memory for decoded textures
 constexpr std::uint32_t kCommandBufferBytes = 0xC0000; // C3D_Init
 // Submit the queued frame when the citro3d command buffer (kCommandBufferBytes)
@@ -271,6 +272,7 @@ void GpuRenderer::flush_frame() {
 // from arena_); a full arena submits the frame first (the GPU must finish
 // reading it before reuse).
 void *GpuRenderer::alloc_linear(std::uint32_t bytes, std::uint32_t align) {
+    close_run(); // an open run owns the end of the arena
     bytes = (bytes + 3u) & ~3u;
     if (bytes > kVertexBytes) return nullptr;
     std::uint32_t at = (arena_used_ + align - 1u) / align * align;
@@ -646,6 +648,7 @@ void GpuRenderer::set_scissor(const ge::GeRegisters &regs) {
 
 // Submit the pending batch of model draws (one triangle list).
 void GpuRenderer::flush_batch() {
+    close_run(); // the batch's indices may point into the open run's block
     if (!batch_active_) return;
     batch_active_ = false;
     if (batch_indices_.empty()) return;
@@ -1005,66 +1008,50 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     const bool skinned = layout.weights != 0u;
     const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
     if (n * stride > kVertexBytes) { ++gpu_stats_.skipped_prims; return; }
-    // A full vertex arena submits the GPU frame (and with it the pending
-    // batch); the GPU state stays, so the batch simply continues.
-    auto *block = static_cast<std::uint8_t *>(alloc_linear(n * stride, stride));
-    if (block == nullptr) { ++gpu_stats_.skipped_prims; return; }
-    // Index of the first vertex from arena_ (the attribute buffer base); the
-    // arena holds fewer than 0x10000 vertices of any layout.
-    const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
-
-    const u64 fill_start = tick();
-    auto unpack = [&](std::uint8_t *out) {
-        if (model_.size() < n) model_.resize(n);
-        if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
-            for (std::uint32_t k = 0; k < n; ++k)
-                if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
-        ShaderVertex s;
-        for (std::uint32_t k = 0; k < n; ++k) {
-            const ge::ModelVertex &m = model_[k];
-            s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
-            s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
-            s.u = m.uv[0]; s.v = m.uv[1];
-            s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
-            std::memcpy(s.w, m.weights, sizeof s.w);
-            std::memcpy(out + k * stride, &s, stride);
-        }
-    };
-    // Unchanged guest vertices drawn again (most models, every frame) are
-    // copied from the vertex cache instead of being unpacked. Morphing blends
-    // with GE weight registers, so it is always unpacked.
-    const std::uint32_t raw_size = n * layout.size;
-    const std::uint8_t *raw = vertex_cache_enabled_ && layout.morphs <= 1u ? memory.raw_pointer(vertex_address + lo * layout.size, raw_size)
-                                                                            : nullptr;
-    const std::uint8_t *cached = nullptr;
-    if (raw != nullptr) {
-        const std::uint32_t material = layout.color_format >= 4u ? 0u : (r24(regs, 0x55) | ((r24(regs, 0x58) & 0xFFu) << 24));
-        cached = vertex_cache_.get(ge::VertexCacheKey{vertex_address, r24(regs, 0x12), lo, n, material}, raw, raw_size, n * stride, frame_,
-                                   unpack);
-    }
-    if (cached != nullptr) std::memcpy(block, cached, n * stride);
-    else unpack(block);
-    add(gpu_stats_.fill_ticks, fill_start, tick());
-    // Triangle list (strips and fans unrolled with the software renderer's
-    // winding: odd strip triangles swap their first two vertices).
-    auto vtx = [&](std::uint32_t i) { return static_cast<std::uint16_t>(first + index_at(i) - lo); };
+    const std::uint32_t material = layout.color_format >= 4u ? 0u : (r24(regs, 0x55) | ((r24(regs, 0x58) & 0xFFu) << 24));
     auto tri = [this](std::uint16_t a, std::uint16_t b, std::uint16_t c) {
         batch_indices_.push_back(a);
         batch_indices_.push_back(b);
         batch_indices_.push_back(c);
     };
     const std::size_t before = batch_indices_.size();
-    switch (prim) {
-    case ge::Prim::Triangles:
-        for (std::uint32_t i = 0; i + 2 < count; i += 3) tri(vtx(i), vtx(i + 1), vtx(i + 2));
-        break;
-    case ge::Prim::TriangleStrip:
-        for (std::uint32_t i = 0; i + 2 < count; ++i)
-            (i & 1u) ? tri(vtx(i + 1), vtx(i), vtx(i + 2)) : tri(vtx(i), vtx(i + 1), vtx(i + 2));
-        break;
-    default: // TriangleFan
-        for (std::uint32_t i = 1; i + 1 < count; ++i) tri(vtx(0), vtx(i), vtx(i + 1));
-        break;
+
+    if (isize == 0u && layout.morphs <= 1u) {
+        // Non-indexed: the draw joins (or opens) a run of contiguous draws;
+        // its vertices are converted when the run ends (close_run).
+        const std::uint32_t vtype = r24(regs, 0x12);
+        if (!run_.continues(vertex_address, vtype, material, count)) {
+            close_run();
+            // Reserve room for the run in one block; a full arena submits the
+            // GPU frame first (no run is open, the batch continues).
+            const std::uint32_t at = (arena_used_ + stride - 1u) / stride * stride;
+            const std::uint32_t room = at < kVertexBytes ? (kVertexBytes - at) / stride : 0u;
+            const std::uint32_t capacity = std::max(count, std::min<std::uint32_t>(kRunVertices, room >= count ? room : kRunVertices));
+            auto *block = static_cast<std::uint8_t *>(alloc_linear(capacity * stride, stride));
+            if (block == nullptr) { ++gpu_stats_.skipped_prims; return; }
+            run_offset_ = static_cast<std::uint32_t>(block - arena_);
+            run_ = ge::ModelRun{true, vertex_address, layout.size, vtype, material, 0u, capacity, run_offset_ / stride};
+            run_layout_ = layout;
+            run_regs_.reg[0x55] = regs.reg[0x55];
+            run_regs_.reg[0x58] = regs.reg[0x58];
+            run_memory_ = &memory;
+        }
+        const std::uint32_t base = run_.append(count);
+        ++gpu_stats_.run_draws;
+        ge::append_triangles(prim, count, [base](std::uint32_t i) { return static_cast<std::uint16_t>(base + i); }, tri);
+    } else {
+        close_run();
+        // A full vertex arena submits the GPU frame (and with it the pending
+        // batch); the GPU state stays, so the batch simply continues.
+        auto *block = static_cast<std::uint8_t *>(alloc_linear(n * stride, stride));
+        if (block == nullptr) { ++gpu_stats_.skipped_prims; return; }
+        // Index of the first vertex from arena_ (the attribute buffer base); the
+        // arena holds fewer than 0x10000 vertices of any layout.
+        const std::uint32_t first = static_cast<std::uint32_t>(block - arena_) / stride;
+        const u64 fill_start = tick();
+        fill_model_vertices(memory, regs, layout, vertex_address, lo, n, block);
+        add(gpu_stats_.fill_ticks, fill_start, tick());
+        ge::append_triangles(prim, count, [&](std::uint32_t i) { return static_cast<std::uint16_t>(first + index_at(i) - lo); }, tri);
     }
     const u64 uniform_start = tick();
     add(gpu_stats_.vertex_ticks, vertex_start, uniform_start);
@@ -1083,9 +1070,63 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     gpu_stats_.triangles += static_cast<std::uint64_t>(batch_indices_.size() - before) / 3u;
 }
 
+void GpuRenderer::fill_model_vertices(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
+                                      std::uint32_t vertex_address, std::uint32_t lo, std::uint32_t n, std::uint8_t *out) {
+    const std::uint32_t stride = layout.weights != 0u ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
+    auto unpack = [&](std::uint8_t *dst) {
+        if (model_.size() < n) model_.resize(n);
+        if (!ge::decode_model_vertices(memory, regs, layout, vertex_address, lo, n, model_.data()))
+            for (std::uint32_t k = 0; k < n; ++k)
+                if (!ge::decode_model_vertex(memory, regs, layout, vertex_address, lo + k, model_[k])) model_[k] = ge::ModelVertex{};
+        ShaderVertex s;
+        for (std::uint32_t k = 0; k < n; ++k) {
+            const ge::ModelVertex &m = model_[k];
+            s.x = m.pos[0]; s.y = m.pos[1]; s.z = m.pos[2];
+            s.nx = m.normal[0]; s.ny = m.normal[1]; s.nz = m.normal[2];
+            s.u = m.uv[0]; s.v = m.uv[1];
+            s.r = m.color[0]; s.g = m.color[1]; s.b = m.color[2]; s.a = m.color[3];
+            std::memcpy(s.w, m.weights, sizeof s.w);
+            std::memcpy(dst + k * stride, &s, stride);
+        }
+    };
+    // Unchanged guest vertices drawn again (most models, every frame) are
+    // copied from the vertex cache instead of being unpacked. Morphing blends
+    // with GE weight registers, so it is always unpacked.
+    const std::uint32_t raw_size = n * layout.size;
+    const std::uint8_t *raw = vertex_cache_enabled_ && layout.morphs <= 1u ? memory.raw_pointer(vertex_address + lo * layout.size, raw_size)
+                                                                            : nullptr;
+    const std::uint8_t *cached = nullptr;
+    if (raw != nullptr) {
+        const std::uint32_t material = layout.color_format >= 4u ? 0u : (r24(regs, 0x55) | ((r24(regs, 0x58) & 0xFFu) << 24));
+        cached = vertex_cache_.get(ge::VertexCacheKey{vertex_address, r24(regs, 0x12), lo, n, material}, raw, raw_size, n * stride, frame_,
+                                   unpack);
+    }
+    if (cached != nullptr) std::memcpy(out, cached, n * stride);
+    else unpack(out);
+}
+
+void GpuRenderer::close_run() {
+    if (!run_.active) return;
+    run_.active = false;
+    const u64 start = timed_ ? svcGetSystemTick() : 0u;
+    const std::uint32_t stride = run_layout_.weights != 0u ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
+    run_regs_.reg[0x12] = run_.vertex_type;
+    fill_model_vertices(*run_memory_, run_regs_, run_layout_, run_.address, 0u, run_.count, arena_ + run_offset_);
+    // Nothing was allocated after the run's block (alloc_linear closes runs
+    // first): its unused tail goes back to the arena.
+    arena_used_ = run_offset_ + run_.count * stride;
+    last_alloc_ = run_offset_;
+    ++gpu_stats_.model_runs;
+    if (timed_) {
+        const u64 end = svcGetSystemTick();
+        if (end - start > tick_cost_) gpu_stats_.fill_ticks += (end - start - tick_cost_) * 16u;
+    }
+}
+
 void GpuRenderer::transfer(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs) {
     // Block transfers copy guest memory exactly like the reference renderer; a
     // destination inside a GPU framebuffer then holds newer data than the GPU copy.
+    close_run(); // the copy may overwrite vertices of the open run
     ge::SoftwareRenderer copy;
     copy.transfer(memory, regs);
     ++draw_stats_.transfers;

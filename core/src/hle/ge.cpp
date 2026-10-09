@@ -289,6 +289,8 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
 }
 
 void GeManager::pump(psprecomp::Runtime &rt) {
+    // Whenever execution returns to the guest, the renderer must be done with guest memory.
+    struct SyncOnExit { ge::GeRenderer *r; ~SyncOnExit(){ r->sync(); } } sync_on_exit{renderer_.get()};
     std::uint64_t budget=4u<<20;
     auto &mem=rt.memory();
     while(!queue_.empty() && !rt.stopped()) {
@@ -310,7 +312,7 @@ void GeManager::pump(psprecomp::Runtime &rt) {
                 ++l.completions; l.status=GeStatus::Completed;
                 queue_.pop_front();
                 rt.event("ge_finish", {{"list",l.id},{"ge_pc",l.pc},{"commands",l.commands},{"completions",l.completions}});
-                if(l.previous==0x0F) deliver_finish_callback(rt,l,l.pc);
+                if(l.previous==0x0F) { renderer_->sync(); deliver_finish_callback(rt,l,l.pc); }
                 break;
             }
             execute(rt,l,word);

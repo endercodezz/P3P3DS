@@ -47,6 +47,10 @@ public:
                       std::uint32_t vertex_address, std::uint32_t index_address) = 0;
     // Block transfer (TRANSFERSTART) of a rectangle between guest addresses.
     virtual void transfer(psprecomp::GuestMemory &memory, const GeRegisters &regs) = 0;
+    // The GE stops reading guest memory for now (list stalled or done, or a
+    // finish callback runs guest code next): a backend that defers reading
+    // vertices must read them before the CPU can change them.
+    virtual void sync() {}
     [[nodiscard]] virtual const DrawStats &stats() const = 0;
 };
 
