@@ -102,6 +102,7 @@ struct Stats {
     std::uint32_t buttons{};
     std::string status{"booting"};
     std::string iso;
+    std::string cores; // probe_cores() at start
     // Wall-time split (ARM11 system ticks): presentation, pacing sleep (idle)
     // and the bottom-screen/SD report (ui) are timed here, HLE (includes GE
     // rendering and everything of the vblank wait) and rendering by the
@@ -111,6 +112,58 @@ struct Stats {
     bool skip_movies{true};
     std::uint64_t movie_vblanks{}, movie_frames_seen{};
 };
+
+// A second CPU core for the GE back end: can this .3dsx create a thread on
+// another core, and does it really run in parallel (an emulator may run all
+// cores on one host thread)? The same busy loop runs alone on the main thread,
+// then on the main thread and the other core at once:
+// parallel = 2 x alone / together (2.0: a real second core, 1.0: time-shared).
+struct CoreProbe {
+    int core{-1};
+    bool created{};
+    double parallel{};
+};
+volatile std::uint32_t g_probe_sink;
+std::uint32_t busy_work(std::uint32_t n) {
+    std::uint32_t x = 12345u;
+    for (std::uint32_t i = 0; i < n; ++i) x = x * 1664525u + 1013904223u + (x >> 7);
+    return x;
+}
+void probe_worker(void *arg) { g_probe_sink = busy_work(*static_cast<const std::uint32_t *>(arg)); }
+CoreProbe probe_core(int core) {
+    CoreProbe p;
+    p.core = core;
+    std::uint32_t n = 2000000u; // about 10 M cycles
+    u64 t0 = svcGetSystemTick();
+    g_probe_sink = busy_work(n);
+    const u64 alone = svcGetSystemTick() - t0;
+    s32 priority = 0x30;
+    svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+    t0 = svcGetSystemTick();
+    Thread t = threadCreate(probe_worker, &n, 4096, priority, core, false);
+    if (t == nullptr) return p; // core not available to this process
+    p.created = true;
+    g_probe_sink = busy_work(n);
+    threadJoin(t, U64_MAX);
+    const u64 together = svcGetSystemTick() - t0;
+    threadFree(t);
+    p.parallel = together != 0u ? 2.0 * static_cast<double>(alone) / static_cast<double>(together) : 0.0;
+    return p;
+}
+// Core 2 (New 3DS, exheader flag 0x2000), else core 1 with a CPU time limit.
+std::string probe_cores() {
+    char buf[96];
+    const CoreProbe c2 = probe_core(2);
+    if (c2.created) {
+        std::snprintf(buf, sizeof buf, "core2 ok, parallel x%.2f", c2.parallel);
+        return buf;
+    }
+    APT_SetAppCpuTimeLimit(30);
+    const CoreProbe c1 = probe_core(1);
+    if (c1.created) std::snprintf(buf, sizeof buf, "core2 no; core1(30%%) x%.2f", c1.parallel);
+    else std::snprintf(buf, sizeof buf, "core2 no; core1 no");
+    return buf;
+}
 
 double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM11; }
 constexpr double kNsPerTick = 1e9 / SYSCLOCK_ARM11;
@@ -499,6 +552,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "input  : %08lx\n"
         "app mem free: %lu KiB / %lu KiB\n"
         "linear free : %lu KiB\n"
+        "cores  : %s\n"
         "iso    : %s\n"
         "stop   : %s\n"
         "%s"
@@ -508,7 +562,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         static_cast<unsigned long>(s.buttons),
         static_cast<unsigned long>(osGetMemRegionFree(MEMREGION_APPLICATION) / 1024u),
         static_cast<unsigned long>(osGetMemRegionSize(MEMREGION_APPLICATION) / 1024u),
-        static_cast<unsigned long>(linearSpaceFree() / 1024u), s.iso.c_str(),
+        static_cast<unsigned long>(linearSpaceFree() / 1024u), s.cores.c_str(), s.iso.c_str(),
         rt.stopped() ? rt.stop_reason().c_str() : "-", profile_text(s).c_str());
     return buf;
 }
@@ -577,6 +631,8 @@ int main() {
     Autotest autotest;
     stats.start_ms = stats.last_report_ms = stats.last_fps_ms = osGetTime();
     std::printf("P3P3DS by %s\nbuild %s\n\nLoading...\n", kAuthor, P3P3DS_BUILD_ID);
+    stats.cores = probe_cores();
+    std::printf("cores: %s\n", stats.cores.c_str());
 
     stats.iso = find_iso();
     if (stats.iso.empty()) {

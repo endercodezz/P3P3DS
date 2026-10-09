@@ -2,6 +2,10 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Second CPU core: availability probe (2026-10-10)
+
+Before moving the GE back end to another core (estimate: at most about 1.6x in battle, since the game code and GE list parsing stay on the main thread [INFERRED]), the runner checks at start whether the `.3dsx` can create a thread on core 2 (else core 1 with `APT_SetAppCpuTimeLimit(30)`) and whether it really runs in parallel: the same busy loop alone, then on both threads at once; `parallel = 2 x alone / together` (2.0: a real second core, 1.0: time-shared, as an emulator may do). Shown as `cores :` in the report and on the loading screen. [UNVERIFIED] the result on hardware and in Azahar.
+
 ## Runs of contiguous model draws (2026-10-10)
 
 For the per-draw cost of the battle (about 2,000 model draws per frame, median 4 vertices).
