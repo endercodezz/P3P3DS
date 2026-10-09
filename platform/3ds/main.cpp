@@ -113,6 +113,8 @@ struct Stats {
 };
 
 double ticks_to_s(u64 ticks) { return static_cast<double>(ticks) / SYSCLOCK_ARM11; }
+constexpr double kNsPerTick = 1e9 / SYSCLOCK_ARM11;
+std::uint64_t profile_ticks() noexcept { return svcGetSystemTick(); }
 
 // Cumulative time counters, sampled once per second; the report shows the
 // split over the last 10 s next to the run average, so slow places show up.
@@ -364,10 +366,11 @@ TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
         t.vc_uses = static_cast<double>(c.hits + c.misses + c.volatile_skips + c.full);
     }
     t.guest_us = static_cast<double>(guest_us);
-    t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns);
+    // Profile counters are in system ticks (see profile_ticks).
+    t.hle_ns = static_cast<double>(psprecomp::runtime_profile().hle_ns) * kNsPerTick;
     t.hle_calls = static_cast<double>(psprecomp::runtime_profile().hle_calls);
-    t.render_ns = static_cast<double>(p3p3ds::host_profile().render_ns);
-    t.io_ns = static_cast<double>(p3p3ds::host_profile().io_ns);
+    t.render_ns = static_cast<double>(p3p3ds::host_profile().render_ns) * kNsPerTick;
+    t.io_ns = static_cast<double>(p3p3ds::host_profile().io_ns) * kNsPerTick;
     t.io_bytes = static_cast<double>(p3p3ds::host_profile().io_bytes);
     t.vblanks = s.frames;
     t.game_frames = s.game_frames;
@@ -446,7 +449,7 @@ std::string top_imports(const psprecomp::Runtime &rt) {
         std::snprintf(nid, sizeof nid, "%08lX", static_cast<unsigned long>(d.import->nid));
         const std::string name = rt.nids().resolve(d.import->library, d.import->nid).value_or(d.import->library + "_" + nid);
         char buf[160];
-        std::snprintf(buf, sizeof buf, "%s%s:%.0f/%llu", out.empty() ? "" : " ", name.c_str(), static_cast<double>(d.ns) / 1e6,
+        std::snprintf(buf, sizeof buf, "%s%s:%.0f/%llu", out.empty() ? "" : " ", name.c_str(), static_cast<double>(d.ns) * kNsPerTick / 1e6,
                       static_cast<unsigned long long>(d.calls));
         out += buf;
     }
@@ -472,7 +475,7 @@ std::string profile_text(const Stats &s) {
     text += split_text("run avg ", start, g_samples.back());
     char buf[96];
     std::snprintf(buf, sizeof buf, "hle    : %llu calls  interp %.1f%%\n", static_cast<unsigned long long>(psprecomp::runtime_profile().hle_calls),
-                  100.0 * static_cast<double>(p3p3ds::host_profile().interpreter_ns) / 1e9 / ticks_to_s(g_samples.back().wall));
+                  100.0 * ticks_to_s(p3p3ds::host_profile().interpreter_ns) / ticks_to_s(g_samples.back().wall));
     return text + buf + gpu_text();
 }
 
@@ -678,6 +681,12 @@ int main() {
         }
 
         stats.status = "running";
+        // Profiling clock: raw system ticks (one SVC, no 64-bit division as in
+        // steady_clock), converted to seconds only when the report is built.
+        psprecomp::runtime_profile().clock = profile_ticks;
+        psprecomp::runtime_profile().ns_per_unit = kNsPerTick;
+        p3p3ds::host_profile().clock = profile_ticks;
+        p3p3ds::host_profile().ns_per_unit = kNsPerTick;
         psprecomp::runtime_profile().enabled = true;
         p3p3ds::host_profile().enabled = true;
         stats.run_start_ticks = svcGetSystemTick();

@@ -10,6 +10,7 @@
 #include "p3p3ds/profile.hpp"
 #include "sampler.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
@@ -26,7 +27,7 @@ int main(int argc,char **argv) {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
             ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path, sample_path, draw_log_path;
         std::string savedata_policy="latest";
-        std::uint64_t frame_every=30, render_from=0, sample_from=0, draw_log_from=0;
+        std::uint64_t frame_every=30, render_from=0, sample_from=0, draw_log_from=0, stop_vblank=0;
         std::uint64_t budget=100000;
         bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
         std::optional<std::uint32_t> expected;
@@ -52,6 +53,7 @@ int main(int argc,char **argv) {
             else if(a=="--profile") profile=true;
             else if(a=="--sample") sample_path=value();
             else if(a=="--sample-from") sample_from=std::stoull(value());
+            else if(a=="--stop-vblank") stop_vblank=std::stoull(value());
             else if(a=="--draw-log") draw_log_path=value();
             else if(a=="--draw-log-from") draw_log_from=std::stoull(value());
             else if(a=="--savedata") savedata_policy=value();
@@ -71,6 +73,7 @@ int main(int argc,char **argv) {
                          <<"--profile (wall time of HLE, interpreter and GE rendering; rest is AOT + dispatch)\n"
                          <<"--sample <file> (statistical profile: instruction pointer every ~1 ms; tools/profile_symbols.py)\n"
                          <<"--sample-from <vblank> (start sampling at that vblank)\n"
+                         <<"--stop-vblank <vblank> (end the run at that vblank, e.g. the end of a sampled scene)\n"
                          <<"--draw-log <file> --draw-log-from <frame> (one line per GE draw of the 2 displayed frames after that frame index)\n"
                          <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
@@ -233,8 +236,9 @@ int main(int argc,char **argv) {
         std::cout<<"P3P3DS bootstrap: entry="<<psprecomp::hex32(entry)<<" relocations="<<reloc.total
                  <<" registered_entries="<<rt.function_count()<<"\n";
         psprecomp::runtime_profile().enabled=profile;
+        psprecomp::runtime_profile().per_import=profile;
         p3p3ds::host_profile().enabled=profile;
-        const auto run_start=std::chrono::steady_clock::now();
+        auto run_start=std::chrono::steady_clock::now();
         // Host time of the sampled window (from --sample-from to the end of the run).
         auto window_start=run_start; std::uint64_t window_vblank=0;
         try {
@@ -245,6 +249,15 @@ int main(int argc,char **argv) {
                 if(kernel.ge().skip_rasterization && vblank>=render_from) kernel.ge().skip_rasterization=false;
                 if(sample_from && vblank>=sample_from && !sampler.active) {
                     sampler.active=true; window_start=std::chrono::steady_clock::now(); window_vblank=vblank;
+                    if(profile) { // --profile then covers the sampled window only
+                        auto &h=psprecomp::runtime_profile(); h.hle_ns=h.hle_calls=0; h.imports.clear();
+                        auto &p=p3p3ds::host_profile(); p.render_ns=p.render_calls=p.interpreter_ns=p.interpreter_entries=p.io_ns=p.io_calls=0;
+                        run_start=window_start;
+                    }
+                }
+                if(stop_vblank && vblank>=stop_vblank) {
+                    rt.stop("Stop vblank "+std::to_string(stop_vblank)+" reached");
+                    throw psprecomp::FrontierHalt{};
                 }
             };
             rt.run(entry,budget);
@@ -270,6 +283,16 @@ int main(int argc,char **argv) {
             std::printf("[PROFILE] wall=%.2fs hle=%.2fs (%.1f%%, %llu calls) render=%.2fs (%.1f%%, %llu draws/transfers) interpreter=%.3fs (%.2f%%, %llu entries)\n",
                 wall/1e9,h.hle_ns/1e9,pct(h.hle_ns),static_cast<unsigned long long>(h.hle_calls),p.render_ns/1e9,pct(p.render_ns),
                 static_cast<unsigned long long>(p.render_calls),p.interpreter_ns/1e9,pct(p.interpreter_ns),static_cast<unsigned long long>(p.interpreter_entries));
+            // The HLE imports with the most time (inclusive: GE rendering, waits and file reads they start).
+            std::vector<const psprecomp::RuntimeProfile::Import*> top;
+            for(const auto &[key,import]:h.imports) top.push_back(&import);
+            std::sort(top.begin(),top.end(),[](auto *x,auto *y){return x->ns>y->ns;});
+            for(std::size_t i=0;i<top.size() && i<12;++i) {
+                const auto &im=*top[i];
+                std::printf("[PROFILE] import %s::%s %.3fs (%.1f%%) %llu calls %.2f us/call\n",im.library.c_str(),
+                    rt.nids().resolve(im.library,im.nid).value_or(psprecomp::hex32(im.nid)).c_str(),im.ns/1e9,pct(im.ns),
+                    static_cast<unsigned long long>(im.calls),im.calls?im.ns/1e3/static_cast<double>(im.calls):0.0);
+            }
         }
         if(std::getenv("PSPRECOMP_HLE_HISTOGRAM")) rt.report_hle_histogram(80); // per-NID call counts
         p3p3ds::install_interpreter_fallback(nullptr);

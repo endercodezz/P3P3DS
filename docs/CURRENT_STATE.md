@@ -2,6 +2,17 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Battle: what the vertex cache did, cheaper profiling, where HLE time goes (2026-10-09)
+
+Maintainer's Azahar run of the vertex-cache build (first Shadow battle, report "last 10 s"): 7-10 fps, speed 29-31 %, aot 33 hle 21 ge 36 idle 8; draw: prep 6.6 vtx 23.7 unif 1.3 sub 0.5; `vtx: fill 12.6 cache hit 100%`; vcache 1,727 KiB, 3,442 sources, 941k hits, 4k misses, 0 volatile. Dorm 18-21 fps (cache not involved: through mode, hit 0 %; no Azahar dorm figure of 0.2.8 to compare with).
+
+- [VERIFIED] The cache works (100 % hits) but `vtx` fell only from 26.5 to 23.7 %: the battle is about 1,975 draws per displayed frame with a median of **4 vertices** (mean 6.4; PC draw log of two battle frames, `--draw-log`, which now also prints the vertex and index addresses `va=`/`ia=`). The unpack of so few vertices was never the main cost; per-draw work is. [WRONG] the earlier reading "26.5 % = vertex unpack" (`vtx` holds all per-draw vertex work).
+- [VERIFIED] 3DS profiling read `steady_clock` (an SVC plus 64-bit software divisions) twice per HLE call and per GE primitive. Now: raw system ticks (`RuntimeProfile::clock` / `HostProfile::clock`, converted to seconds only for the report), every HLE call still timed (waits and presents inside calls make sampling unreliable), GE primitives timed one in 8 (`SampledProfileScope`). [UNVERIFIED] the gain and the new split on the 3DS.
+- [VERIFIED] HLE calls in the battle window (PC production build, vblank 22165-32165 of `first_battle.txt`, histogram difference): 4.16 M calls = 24,960 per game second, **87.6 % `sceKernelCpuSuspendIntr` / `sceKernelCpuResumeIntr`** (10,929 pairs per game second, about 360 per frame), then `sceKernelGetSystemTimeLow` 817/s, `sceAudioOutputPannedBlocking` 689/s, lwmutex lock/unlock 404/s each.
+- [VERIFIED] HLE time by import in that window on the PC (`--profile`, new per-import list; inclusive times): `sceGeListEnQueue` 10.1 % of host time (91 us per call, one per frame: GE list execution, the renderer's own share 3.9 %), `sceAudioOutputPannedBlocking` 5.1 %, Suspend/ResumeIntr 3.6 % together (0.05 us each), `__sceSasCore` 1.0 %. On the 3DS the GE list command processing counts as `hle`, not `ge` (`ge` is the renderer only). [UNVERIFIED] the same split on the 3DS: `sdmc:/p3p3ds/profile_seconds.txt` writes the top three imports per second to `profile_seconds.csv`.
+- PC runner: `--stop-vblank <n>` ends a run at a vblank (a sampled scene without the rest of the route); `--profile` with `--sample-from` covers only the sampled window and lists the 12 imports with the most time.
+- Replay `new_game.txt` 60M dispatches unchanged (events `055626D9...`, WAV `22532254...`); CTest 27/27.
+
 ## Model vertex cache for battle speed (2026-10-08)
 
 For the battle's vertex unpack (26.5 % of time in Azahar, 0.2.8). Not yet measured in Azahar or on hardware.

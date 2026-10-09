@@ -464,6 +464,11 @@ void set_runtime_post_import_hook(RuntimePostImportHook hook) noexcept;
 // P3P3DS: optional wall-time accounting of HLE calls (runner --profile).
 struct RuntimeProfile {
     bool enabled{};
+    // P3P3DS: hle_ns and Import::ns count `clock` units: nanoseconds of the
+    // steady clock by default; a host with a cheaper counter sets clock and
+    // ns_per_unit (New 3DS: raw system ticks, no division per HLE call).
+    std::uint64_t (*clock)() noexcept = nullptr;
+    double ns_per_unit{1.0};
     std::uint64_t hle_ns{}, hle_calls{};
     // P3P3DS: with per_import also set, time and calls per HLE import
     // (key: hash of library and NID), to find the expensive services.

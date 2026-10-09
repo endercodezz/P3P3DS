@@ -119,18 +119,23 @@ std::uint64_t runtime_import_entry_generation() noexcept { return g_runtime_impo
 // P3P3DS: see RuntimeProfile in runtime.hpp.
 RuntimeProfile &runtime_profile() noexcept { static RuntimeProfile profile; return profile; }
 namespace {
+std::uint64_t profile_clock(const RuntimeProfile &p) noexcept {
+    if (p.clock != nullptr) return p.clock();
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+}
 struct HleTimer {
-    std::chrono::steady_clock::time_point start;
+    std::uint64_t start{};
     std::string_view library;
     std::uint32_t nid;
     bool on;
     HleTimer(std::string_view lib, std::uint32_t id) : library(lib), nid(id), on(runtime_profile().enabled) {
-        if (on) start = std::chrono::steady_clock::now();
+        if (on) start = profile_clock(runtime_profile());
     }
     ~HleTimer() {
         if (!on) return;
         auto &p = runtime_profile();
-        const auto ns = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
+        const std::uint64_t ns = profile_clock(p) - start; // clock units
         p.hle_ns += ns;
         ++p.hle_calls;
         if (!p.per_import) return;

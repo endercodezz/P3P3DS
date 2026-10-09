@@ -132,10 +132,10 @@ void GeManager::log_draw(psprecomp::GuestMemory &mem, std::uint32_t prim_type, s
     }
     const auto tex=(r[0xA0]&0xFFFFF0u)|((r[0xA8]>>16)&0xFFu)<<24;
     std::fprintf(draw_log,"prim=%u n=%u vtype=%06X fb=%06X tex=%s%08X %ux%u fmt=%u clut=%06X tfunc=%06X blend=%u:%06X atest=%u:%06X "
-        "ztest=%u:%u zmask=%u light=%u fog=%u cull=%u:%u bbox=%.0f,%.0f-%.0f,%.0f clipped=%u\n",
+        "ztest=%u:%u zmask=%u light=%u fog=%u cull=%u:%u bbox=%.0f,%.0f-%.0f,%.0f clipped=%u va=%08X ia=%08X\n",
         prim_type,count,r[0x12]&0xFFFFFFu,r[0x9C]&0xFFFFFFu,(r[0x1E]&1u)?"":"off:",tex,1u<<(r[0xB8]&0xFu),1u<<((r[0xB8]>>8)&0xFu),
         r[0xC3]&0xFu,r[0xC5]&0xFFFFFFu,r[0xC9]&0xFFFFFFu,r[0x21]&1u,r[0xDF]&0xFFFFFFu,r[0x22]&1u,r[0xDB]&0xFFFFFFu,
-        r[0x23]&1u,r[0xDE]&7u,r[0xE7]&0xFFFFFFu,r[0x17]&1u,r[0x1F]&1u,r[0x1D]&1u,r[0x9B]&1u,x0,y0,x1,y1,clipped);
+        r[0x23]&1u,r[0xDE]&7u,r[0xE7]&0xFFFFFFu,r[0x17]&1u,r[0x1F]&1u,r[0x1D]&1u,r[0x9B]&1u,x0,y0,x1,y1,clipped,state_.vertex,state_.index);
     const auto layout=ge::vertex_layout(r[0x12]);
     if(layout.weights==0u || layout.through) return;
     // Skinned draws: the bone matrices, then per vertex the weights and the screen position.
@@ -224,7 +224,7 @@ void GeManager::execute(psprecomp::Runtime &rt, GeListInfo &l, std::uint32_t wor
         const auto count=arg&0xFFFF, type=(arg>>16)&7;
         if(type==7) { rt.stop("GE PRIM type 7 unsupported"); return; }
         if(census) count_features(type);
-        const ProfileScope timer(host_profile().render_ns, host_profile().render_calls);
+        const SampledProfileScope timer(host_profile().render_ns, host_profile().render_calls); // thousands per frame: sampled
         if(!skip_rasterization) renderer_->draw(mem,regs_,static_cast<ge::Prim>(type),count,state_.vertex,state_.index);
         if(draw_log) log_draw(mem,type,count);
         const auto layout=ge::vertex_layout(regs_.reg[0x12]);
