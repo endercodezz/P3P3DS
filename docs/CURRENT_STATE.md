@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Old 3DS: stops at start, out of memory (2026-10-11)
+
+- [VERIFIED] Maintainer, original Old 3DS, release 0.2.9 (build fa6e196), photo of the bottom screen: APPLICATION region 65,536 KiB, heap 9,468 KiB after the code is loaded (34 KiB in use), linear free 10,713 KiB; the runtime then fails to allocate 33,554,432 bytes (the 32 MiB PSP RAM) and stops with "Out of memory creating the runtime (std::bad_alloc)". The failure is the intended clean stop, not a crash.
+- This confirms on hardware the estimate in `NEXT_STEPS.md` ("Old 3DS / 2DS"): about 112 MB of application memory are needed (code now about 41 MB after the AOT view change, 32 MiB PSP RAM, about 10-15 MB of function tables), the Old 3DS gives 64 MB by default and at most 96 MB. Even with 96 MB it would also run its CPU at 268 MHz without L2 cache, about a third of the New 3DS. [INFERRED] It needs a different approach (compile only hot code ahead of time, interpret the rest), not tuning.
+
 ## Game code: local AOT memory view (2026-10-10)
 
 The game's own code (`aot`) is the largest share of the battle (45 % in Azahar, 0.2.9) and stays on the main thread whatever happens to the GE.
