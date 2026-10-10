@@ -61,7 +61,9 @@ std::int32_t GeManager::enqueue_list(psprecomp::Runtime &rt, std::uint32_t start
               << " stall=" << psprecomp::hex32(stall) << " cb=" << cb
               << " context=" << psprecomp::hex32(context) << " stacks=" << stack_count
               << " stack=" << psprecomp::hex32(stack) << (head?" head":"") << "\n";
-    pump(rt); return id;
+    pump(rt);
+    if(host_profile().enabled && enqueue_end_==0) enqueue_end_=profile_now(host_profile());
+    return id;
 }
 std::int32_t GeManager::update_stall(psprecomp::Runtime &rt, int id, std::uint32_t stall) {
     auto i=lists_.find(id); if(i==lists_.end()) return invalid_id;
@@ -74,7 +76,13 @@ std::int32_t GeManager::update_stall(psprecomp::Runtime &rt, int id, std::uint32
 std::int32_t GeManager::sync(psprecomp::Runtime &rt, int id, int mode, bool all) {
     if(mode!=0 && mode!=1) return invalid_mode;
     if(!all && !find(id)) return invalid_id;
+    if(enqueue_end_!=0 && mode==0) { // the game waits for the GE: guest time since the first unsynced enqueue
+        auto &p=host_profile();
+        if(p.enabled) { p.ge_window_ns+=profile_now(p)-enqueue_end_; ++p.ge_windows; }
+        enqueue_end_=0;
+    }
     pump(rt);
+    renderer_->drain(); // the game waits for the GE: an asynchronous back end must be done, as the PSP GE would be
     const auto status=all ? (queue_.empty()?GeStatus::Completed:lists_.at(queue_.front()).status) : find(id)->status;
     if(mode==0 && status!=GeStatus::Completed) {
         // DIRTY_FIRST_FRAME: no scheduler GE wait integration yet; never fake completion.
@@ -104,6 +112,7 @@ void GeManager::deliver_finish_callback(psprecomp::Runtime &rt, const GeListInfo
     // Interrupt-context handler: it cannot block, so it runs to completion in
     // isolation. The cap only guards against a runaway handler.
     unsigned budget=1000000;
+    const ProfileScope callback_timer(host_profile().ge_callback_ns, host_profile().ge_callbacks);
     while (callback_ctx.pc!=0x20 && !rt.stopped() && budget--) {
         const auto pc=callback_ctx.pc;
         if (!rt.invoke_isolated_aot(pc,callback_ctx)) {

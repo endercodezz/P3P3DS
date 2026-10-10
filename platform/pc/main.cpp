@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <thread>
+#include "p3p3ds/ge/async_renderer.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
@@ -29,7 +31,7 @@ int main(int argc,char **argv) {
         std::string savedata_policy="latest";
         std::uint64_t frame_every=30, render_from=0, sample_from=0, draw_log_from=0, stop_vblank=0;
         std::uint64_t budget=100000;
-        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false;
+        bool verify=false, chase=false, stop_any_vram=false, interpreter_enabled=true, gamepad=false, profile=false, ge_thread=false;
         std::optional<std::uint32_t> expected;
         for(int i=1;i<argc;++i) {
             const std::string a=argv[i];
@@ -54,6 +56,7 @@ int main(int argc,char **argv) {
             else if(a=="--sample") sample_path=value();
             else if(a=="--sample-from") sample_from=std::stoull(value());
             else if(a=="--stop-vblank") stop_vblank=std::stoull(value());
+            else if(a=="--ge-thread") ge_thread=true;
             else if(a=="--draw-log") draw_log_path=value();
             else if(a=="--draw-log-from") draw_log_from=std::stoull(value());
             else if(a=="--savedata") savedata_policy=value();
@@ -74,6 +77,7 @@ int main(int argc,char **argv) {
                          <<"--sample <file> (statistical profile: instruction pointer every ~1 ms; tools/profile_symbols.py)\n"
                          <<"--sample-from <vblank> (start sampling at that vblank)\n"
                          <<"--stop-vblank <vblank> (end the run at that vblank, e.g. the end of a sampled scene)\n"
+                         <<"--ge-thread (GE renderer on a worker thread, drained after every list: must give the same run)\n"
                          <<"--draw-log <file> --draw-log-from <frame> (one line per GE draw of the 2 displayed frames after that frame index)\n"
                          <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
@@ -184,6 +188,18 @@ int main(int argc,char **argv) {
         const char *trace_from=std::getenv("P3P_TRACE_FROM_US");
         bool trace_reset=false;
         kernel.ge().skip_rasterization=render_from>0;
+        // --ge-thread: the reference renderer behind the New 3DS's asynchronous
+        // GE path, drained after each list so the run stays deterministic.
+        // Static: it must outlive `kernel`, whose AsyncRenderer joins it when destroyed.
+        static std::thread ge_worker;
+        if(ge_thread) {
+            p3p3ds::ge::WorkerHooks hooks;
+            hooks.start=[](void (*entry)(void *),void *arg){ ge_worker=std::thread(entry,arg); return true; };
+            hooks.join=[]{ if(ge_worker.joinable()) ge_worker.join(); };
+            hooks.pause=[]{ std::this_thread::yield(); };
+            kernel.ge().set_renderer(std::make_unique<p3p3ds::ge::AsyncRenderer>(std::make_unique<p3p3ds::ge::SoftwareRenderer>(),
+                                                                                std::size_t{4}<<20,std::move(hooks),true));
+        }
         rt.event_observer=[&] {
             if(kernel.ge().skip_rasterization && kernel.threads().vblank_count()>=render_from) kernel.ge().skip_rasterization=false;
             if(trace_from && !trace_reset && kernel.threads().now()>=std::stoull(trace_from)) {
@@ -251,7 +267,7 @@ int main(int argc,char **argv) {
                     sampler.active=true; window_start=std::chrono::steady_clock::now(); window_vblank=vblank;
                     if(profile) { // --profile then covers the sampled window only
                         auto &h=psprecomp::runtime_profile(); h.hle_ns=h.hle_calls=0; h.imports.clear();
-                        auto &p=p3p3ds::host_profile(); p.render_ns=p.render_calls=p.interpreter_ns=p.interpreter_entries=p.io_ns=p.io_calls=p.ge_commands=0;
+                        auto &p=p3p3ds::host_profile(); p.render_ns=p.render_calls=p.interpreter_ns=p.interpreter_entries=p.io_ns=p.io_calls=p.ge_commands=p.ge_window_ns=p.ge_windows=p.ge_callback_ns=p.ge_callbacks=0;
                         run_start=window_start;
                     }
                 }
@@ -283,7 +299,9 @@ int main(int argc,char **argv) {
             std::printf("[PROFILE] wall=%.2fs hle=%.2fs (%.1f%%, %llu calls) render=%.2fs (%.1f%%, %llu draws/transfers) interpreter=%.3fs (%.2f%%, %llu entries)\n",
                 wall/1e9,h.hle_ns/1e9,pct(h.hle_ns),static_cast<unsigned long long>(h.hle_calls),p.render_ns/1e9,pct(p.render_ns),
                 static_cast<unsigned long long>(p.render_calls),p.interpreter_ns/1e9,pct(p.interpreter_ns),static_cast<unsigned long long>(p.interpreter_entries));
-            std::printf("[PROFILE] ge commands=%llu\n",static_cast<unsigned long long>(p.ge_commands));
+            std::printf("[PROFILE] ge commands=%llu enqueue->sync window=%.2fs (%.1f%%, %llu) finish callbacks=%.3fs (%.2f%%, %llu)\n",
+                static_cast<unsigned long long>(p.ge_commands),p.ge_window_ns/1e9,pct(p.ge_window_ns),static_cast<unsigned long long>(p.ge_windows),
+                p.ge_callback_ns/1e9,pct(p.ge_callback_ns),static_cast<unsigned long long>(p.ge_callbacks));
             // The HLE imports with the most time (inclusive: GE rendering, waits and file reads they start).
             std::vector<const psprecomp::RuntimeProfile::Import*> top;
             for(const auto &[key,import]:h.imports) top.push_back(&import);

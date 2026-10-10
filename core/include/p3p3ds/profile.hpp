@@ -19,6 +19,10 @@ struct HostProfile {
     std::uint64_t render_ns{}, render_calls{};
     std::uint64_t io_ns{}, io_calls{}, io_bytes{};
     std::uint64_t ge_commands{}; // GE display-list commands executed (counted always, one add per command)
+    // Guest time between a list enqueue and the game's next wait for the GE
+    // (sceGeDrawSync / sceGeListSync mode 0): what a GE back end on another
+    // core could overlap. And the GE finish callbacks' own guest code.
+    std::uint64_t ge_window_ns{}, ge_windows{}, ge_callback_ns{}, ge_callbacks{};
     std::uint32_t render_sample{}; // sampled render scopes (SampledProfileScope)
 };
 

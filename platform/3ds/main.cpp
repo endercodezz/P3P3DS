@@ -29,6 +29,7 @@
 #include "p3p3ds/vfs.hpp"
 #include "bootstrap_expectations.hpp"
 #include "gpu_renderer.hpp"
+#include "p3p3ds/ge/async_renderer.hpp"
 #include "psprecomp/elf32.hpp"
 #include "psprecomp/runtime.hpp"
 
@@ -175,6 +176,7 @@ struct TimeSample {
     u64 wall{}, present{}, idle{}, ui{}, hash{}, upload{}, wait{};
     u64 prep{}, vertex{}, uniform{}, submit{}; // GPU renderer steps (GpuStats)
     u64 fill{};                                // model vertices into the arena (part of vertex)
+    u64 gpu_busy{}, gpu_wait{};                // GE worker busy; game's thread waiting for it
     double vc_hits{}, vc_uses{};               // vertex cache hits / model draws that asked it
     double guest_us{}, hle_ns{}, render_ns{}, io_ns{}, io_bytes{}, hle_calls{};
     std::uint64_t vblanks{}, game_frames{};
@@ -212,6 +214,47 @@ public:
 };
 
 p3p3ds::n3ds::GpuRenderer *g_gpu = nullptr;
+// The GE back end on core 2 (nullptr: the renderer runs on the game's thread).
+// Everything that touches citro3d goes through it: posted in order, or called
+// once the worker is idle.
+p3p3ds::ge::AsyncRenderer *g_async = nullptr;
+Thread g_gpu_thread = nullptr;
+bool start_gpu_thread(void (*entry)(void *), void *arg) {
+    s32 priority = 0x30;
+    svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+    g_gpu_thread = threadCreate(entry, arg, 64u << 10, priority, 2, false);
+    return g_gpu_thread != nullptr;
+}
+void join_gpu_thread() {
+    if (g_gpu_thread == nullptr) return;
+    threadJoin(g_gpu_thread, U64_MAX);
+    threadFree(g_gpu_thread);
+    g_gpu_thread = nullptr;
+}
+void gpu_pause() { svcSleepThread(20000); } // 20 us between polls of the queue
+void gpu_present(psprecomp::GuestMemory &memory, const p3p3ds::hle::DisplayFramebufInfo &fb) {
+    if (g_async == nullptr) {
+        g_gpu->present(memory, fb);
+        return;
+    }
+    g_async->post([&memory, fb](p3p3ds::ge::GeRenderer &) { g_gpu->present(memory, fb); });
+}
+// CPU stores into EDRAM: one note per 64 KiB block between other queued work
+// is enough (a note only marks the target as written by the CPU); the movie
+// decoder writes 130k words per picture.
+void gpu_note_cpu_write(std::uint32_t address, std::size_t bytes) {
+    if (g_async == nullptr) {
+        g_gpu->note_cpu_write(address, bytes);
+        return;
+    }
+    static std::uint64_t last_records = ~0ull;
+    static std::uint32_t last_block = ~0u;
+    const std::uint32_t block = psprecomp::GuestMemory::canonical(address) >> 16;
+    if (g_async->records() == last_records && block == last_block) return;
+    g_async->post([address, bytes](p3p3ds::ge::GeRenderer &) { g_gpu->note_cpu_write(address, bytes); });
+    last_records = g_async->records();
+    last_block = block;
+}
 
 // Save/load list dialogs of sceUtilitySavedata (the PSP draws them as system
 // UI): shown on the bottom screen. D-Pad chooses, B confirms (Cross), A goes
@@ -415,6 +458,11 @@ TimeSample time_sample(const Stats &s, std::uint64_t guest_us) {
         t.uniform = g.uniform_ticks;
         t.submit = g.submit_ticks;
         t.fill = g.fill_ticks;
+        if (g_async != nullptr) {
+            const auto &a = g_async->async_stats();
+            t.gpu_busy = a.busy.load(std::memory_order_relaxed);
+            t.gpu_wait = a.drain_wait + a.full_wait;
+        }
         const auto &c = g_gpu->vertex_cache_stats();
         t.vc_hits = static_cast<double>(c.hits);
         t.vc_uses = static_cast<double>(c.hits + c.misses + c.volatile_skips + c.full);
@@ -476,6 +524,15 @@ std::string split_text(const char *label, const TimeSample &a, const TimeSample 
         else
             std::snprintf(buf, sizeof buf, " vtx: fill %.1f cache hit %.0f%%\n", pct(ticks_to_s(b.fill - a.fill)),
                           uses > 0 ? 100.0 * (b.vc_hits - a.vc_hits) / uses : 0.0);
+        text += buf;
+        // GE worker on core 2: its busy share, and how long the game's thread
+        // waited for it (sceGeDrawSync; counted in hle above). draw: and vtx:
+        // are the worker's steps when it is on.
+        if (g_async != nullptr)
+            std::snprintf(buf, sizeof buf, " gpu thd: busy %.0f wait %.1f\n", pct(ticks_to_s(b.gpu_busy - a.gpu_busy)),
+                          pct(ticks_to_s(b.gpu_wait - a.gpu_wait)));
+        else
+            std::snprintf(buf, sizeof buf, " gpu thd: off\n");
         text += buf;
     }
     return text;
@@ -718,8 +775,24 @@ int main() {
         stage = "init gpu";
         auto gpu = std::make_unique<p3p3ds::n3ds::GpuRenderer>();
         g_gpu = gpu.get();
-        kernel.ge().set_renderer(std::move(gpu));
-        rt.memory().vram_write_observer = [](std::uint32_t address, std::size_t bytes) { g_gpu->note_cpu_write(address, bytes); };
+        // GE back end on core 2 when the probe found a parallel core 2;
+        // sdmc:/p3p3ds/no_gpu_thread.txt keeps it on the game's thread (A/B runs).
+        bool gpu_thread = stats.cores.rfind("core2 ok", 0) == 0;
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/no_gpu_thread.txt", "r")) { gpu_thread = false; std::fclose(f); }
+        if (gpu_thread) {
+            p3p3ds::ge::WorkerHooks hooks;
+            hooks.start = start_gpu_thread;
+            hooks.join = join_gpu_thread;
+            hooks.pause = gpu_pause;
+            hooks.clock = profile_ticks;
+            auto async = std::make_unique<p3p3ds::ge::AsyncRenderer>(std::move(gpu), 1536u << 10, std::move(hooks));
+            if (async->threaded()) g_async = async.get();
+            kernel.ge().set_renderer(std::move(async));
+        } else {
+            kernel.ge().set_renderer(std::move(gpu));
+        }
+        stats.cores += g_async != nullptr ? ", GE on core2" : ", GE on core0";
+        rt.memory().vram_write_observer = [](std::uint32_t address, std::size_t bytes) { gpu_note_cpu_write(address, bytes); };
         if (FILE *f = std::fopen("sdmc:/p3p3ds/play_movies.txt", "r")) { stats.skip_movies = false; std::fclose(f); }
         if (FILE *f = std::fopen(autotest.active ? "sdmc:/p3p3ds/autotest/dump_every.txt" : "sdmc:/p3p3ds/dump_every.txt", "r")) {
             unsigned long long every = 0;
@@ -762,6 +835,9 @@ int main() {
             const auto vblank = kernel.threads().vblank_count();
             if (vblank == last_presented_vblank) return;
             last_presented_vblank = vblank;
+            // citro3d must be idle on the GE worker before APT may suspend the
+            // application (HOME menu); the game already waited for its lists.
+            if (g_async != nullptr) g_async->drain();
             if (!aptMainLoop()) { rt.stop("Closed by the system (HOME)"); throw psprecomp::FrontierHalt{}; }
             hid->poll();
             if (autotest.active) {
@@ -812,11 +888,14 @@ int main() {
                 else if (ahead_us < -50000.0) wall_minus_guest_us = wall_us - guest_us; // behind: do not race later
             }
             const u64 present_start = svcGetSystemTick();
-            g_gpu->present(rt.memory(), fb);
+            gpu_present(rt.memory(), fb);
             stats.present_ticks += svcGetSystemTick() - present_start;
             if (stats.dump_every && vblank % stats.dump_every == 0u) {
                 std::vector<std::uint8_t> rgb;
-                if (g_gpu->read_top_screen(rgb)) {
+                const bool have_screen = g_async != nullptr
+                    ? g_async->call_idle([&rgb](p3p3ds::ge::GeRenderer &) { return g_gpu->read_top_screen(rgb); })
+                    : g_gpu->read_top_screen(rgb);
+                if (have_screen) {
                     char path[96];
                     std::snprintf(path, sizeof path, "%s/frames/vblank_%06llu.bmp", kBase, static_cast<unsigned long long>(vblank));
                     write_bmp(path, rgb, 400u, 240u);
@@ -860,6 +939,7 @@ int main() {
         if (!rt.stopped()) rt.stop(std::string("Exception: ") + fatal);
     }
     if (!rt.stopped()) rt.stop("Runtime returned");
+    if (g_async != nullptr) g_async->drain(); // the exit screen runs aptMainLoop: citro3d idle
     stats.status = "stopped";
     if (g_seconds_log) { std::fclose(g_seconds_log); g_seconds_log = nullptr; }
     const auto text = report_text(stats, rt, kernel) + "stage  : " + stage + "\n" + mem_line();
@@ -867,7 +947,8 @@ int main() {
     show(text);
     if (!autotest.active) wait_exit("Report saved to sdmc:/p3p3ds/report.txt");
     g_gpu = nullptr;
-    kernel_owner.reset(); // the GPU renderer (citro3d) shuts down before gfx
+    g_async = nullptr;
+    kernel_owner.reset(); // the GE worker stops, then the GPU renderer (citro3d) shuts down before gfx
     romfsExit();
     gfxExit();
     return 0;

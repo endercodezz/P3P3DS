@@ -89,6 +89,7 @@ private:
     int next_id_{1}, next_callback_{0};
     std::uint64_t enqueued_{};
     bool writer_observed_{};
+    std::uint64_t enqueue_end_{}; // profile clock when the last enqueue returned (0: none pending)
     std::uint32_t writer_pc_{};
     void deliver_finish_callback(psprecomp::Runtime &, const GeListInfo &, std::uint32_t end_pc);
 };

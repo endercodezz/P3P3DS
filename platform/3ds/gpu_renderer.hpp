@@ -23,6 +23,7 @@
 
 #include <array>
 #include <cstdint>
+#include <atomic>
 #include <unordered_map>
 #include <vector>
 
@@ -234,7 +235,7 @@ private:
     std::uint32_t fallback_address_{};
     std::uint64_t fallback_seq_{~0ull};
     std::uint64_t fallback_frame_{}; // GPU frame that last sampled fallback_
-    bool last_present_cpu_{};
+    std::atomic<bool> last_present_cpu_{}; // written by the GE worker thread, read by the game's thread
     // What the top screen shows: source texture and its version (gpu_seq of
     // a target, or fallback_seq_ for a CPU picture).
     const C3D_Tex *shown_{};

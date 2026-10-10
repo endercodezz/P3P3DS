@@ -14,6 +14,7 @@ set(P3P3DS_CORE_SOURCES
     core/src/hle/savedata.cpp
     core/src/hle/ctrl.cpp
     core/src/input.cpp
+    core/src/ge/async_renderer.cpp
     core/src/ge/geometry.cpp
     core/src/ge/software_renderer.cpp
     core/src/hle/sysmem.cpp

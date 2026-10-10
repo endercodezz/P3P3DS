@@ -316,7 +316,7 @@ make -C build/3ds -j10
 
 A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Installing and running it: [Running on a New 3DS](#running-on-a-new-3ds). The `.3dsx` embeds code generated from your game executable: it is for your own use, never for distribution.
 
-Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`). An empty `sdmc:/p3p3ds/no_vertex_cache.txt` turns the model vertex cache off, for speed comparisons (bottom-screen line `vtx: fill ... cache hit ...%`).
+Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`). An empty `sdmc:/p3p3ds/no_vertex_cache.txt` turns the model vertex cache off, for speed comparisons (bottom-screen line `vtx: fill ... cache hit ...%`). The GE renderer runs on the New 3DS's second application core when the start-up check finds it (`cores :` line); an empty `sdmc:/p3p3ds/no_gpu_thread.txt` keeps it on the main core.
 
 ### Build the P3P3DS Builder release
 

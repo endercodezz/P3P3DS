@@ -51,6 +51,9 @@ public:
     // finish callback runs guest code next): a backend that defers reading
     // vertices must read them before the CPU can change them.
     virtual void sync() {}
+    // The game waits for the GE (sceGeDrawSync / sceGeListSync): a backend
+    // that renders on another thread finishes everything queued so far.
+    virtual void drain() {}
     [[nodiscard]] virtual const DrawStats &stats() const = 0;
 };
 

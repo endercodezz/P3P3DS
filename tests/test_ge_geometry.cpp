@@ -2,6 +2,7 @@
 // for every texel of every non-DXT format, linear and swizzled, with CLUT
 // shift/mask/start; texture_hash must change with texture bytes and palette; decode_model_vertices
 // must equal decode_model_vertex for every vertex type.
+#include "p3p3ds/ge/async_renderer.hpp"
 #include "p3p3ds/ge/geometry.hpp"
 #include "p3p3ds/ge/model_batch.hpp"
 #include "p3p3ds/ge/vertex_cache.hpp"
@@ -10,6 +11,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <memory>
+#include <thread>
 #include <vector>
 
 using namespace p3p3ds::ge;
@@ -205,6 +208,89 @@ void model_run_checks() {
     check(!other.continues(kBase + 5u * kSize, 0x15Au, 0u, 2u), "model run: a gap breaks it");
 }
 
+// AsyncRenderer: a renderer driven through the queue on a worker thread sees
+// exactly the calls, registers, matrices and CLUT it would see when called
+// directly, also across many wraps of the smallest queue; posted calls run in
+// order; drain() waits until everything was replayed.
+void async_renderer_checks(psprecomp::GuestMemory &m) {
+    struct Recorder final : GeRenderer {
+        std::vector<std::uint64_t> log;
+        DrawStats s;
+        void note(const GeRegisters &r, std::uint64_t what) {
+            std::uint64_t h = 0xCBF29CE484222325ull ^ what;
+            auto mix = [&h](const void *p, std::size_t n) {
+                const auto *b = static_cast<const std::uint8_t *>(p);
+                for (std::size_t i = 0; i < n; ++i) h = (h ^ b[i]) * 0x100000001B3ull;
+            };
+            mix(r.reg.data(), sizeof r.reg);
+            mix(r.bone.data(), sizeof r.bone);
+            mix(r.world.data(), sizeof r.world);
+            mix(r.view.data(), sizeof r.view);
+            mix(r.proj.data(), sizeof r.proj);
+            mix(r.tgen.data(), sizeof r.tgen);
+            mix(r.clut.data(), sizeof r.clut);
+            mix(&r.clut_words, sizeof r.clut_words);
+            mix(&r.state_version, sizeof r.state_version);
+            log.push_back(h);
+        }
+        void draw(psprecomp::GuestMemory &, const GeRegisters &r, Prim p, std::uint32_t c, std::uint32_t v, std::uint32_t i) override {
+            note(r, (static_cast<std::uint64_t>(p) << 56) ^ (static_cast<std::uint64_t>(c) << 32) ^ v ^ (static_cast<std::uint64_t>(i) << 8));
+        }
+        void transfer(psprecomp::GuestMemory &, const GeRegisters &r) override { note(r, 0x7777u); }
+        void sync() override { log.push_back(0x5555u); }
+        const DrawStats &stats() const override { return s; }
+    };
+    auto run = [&m](GeRenderer &target, Recorder *post_into, bool via_post) {
+        std::uint32_t state = 0x9E3779B9u;
+        auto next = [&state] { state = state * 1664525u + 1013904223u; return state >> 8; };
+        GeRegisters r;
+        for (int i = 0; i < 6000; ++i) {
+            const auto what = next() % 16u;
+            if (what < 5u) { // a state change: registers, matrices, sometimes the CLUT (as GeManager does)
+                r.reg[next() % 256u] = next();
+                r.world[next() % 12u] = static_cast<float>(next());
+                r.bone[next() % 96u] = static_cast<float>(next());
+                if (what == 0u) {
+                    for (auto &w : r.clut) w = next();
+                    r.clut_words = next() % 256u;
+                    r.clut_hash = (static_cast<std::uint64_t>(next()) << 32) | next();
+                }
+                ++r.state_version;
+            } else if (what < 13u) {
+                target.draw(m, r, static_cast<Prim>(next() % 7u), next() % 64u, 0x08800000u + next(), 0x08900000u + next());
+            } else if (what == 13u) {
+                target.transfer(m, r);
+            } else if (what == 14u) {
+                target.sync();
+            } else if (via_post) {
+                static_cast<AsyncRenderer &>(target).post([post_into, i](GeRenderer &) { post_into->log.push_back(0xC000u + static_cast<std::uint64_t>(i)); });
+            } else {
+                post_into->log.push_back(0xC000u + static_cast<std::uint64_t>(i));
+            }
+        }
+    };
+    Recorder direct;
+    run(direct, &direct, false);
+
+    std::thread worker;
+    WorkerHooks hooks;
+    hooks.start = [&worker](void (*entry)(void *), void *arg) { worker = std::thread(entry, arg); return true; };
+    hooks.join = [&worker] { if (worker.joinable()) worker.join(); };
+    hooks.pause = [] { std::this_thread::yield(); };
+    auto inner = std::make_unique<Recorder>();
+    Recorder *queued = inner.get();
+    {
+        AsyncRenderer async(std::move(inner), 0, std::move(hooks)); // 0: the smallest queue, many wraps
+        check(async.threaded(), "async renderer: worker started");
+        run(async, queued, true);
+        async.drain();
+        check(queued->log == direct.log, "async renderer: replayed calls, registers and CLUT equal direct calls");
+        check(async.async_stats().states < async.async_stats().draws, "async renderer: state sent only when it changed");
+    }
+    AsyncRenderer fallback(std::make_unique<Recorder>(), 0, WorkerHooks{});
+    check(!fallback.threaded(), "async renderer: no start hook -> direct calls");
+}
+
 int main() {
     psprecomp::GuestMemory m;
     for (std::uint32_t format = 0; format < 8; ++format)
@@ -266,6 +352,7 @@ int main() {
 
     vertex_cache_checks(m);
     model_run_checks();
+    async_renderer_checks(m);
 
     if (failures == 0) std::printf("test_ge_geometry: all checks passed\n");
     return failures == 0 ? 0 : 1;
