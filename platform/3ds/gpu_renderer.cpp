@@ -1009,12 +1009,15 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     const std::uint32_t stride = skinned ? sizeof(ShaderVertex) : static_cast<std::uint32_t>(offsetof(ShaderVertex, w));
     if (n * stride > kVertexBytes) { ++gpu_stats_.skipped_prims; return; }
     const std::uint32_t material = layout.color_format >= 4u ? 0u : (r24(regs, 0x55) | ((r24(regs, 0x58) & 0xFFu) << 24));
-    auto tri = [this](std::uint16_t a, std::uint16_t b, std::uint16_t c) {
+    // Counted per triangle: an arena flush while a run opens clears
+    // batch_indices_, so a size difference would underflow.
+    std::uint32_t triangles = 0;
+    auto tri = [this, &triangles](std::uint16_t a, std::uint16_t b, std::uint16_t c) {
         batch_indices_.push_back(a);
         batch_indices_.push_back(b);
         batch_indices_.push_back(c);
+        ++triangles;
     };
-    const std::size_t before = batch_indices_.size();
 
     if (isize == 0u && layout.morphs <= 1u) {
         // Non-indexed: the draw joins (or opens) a run of contiguous draws;
@@ -1067,7 +1070,7 @@ void GpuRenderer::draw_model(psprecomp::GuestMemory &memory, const ge::GeRegiste
     add(gpu_stats_.uniform_ticks, uniform_start, tick());
     ++gpu_stats_.model_draws;
     gpu_stats_.model_vertices += n;
-    gpu_stats_.triangles += static_cast<std::uint64_t>(batch_indices_.size() - before) / 3u;
+    gpu_stats_.triangles += triangles;
 }
 
 void GpuRenderer::fill_model_vertices(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, const ge::VertexLayout &layout,
