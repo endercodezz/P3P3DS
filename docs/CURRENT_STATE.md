@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Report written off the game's thread; new targets cleared (2026-10-11)
+
+- [VERIFIED] User report attached to issue #3 (New 2DS XL, 0.3.0 build f23bc87, 3 minutes from start): `speed 36%`, `ui 58.6` (last 10 s) / `62.2` (run average), `aot 8`, `idle 31`, `fps 30.0` between stalls. On the maintainer's console the same build shows `ui 0.7-0.8`. `ui` covers only the report every 5 s: building the text, the bottom screen and rewriting `sdmc:/p3p3ds/report.txt` (`profile_seconds.txt` absent). [INFERRED] On that SD card one `fopen`/`fclose` rewrite takes about 3 s, and the game stood still for it every 5 s.
+- `platform/3ds/main.cpp`: the periodic report is posted to a writer thread on core 0 below the game's priority (a newer report replaces one not yet written); the final report at exit is still written directly after the thread stops. The report shows the longest rewrite so far: `linear free : N KiB  sd max M ms`.
+- `platform/3ds/gpu_renderer.cpp` `target_for`: a new render target is filled black (`C3D_FrameBufClear`, queued before the frame's draws) instead of keeping what the previous application left in VRAM. [UNVERIFIED] whether this removes the garbage at start and in transitions (issue #3): the first draw into a target already starts from the guest framebuffer, so the garbage may come from elsewhere.
+- Verified: `.3dsx` builds, CTest 27/27. [UNVERIFIED] on hardware. Released as 0.3.1.
+
 ## Hardware: GE on core 2, battles at 16-25 fps (2026-10-11)
 
 Maintainer, New 2DS XL, build 7eabbb8 (the report shows `build b073247`: the build id is taken when CMake configures, not at each build), 7.6 minutes from start through the first days and the first battle. Files: report and five photos of the screens (not tracked).

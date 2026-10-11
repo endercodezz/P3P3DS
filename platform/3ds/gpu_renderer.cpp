@@ -350,6 +350,10 @@ GpuRenderer::Target *GpuRenderer::target_for(std::uint32_t address, std::uint32_
     t.rt = C3D_RenderTargetCreateFromTex(&t.tex, GPU_TEXFACE_2D, 0, -1);
     if (t.rt == nullptr) { C3D_TexDelete(&t.tex); return nullptr; }
     C3D_FrameBufDepth(&t.rt->frameBuf, shared_depth_, GPU_RB_DEPTH24_STENCIL8);
+    // VRAM keeps whatever the previous application left there (on hardware:
+    // pictures of the Homebrew Launcher, issue #3). Black until drawn; the
+    // fill is queued before this frame's draws.
+    C3D_FrameBufClear(&t.rt->frameBuf, C3D_CLEAR_COLOR, 0x000000FFu, 0);
     t.cpu_seq = ++seq_; // guest EDRAM holds the current contents until the GE draws
     targets_.push_back(t);
     gpu_stats_.targets = static_cast<std::uint32_t>(targets_.size());

@@ -14,9 +14,10 @@
 
 | Issue | Where | State |
 |---|---|---|
-| Logos at start replaced by garbage (gray screen with stripes of old video memory, left over from the Homebrew Launcher); the game then continues normally | first seconds after start, 0.3.0 | new in 0.3.0 with the GE on core 2; [UNVERIFIED] cause: a render target shown before anything was drawn into it. Check: create `sdmc:/p3p3ds/no_gpu_thread.txt` (GE back on the main core) and see whether the logos return |
+| Logos at start replaced by garbage (gray screen with stripes of old video memory, left over from the Homebrew Launcher); the game then continues normally | first seconds after start, 0.3.0 | new in 0.3.0 with the GE on core 2; [UNVERIFIED] cause: a render target shown before anything was drawn into it. 0.3.1 fills new render targets black instead of leaving old video memory (untested on hardware). Check: create `sdmc:/p3p3ds/no_gpu_thread.txt` (GE back on the main core) and see whether the logos return |
 | Scene transitions: one or more frames of garbage (hardware) or black (Azahar) instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)) | cutscene and scene changes | [UNVERIFIED] same family as above: uninitialized render target, or a copy of a frame the GPU drew but guest memory does not hold |
 | Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
+| 0.3.0 only: on a slow SD card the game stops for seconds every 5 s while it rewrites `report.txt` (one user: 36 % speed, `ui` about 60 %) | everywhere | fixed in 0.3.1: the report is written by a thread of its own; `sd max` on the `linear free` line shows the slowest write |
 | Battle: 16-25 fps, 63-86 % of real time (0.3.0, hardware; was 5-7.5 fps in 0.2.7) | battles | game targets 30 fps; the game's own code is now the largest share (`aot` 63-70 %) |
 | Dorm: 28-30 fps (0.3.0, hardware) | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
