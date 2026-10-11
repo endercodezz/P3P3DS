@@ -4,16 +4,21 @@
 
 ---
 
-## Status: NOT PLAYABLE YET (New 3DS: first days at 21-30 fps, saves work, no sound; battles slow)
+## Status: PLAYABLE, EARLY (New 3DS: 28-30 fps in the field, battles 16-25 fps, saves work; no sound, no opening movie)
 
-> **IMPORTANT:** The game is **not playable** on PC or Nintendo 3DS. On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game runs from the title screen through NEW GAME and the first days at about **30 fps** (drops to 25 in the field, 15 when the first Shadow appears), rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle renders correctly since 0.2.7 (faces, roof, sky, the Shadow; before, a back-face culling rule inverted for 3D draws turned the models inside out and the surroundings black), but runs slowly: 5-7.5 fps on hardware in 0.2.7, about 16 fps in Azahar in 0.2.9 (see Known issues below). The opening movie is skipped automatically (no video decoder yet).
+> **IMPORTANT:** Since 0.3.0 the game is **playable on a New 3DS** without sound and without the opening movie (no audio output on the 3DS and no video decoder yet). The maintainer has played on a New 2DS XL through the first days and the first battle; later parts of the game are untested. On hardware: about 28-30 fps in the dorm, 30 fps most of the time in dialogue scenes, 16-25 fps in battle (the GE back end runs on the second CPU core). See Known issues below.
+>
+> On the PC development runner it boots, shows its logos, plays the opening movie (as black frames: there is no video decoder yet), reaches the title screen with audio and, driven by a scripted controller input, starts a New Game and plays through name entry, the first night in the dorm and the walk to school, where the navigation cursor responds to input. Input comes from deterministic scripts (or an XInput gamepad); there is no window yet, so frames are written as images. On a **real New 3DS** the game is rendered by the PICA200 GPU, with **no sound yet**. Saving and loading work (save/load menu on the bottom screen). The first battle renders correctly since 0.2.7 (faces, roof, sky, the Shadow; before, a back-face culling rule inverted for 3D draws turned the models inside out and the surroundings black), and its speed went from 5-7.5 fps on hardware in 0.2.7 to 16-25 fps in 0.3.0. The opening movie is skipped automatically (no video decoder yet).
 
 ### Known issues (New 3DS, maintainer's tests on a New 2DS XL)
 
 | Issue | Where | State |
 |---|---|---|
-| Battle: slow. 0.2.7 on hardware: 5-7.5 fps, 18-25 % of real time. 0.2.9 in Azahar: about 16 fps, 52 % in the Evoker scene (was 10 fps, 33 % in 0.2.8: vertex cache, merged model draws, cheaper profiling; not yet measured on hardware) | first Shadow battle | next optimisation target (goal: 20 fps first, then the game's full 30 fps) |
-| Dorm: 21-26 fps on the floors (30 in the own room), 89-91 % speed | field | game targets 30 fps |
+| Logos at start replaced by garbage (gray screen with stripes of old video memory, left over from the Homebrew Launcher); the game then continues normally | first seconds after start, 0.3.0 | new in 0.3.0 with the GE on core 2; [UNVERIFIED] cause: a render target shown before anything was drawn into it. Check: create `sdmc:/p3p3ds/no_gpu_thread.txt` (GE back on the main core) and see whether the logos return |
+| Scene transitions: one or more frames of garbage (hardware) or black (Azahar) instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)) | cutscene and scene changes | [UNVERIFIED] same family as above: uninitialized render target, or a copy of a frame the GPU drew but guest memory does not hold |
+| Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
+| Battle: 16-25 fps, 63-86 % of real time (0.3.0, hardware; was 5-7.5 fps in 0.2.7) | battles | game targets 30 fps; the game's own code is now the largest share (`aot` 63-70 %) |
+| Dorm: 28-30 fps (0.3.0, hardware) | field | game targets 30 fps |
 | No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
 | Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
 | Saves stored in their own format | `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` | not compatible with PSP or PPSSPP saves |
@@ -26,7 +31,7 @@ Defects found in the code review of 2026-10-08, not fixed yet (evidence and test
 | Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
 | Mutexes are not released when their owner thread exits; event-flag result bits differ from the PSP on timeouts | possible deadlock or wrong wake-up | reproduced in a unit test |
 | Every file read, also from the SD card and mods, is slowed to UMD speed in game time | longer loads; a candidate cause of the dorm frame drops | suspected; test on the PC route planned |
-| Only one of the New 3DS CPU cores is used; profiling timers always on | speed left unused | confirmed in code |
+| Only one of the New 3DS CPU cores is used; profiling timers always on | speed left unused | fixed: GE back end on core 2 and sampled draw timers (0.3.0) |
 | Save names from the game are not checked before building SD card paths | a corrupted or modded name could write or delete outside the save folder | confirmed in code |
 
 Reports help: the bottom screen and `sdmc:/p3p3ds/report.txt` show the build, speed and where the time goes.
@@ -37,7 +42,8 @@ On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8
 |---|---|
 | `.3dsx` build | devkitARM, 44 MB of recompiled ARM code (cut from 77 MB), clean build in about 9 minutes |
 | Boot | logos, title screen and main menu, drawn by the PICA200; logo positions pixel-identical to the PC renderer; the opening movie is skipped (no video decoder yet) |
-| Speed | about 30 game frames/s in the own room and at school, 21-26 on the dorm floors; 88 % of real time on average over 21 minutes (CPU rendering at first: 5 %, 2 fps); first battle 5-7.5 fps (0.2.7, hardware), about 16 fps (0.2.9, Azahar) |
+| Speed | 0.3.0: 28-30 game frames/s in the dorm, 30 most of the time in dialogue, 16-25 in battle; 90 % of real time on average over 7.6 minutes including a battle (CPU rendering at first: 5 %, 2 fps; first battle 5-7.5 fps in 0.2.7) |
+| Second CPU core | the GE back end (draw preparation and citro3d) runs on core 2 beside the game's code; start probe on hardware: `core2 ok, parallel x1.98` |
 | Saves | save and load at the dorm desk and from LOAD GAME, menu on the bottom screen |
 | First battle | starts since 0.2.5; transform, skinning and lighting on the GPU since 0.2.6; renders correctly since 0.2.7 (culling fix); slow (see Known issues) |
 | Memory | heap 71,220 KiB with 60,284 KiB in use (hardware, 2026-10-02; 12 MiB linear heap); about 10.7 MiB free |
@@ -83,7 +89,7 @@ Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_ST
 - [x] Battles rendered correctly (lighting, skinning on the GPU)
 - [ ] Battles at full speed, sound (ndsp), movie decoding
 - [ ] ndsp audio, live controls tested and `.cia` for New 3DS
-- [ ] Playable game on New Nintendo 3DS hardware
+- [x] Playable game on New Nintendo 3DS hardware (early: first days and first battle, no sound, no opening movie)
 
 ---
 

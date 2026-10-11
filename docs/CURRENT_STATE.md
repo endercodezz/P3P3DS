@@ -2,6 +2,16 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Hardware: GE on core 2, battles at 16-25 fps (2026-10-11)
+
+Maintainer, New 2DS XL, build 7eabbb8 (the report shows `build b073247`: the build id is taken when CMake configures, not at each build), 7.6 minutes from start through the first days and the first battle. Files: report and five photos of the screens (not tracked).
+
+- [VERIFIED] Core 2 is usable by the `.3dsx` under the Homebrew Launcher and runs in parallel: `cores : core2 ok, parallel x1.98, GE on core2`.
+- [VERIFIED] Speed (maintainer's observation and bottom-screen photos): dorm 28-30 fps, dialogue scenes 30 fps most of the time, battle 16-25 fps. Photos: Yukari's Evoker 21.9 fps / 66 % (`aot 63 hle 15 ge 13`, `gpu thd: busy 57 wait 4.3`), the protagonist's Evoker 25.9 fps / 86 % (`aot 70`, `busy 65 wait 0.4`), battle command menu 19.0 fps / 63 % (`aot 66`, `busy 56 wait 0.2`). Final report: run average 90 % of real time, 24,583 vblanks, `vtx: cache hit 100%`, `runs : 6591k draws in 193k runs`, linear free 1,501 KiB. For comparison 0.2.7 on hardware: battle 5-7.5 fps, 18-25 %.
+- The game's thread rarely waits for the worker (`wait` 0.0-4.3 % of the time) and the worker is busy 56-65 %: the battle is now bound by the game's own code (`aot` 63-70 %), not by the renderer. [INFERRED] Next gains in battle come from the game code (AOT output, HLE call cost), not from the GE.
+- [VERIFIED] New defect: the logos at start are replaced by a gray screen with stripes of old video memory (tiled pictures left over from the Homebrew Launcher, same look as issue #3 on hardware); after them the game continues normally. Report at that moment: vblank 207, `draws 322`, `tex 0 up 0`, `present gpu 54 cpu 99 same 53`. Not seen with the GE on the main thread (0.2.9). [UNVERIFIED] cause: a render target presented on the GPU path (`gpu_seq > cpu_seq`) before it holds the picture, i.e. the order of CPU-write notes and draws differs once they are queued for the worker. Next step: the same start with `sdmc:/p3p3ds/no_gpu_thread.txt` to confirm it is the worker, then a frame log of the first 300 vblanks.
+- Released as 0.3.0.
+
 ## GE back end on core 2 (2026-10-11)
 
 - [VERIFIED] Azahar run of build 9f2dc29 (maintainer, 2026-10-10): `cores : core2 ok, parallel x2.00`. Same run: Evoker scenes 16.3 fps / 54 % and 13.5 fps / 35 %; in the battle proper (Orpheus attacking) 9.3 fps / 34 %, `ge` 33-36 %, `prep` 17-20 %. [UNVERIFIED] core 2 on hardware.
