@@ -428,6 +428,11 @@ void GpuRenderer::blit(C3D_Tex &source, float src_w, float src_h, bool to_screen
     C3D_TexSetFilter(&source, to_screen ? GPU_LINEAR : GPU_NEAREST, to_screen ? GPU_LINEAR : GPU_NEAREST);
     C3D_TexSetWrap(&source, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
     C3D_TexBind(0, &source);
+    // The next textured GE draw must bind its texture again even when it is the
+    // one bound before this blit: untextured draws in between (clears) make the
+    // state valid again without binding. Without this the ATLUS and CRIWARE
+    // logos sampled the black render target and were invisible.
+    bound_tex_ = nullptr;
     use_buffer(Layout::Screen);
     C3D_DrawArrays(GPU_TRIANGLES, static_cast<int>(first), 6);
 }
@@ -697,9 +702,14 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
         flush_frame();
     }
     Target *target = target_for(color_address, r24(regs, 0xD2) & 3u, true);
-    if (target == nullptr) { ++gpu_stats_.skipped_prims; return; }
+    if (target == nullptr) {
+        if (trace_) std::fprintf(trace_, "D %llu fb=%08lX no target\n", static_cast<unsigned long long>(frame_), static_cast<unsigned long>(color_address));
+        ++gpu_stats_.skipped_prims;
+        return;
+    }
     if (batch_active_ && target != batch_target_) flush_batch();
     if (bound_ != target || bound_screen_) bind_target(*target);
+    const bool trace_upload = target->cpu_seq > target->gpu_seq;
     if (target->cpu_seq > target->gpu_seq) {
         // The guest wrote this framebuffer since the GPU last drew it: start from its contents.
         upload_guest_framebuffer(memory, color_address, stride, target->format);
@@ -718,6 +728,38 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     float su = 1.0f, sv = 1.0f;
     C3D_Tex *tex = textured ? const_cast<C3D_Tex *>(bind_texture(memory, regs, su, sv)) : nullptr;
     const bool sprites = prim == ge::Prim::Sprites;
+    if (trace_ && (layout.through || clear_mode || sprites)) {
+        const auto ti = ge::texture_info(regs);
+        std::fprintf(trace_, "D %llu fb=%08lX prim=%u n=%lu vt=%06lX up=%d clear=%d tex=%d:%08lX %lux%lu f%lu ok=%d tf=%06lX bl=%lu:%06lX at=%lu:%06lX zt=%lu:%06lX sc=%06lX,%06lX\n",
+                     static_cast<unsigned long long>(frame_), static_cast<unsigned long>(color_address), static_cast<unsigned>(prim),
+                     static_cast<unsigned long>(count), static_cast<unsigned long>(r24(regs, 0x12)), trace_upload ? 1 : 0, clear_mode ? 1 : 0,
+                     textured ? 1 : 0, static_cast<unsigned long>(ti.address), static_cast<unsigned long>(ti.width),
+                     static_cast<unsigned long>(ti.height), static_cast<unsigned long>(ti.format), tex != nullptr ? 1 : 0,
+                     static_cast<unsigned long>(r24(regs, 0xC9)), static_cast<unsigned long>(regs.reg[0x21] & 1u),
+                     static_cast<unsigned long>(r24(regs, 0xDF)), static_cast<unsigned long>(regs.reg[0x22] & 1u),
+                     static_cast<unsigned long>(r24(regs, 0xDB)), static_cast<unsigned long>(regs.reg[0x23] & 1u),
+                     static_cast<unsigned long>(r24(regs, 0xDE)), static_cast<unsigned long>(r24(regs, 0xD4)),
+                     static_cast<unsigned long>(r24(regs, 0xD5)));
+        if (tex != nullptr) {
+            // Decoded contents: texels with alpha > 0 and with a non-black colour.
+            std::vector<std::uint32_t> texels;
+            ge::decode_texture(memory, regs, ti, texels);
+            std::size_t alpha = 0, colour = 0;
+            std::uint32_t amin = 255, amax = 0;
+            for (const std::uint32_t c : texels) {
+                alpha += (c >> 24) != 0u;
+                colour += (c & 0xFFFFFFu) != 0u;
+                if ((c & 0xFFFFFFu) != 0u) { amin = std::min(amin, c >> 24); amax = std::max(amax, c >> 24); }
+            }
+            std::fprintf(trace_, "  colour alpha %lu..%lu mask E8=%06lX E7=%06lX E9=%06lX\n", static_cast<unsigned long>(amin),
+                         static_cast<unsigned long>(amax), static_cast<unsigned long>(r24(regs, 0xE8)), static_cast<unsigned long>(r24(regs, 0xE7)),
+                         static_cast<unsigned long>(r24(regs, 0xE9)));
+            std::fprintf(trace_, "  texels %zu alpha>0 %zu colour %zu clut=%06lX words=%lu cull=%lu:%lu tex %ux%u fmt %d\n", texels.size(), alpha,
+                         colour, static_cast<unsigned long>(r24(regs, 0xC5)), static_cast<unsigned long>(regs.clut_words),
+                         static_cast<unsigned long>(regs.reg[0x1D] & 1u), static_cast<unsigned long>(r24(regs, 0x9B)), tex->width,
+                         tex->height, static_cast<int>(tex->fmt));
+        }
+    }
     const std::array<std::uint32_t, 20> key = {
         r24(regs, 0xC9), r24(regs, 0xCA), regs.reg[0x22] & 1u, r24(regs, 0xDB), regs.reg[0x21] & 1u, r24(regs, 0xDF),
         r24(regs, 0xE0), r24(regs, 0xE1), r24(regs, 0xE8), regs.reg[0x23] & 1u, r24(regs, 0xDE), r24(regs, 0xE7),
@@ -862,6 +904,14 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     arena_used_ = last_alloc_ + emitted * static_cast<std::uint32_t>(sizeof(Vertex)); // return the unused tail
     const u64 uniform_start = tick();
     add(gpu_stats_.vertex_ticks, vertex_start, uniform_start);
+    if (trace_) {
+        std::fprintf(trace_, "  emitted %lu", static_cast<unsigned long>(emitted));
+        for (std::uint32_t i = 0; i < count && i < 4u; ++i)
+            std::fprintf(trace_, " (%.1f,%.1f,%.3f uv %.1f,%.1f c%02X%02X%02X%02X%s)", screen_[i].x, screen_[i].y, screen_[i].z, screen_[i].u,
+                         screen_[i].v, screen_[i].color[0], screen_[i].color[1], screen_[i].color[2], screen_[i].color[3],
+                         screen_[i].clipped ? " clip" : "");
+        std::fputc('\n', trace_);
+    }
     if (emitted == 0u) return;
     set_matrix(u_.screen, target_projection());
     use_screen_vertices(su, sv);
@@ -1162,6 +1212,14 @@ void GpuRenderer::present(psprecomp::GuestMemory &memory, const hle::DisplayFram
             cpu = true;
             source = &fallback_;
         }
+    }
+    if (trace_) {
+        std::fprintf(trace_, "P %llu active=%d top=%08lX fmt=%lu w=%lu target=%d gseq=%llu cseq=%llu cpu=%d src=%s same=%d\n",
+                     static_cast<unsigned long long>(frame_), fb.active ? 1 : 0, static_cast<unsigned long>(fb.topaddr),
+                     static_cast<unsigned long>(fb.pixelformat), static_cast<unsigned long>(fb.bufferwidth), t != nullptr ? 1 : 0,
+                     static_cast<unsigned long long>(t ? t->gpu_seq : 0), static_cast<unsigned long long>(t ? t->cpu_seq : 0), cpu ? 1 : 0,
+                     source == nullptr ? "none" : (cpu ? "guest" : "target"), (!cpu && source == shown_ && source_seq == shown_seq_) ? 1 : 0);
+        if (--trace_left_ == 0u) { std::fclose(trace_); trace_ = nullptr; }
     }
     if (!cpu && source == shown_ && source_seq == shown_seq_) {
         ++gpu_stats_.skipped_presents;

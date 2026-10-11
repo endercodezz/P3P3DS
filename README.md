@@ -14,7 +14,7 @@
 
 | Issue | Where | State |
 |---|---|---|
-| ATLUS and CRIWARE logos at start not shown: black screen since 0.3.1 (gray garbage from old video memory in 0.3.0); the game then continues normally | first seconds after start | under investigation: the hardware report shows no texture loaded at that point (`tex 0 up 0`) |
+| ATLUS and CRIWARE logos at start not shown (black since 0.3.1, gray garbage in 0.3.0); the game then continues normally | first seconds after start, 0.2.8-0.3.1 | fixed in master, not released yet: after each presented frame the first textured draw could sample the previous render target instead of its texture (shown in Azahar; hardware not tested yet) |
 | Scene transitions: one or more black frames instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)); garbage on hardware until 0.3.0 | cutscene and scene changes | since 0.3.1 black on hardware and in Azahar alike (new render targets are filled black); the missing fade itself is not fixed |
 | Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
 | 0.3.0 only: on a slow SD card the game stops for seconds every 5 s while it rewrites `report.txt` (one user: 36 % speed, `ui` about 60 %) | everywhere | fixed in 0.3.1, confirmed on hardware by the same user: 97-99 % speed, `ui 0.0`, while one rewrite still takes up to 2.6 s on that card (`sd max 2575 ms`) |
@@ -323,7 +323,7 @@ make -C build/3ds -j10
 
 A clean build takes about 9 minutes; after a runtime change only a few files and the link are rebuilt. Installing and running it: [Running on a New 3DS](#running-on-a-new-3ds). The `.3dsx` embeds code generated from your game executable: it is for your own use, never for distribution.
 
-Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`). An empty `sdmc:/p3p3ds/no_vertex_cache.txt` turns the model vertex cache off, for speed comparisons (bottom-screen line `vtx: fill ... cache hit ...%`). The GE renderer runs on the New 3DS's second application core when the start-up check finds it (`cores :` line); an empty `sdmc:/p3p3ds/no_gpu_thread.txt` keeps it on the main core.
+Debugging aids: a number N in `sdmc:/p3p3ds/dump_every.txt` saves the top screen every N vblanks to `sdmc:/p3p3ds/frames/` (compare with the PC runner's `--frames-dir`). An empty `sdmc:/p3p3ds/no_vertex_cache.txt` turns the model vertex cache off, for speed comparisons (bottom-screen line `vtx: fill ... cache hit ...%`). The GE renderer runs on the New 3DS's second application core when the start-up check finds it (`cores :` line); an empty `sdmc:/p3p3ds/no_gpu_thread.txt` keeps it on the main core. An empty `sdmc:/p3p3ds/gpu_trace.txt` writes the first 1,200 presented frames and their screen-space draws (target, texture, blend, vertices) to `sdmc:/p3p3ds/gpu_trace.log`.
 
 ### Build the P3P3DS Builder release
 

@@ -21,6 +21,8 @@
 // An empty sdmc:/p3p3ds/play_movies.txt turns this off.
 // Short slowdowns: an empty sdmc:/p3p3ds/profile_seconds.txt writes the time
 // split of every second to sdmc:/p3p3ds/profile_seconds.csv.
+// Renderer trace: an empty sdmc:/p3p3ds/gpu_trace.txt writes the first 1,200
+// presents and their screen-space draws to sdmc:/p3p3ds/gpu_trace.log.
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/input.hpp"
 #include "p3p3ds/interpreter.hpp"
@@ -841,6 +843,12 @@ int main() {
         stage = "init gpu";
         auto gpu = std::make_unique<p3p3ds::n3ds::GpuRenderer>();
         g_gpu = gpu.get();
+        // sdmc:/p3p3ds/gpu_trace.txt present: presents and screen-space draws of the
+        // first 1,200 presents (about 20 s) to sdmc:/p3p3ds/gpu_trace.log.
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/gpu_trace.txt", "r")) {
+            std::fclose(f);
+            gpu->set_trace(std::fopen("sdmc:/p3p3ds/gpu_trace.log", "w"), 1200u);
+        }
         // GE back end on core 2 when the probe found a parallel core 2;
         // sdmc:/p3p3ds/no_gpu_thread.txt keeps it on the game's thread (A/B runs).
         bool gpu_thread = stats.cores.rfind("core2 ok", 0) == 0;

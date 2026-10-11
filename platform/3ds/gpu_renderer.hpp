@@ -24,6 +24,7 @@
 #include <array>
 #include <cstdint>
 #include <atomic>
+#include <cstdio>
 #include <unordered_map>
 #include <vector>
 
@@ -80,6 +81,9 @@ public:
     [[nodiscard]] bool vertex_cache_enabled() const { return vertex_cache_enabled_; }
     // The last presented picture came from guest memory (CPU-written, e.g. a movie frame).
     [[nodiscard]] bool last_present_from_cpu() const { return last_present_cpu_; }
+    // Diagnostic trace (sdmc:/p3p3ds/gpu_trace.txt present): one line per present
+    // and per non-model draw until `presents` presents were written.
+    void set_trace(std::FILE *file, std::uint32_t presents) { trace_ = file; trace_left_ = presents; }
 
 private:
     // Screen vertex (CPU-transformed): v0 (x*w, y*w, z*w, w), v2 texels, v3 colour.
@@ -228,6 +232,8 @@ private:
     std::uint32_t last_alloc_{}; // offset of the latest allocation (unused tail can be returned)
     bool in_frame_{};
     std::uint64_t frame_{1}, seq_{};
+    std::FILE *trace_{};
+    std::uint32_t trace_left_{};
     std::vector<ge::ScreenVertex> screen_;
     std::vector<std::uint32_t> rgba_;
     // What fallback_ holds: guest framebuffer address and the target's cpu_seq
