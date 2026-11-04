@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <iterator>
 #include <map>
 #include <regex>
 #include <string_view>
@@ -1498,6 +1499,32 @@ std::string lower_constant_fpr_accesses(std::string text) {
     return lowered;
 }
 
+// P3P3DS: find the literal helper name first so each regex only examines candidate
+// calls instead of searching the full generated unit at every position.
+std::string replace_vfpu_calls(std::string text, std::string_view prefix,
+                               const std::regex &pattern, std::string_view replacement) {
+    std::string result;
+    std::smatch match;
+    std::size_t copied = 0;
+    std::size_t search = 0;
+    while ((search = text.find(prefix, search)) != std::string::npos) {
+        if (!std::regex_search(text.cbegin() + search, text.cend(), match, pattern,
+                               std::regex_constants::match_continuous)) {
+            search += prefix.size();
+            continue;
+        }
+        if (copied == 0) result.reserve(text.size());
+        result.append(text, copied, search - copied);
+        match.format(std::back_inserter(result), replacement.data(),
+                     replacement.data() + replacement.size());
+        search += match.length();
+        copied = search;
+    }
+    if (copied == 0) return text;
+    result.append(text, copied, std::string::npos);
+    return result;
+}
+
 // VFPU operands in automatic AOT are encoded literals. Convert the
 // generic lane/prefix helpers into compile-time templates so row/column mapping,
 // scalar-vs-control selection and 1..4-lane loops disappear before MSVC sees the
@@ -1505,63 +1532,63 @@ std::string lower_constant_fpr_accesses(std::string text) {
 std::string lower_constant_vfpu_accesses(std::string text) {
     const std::regex read_prefix(
         R"(ctx\.read_vfpu_vector_with_source_prefix\(([A-Za-z0-9_]+), ([0-9]+)u, ([1-4])u, ([01])u\);)" );
-    text = std::regex_replace(text, read_prefix,
-        "ctx.read_vfpu_vector_with_source_prefix_ct<$2u, $3u, $4u>($1);");
+    text = replace_vfpu_calls(std::move(text), "ctx.read_vfpu_vector_with_source_prefix(",
+        read_prefix, "ctx.read_vfpu_vector_with_source_prefix_ct<$2u, $3u, $4u>($1);");
 
     const std::regex read_plain(
         R"(ctx\.read_vfpu_vector\(([A-Za-z0-9_]+), ([0-9]+)u, ([1-4])u\);)" );
-    text = std::regex_replace(text, read_plain,
-        "ctx.read_vfpu_vector_ct<$2u, $3u>($1);");
+    text = replace_vfpu_calls(std::move(text), "ctx.read_vfpu_vector(",
+        read_plain, "ctx.read_vfpu_vector_ct<$2u, $3u>($1);");
 
     const std::regex write_prefix(
         R"(ctx\.write_vfpu_vector_with_destination_prefix\(([A-Za-z0-9_]+), ([0-9]+)u, ([1-4])u\);)" );
-    text = std::regex_replace(text, write_prefix,
-        "ctx.write_vfpu_vector_with_destination_prefix_ct<$2u, $3u>($1);");
+    text = replace_vfpu_calls(std::move(text), "ctx.write_vfpu_vector_with_destination_prefix(",
+        write_prefix, "ctx.write_vfpu_vector_with_destination_prefix_ct<$2u, $3u>($1);");
 
     const std::regex write_plain(
         R"(ctx\.write_vfpu_vector\(([A-Za-z0-9_]+), ([0-9]+)u, ([1-4])u\);)" );
-    text = std::regex_replace(text, write_plain,
-        "ctx.write_vfpu_vector_ct<$2u, $3u>($1);");
+    text = replace_vfpu_calls(std::move(text), "ctx.write_vfpu_vector(",
+        write_plain, "ctx.write_vfpu_vector_ct<$2u, $3u>($1);");
 
     const std::regex source_prefix_plain(
         R"(ctx\.apply_vfpu_source_prefix\(([A-Za-z0-9_]+), ([1-4])u, ([01])u\);)" );
-    text = std::regex_replace(text, source_prefix_plain,
-        "ctx.apply_vfpu_source_prefix_ct<$2u, $3u>($1);");
+    text = replace_vfpu_calls(std::move(text), "ctx.apply_vfpu_source_prefix(",
+        source_prefix_plain, "ctx.apply_vfpu_source_prefix_ct<$2u, $3u>($1);");
 
     const std::regex fpu_to_word(
         R"(ctx\.fpu_float_to_word\(([^,\n]+), ([0-3])u\))" );
-    text = std::regex_replace(text, fpu_to_word,
-        "ctx.fpu_float_to_word_ct<$2u>($1)");
+    text = replace_vfpu_calls(std::move(text), "ctx.fpu_float_to_word(",
+        fpu_to_word, "ctx.fpu_float_to_word_ct<$2u>($1)");
 
     const std::regex vcmp(
         R"(ctx\.execute_vfpu_vcmp\(([0-9]+)u, ([0-9]+)u, ([1-4])u, ([0-9]+)u\);)" );
-    text = std::regex_replace(text, vcmp,
-        "ctx.execute_vfpu_vcmp_ct<$1u, $2u, $3u, $4u>();");
+    text = replace_vfpu_calls(std::move(text), "ctx.execute_vfpu_vcmp(",
+        vcmp, "ctx.execute_vfpu_vcmp_ct<$1u, $2u, $3u, $4u>();");
 
     const std::regex vcmov(
         R"(ctx\.execute_vfpu_vcmov\(([0-9]+)u, ([0-9]+)u, ([1-4])u, ([0-7])u, (true|false)\);)" );
-    text = std::regex_replace(text, vcmov,
-        "ctx.execute_vfpu_vcmov_ct<$1u, $2u, $3u, $4u, $5>();");
+    text = replace_vfpu_calls(std::move(text), "ctx.execute_vfpu_vcmov(",
+        vcmov, "ctx.execute_vfpu_vcmov_ct<$1u, $2u, $3u, $4u, $5>();");
 
     const std::regex vdot(
         R"(ctx\.execute_vfpu_vdot\(([0-9]+)u, ([0-9]+)u, ([0-9]+)u, ([1-4])u\);)" );
-    text = std::regex_replace(text, vdot,
-        "ctx.execute_vfpu_vdot_ct<$1u, $2u, $3u, $4u>();");
+    text = replace_vfpu_calls(std::move(text), "ctx.execute_vfpu_vdot(",
+        vdot, "ctx.execute_vfpu_vdot_ct<$1u, $2u, $3u, $4u>();");
 
     const std::regex vscl(
         R"(ctx\.execute_vfpu_vscl\(([0-9]+)u, ([0-9]+)u, ([0-9]+)u, ([1-4])u\);)" );
-    text = std::regex_replace(text, vscl,
-        "ctx.execute_vfpu_vscl_ct<$1u, $2u, $3u, $4u>();");
+    text = replace_vfpu_calls(std::move(text), "ctx.execute_vfpu_vscl(",
+        vscl, "ctx.execute_vfpu_vscl_ct<$1u, $2u, $3u, $4u>();");
 
     const std::regex scalar_read(R"(ctx\.vfpu_scalar_bits\(([0-9]+)u\))");
-    text = std::regex_replace(text, scalar_read,
-        "ctx.vfpu_scalar_bits_ct<$1u>()");
+    text = replace_vfpu_calls(std::move(text), "ctx.vfpu_scalar_bits(",
+        scalar_read, "ctx.vfpu_scalar_bits_ct<$1u>()");
 
     // set_vfpu_scalar_bits second arguments in generated code stay on one line.
     const std::regex scalar_write(
         R"(ctx\.set_vfpu_scalar_bits\(([0-9]+)u, ([^;\n]+)\);)" );
-    text = std::regex_replace(text, scalar_write,
-        "ctx.set_vfpu_scalar_bits_ct<$1u>($2);");
+    text = replace_vfpu_calls(std::move(text), "ctx.set_vfpu_scalar_bits(",
+        scalar_write, "ctx.set_vfpu_scalar_bits_ct<$1u>($2);");
     return text;
 }
 
