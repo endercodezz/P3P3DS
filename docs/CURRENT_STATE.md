@@ -2,6 +2,12 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Builder AOT layout and runner mod paths use the P3P profile (2026-11-04)
+
+- [VERIFIED] `profiles/p3p/config/aot_layout.cmake` supplies the load base, span and count to CMake and to the Builder through its configured header. The PC and New 3DS runners use the mod alias in `profiles/p3p/config/mod_paths.hpp`, from `p3p/p3p-patches/ULUS10512.ini:6-9`.
+- [VERIFIED] Windows Release build, `ctest --test-dir build -j6 --output-on-failure` (27/27), `python tools/verify_aot_layout.py build/generated/auto 237 16384`, stable bootstrap and devkitARM `cmake --build build/3ds --target p3p3ds_objects -j4` passed.
+- [VERIFIED] Two PC runs with `--run-until-blocker --max-dispatches 20000000 --ms0 .tmp/issue27/ms0 --mods .tmp/issue27/mods --dump-events <path>` and the pre-change run all reached the dispatch limit at `0x08A87150`. Their event dumps (`.tmp/issue27/baseline.json`, `run1.json`, `run2.json` in the same directory) share SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605`. No new execution blocker was observed. [UNVERIFIED] Mod loading on physical New 3DS hardware.
+
 ## Known issues tracked on GitHub; issue -> pull request workflow (2026-11-04)
 
 No runtime change; the frontier is the same as in the entry below (logo fix 4d198db in master, not released).

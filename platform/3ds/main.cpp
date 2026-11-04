@@ -5,7 +5,7 @@
 // written to sdmc:/p3p3ds/report.txt every few seconds and on exit.
 //
 // Game data: sdmc:/p3p3ds/*.iso (the user's ULUS-10512 image) mounted as
-// disc0:, sdmc:/p3p3ds/ms0 as ms0:, sdmc:/p3p3ds/mods as ms0:/PSP/P3P.
+// disc0:, sdmc:/p3p3ds/ms0 as ms0:, sdmc:/p3p3ds/mods as the profile's mod directory.
 // The decrypted executable is read from romfs:/eboot.elf (embedded at build
 // time from the local build; it must match the generated AOT code).
 //
@@ -30,6 +30,7 @@
 #include "p3p3ds/profile.hpp"
 #include "p3p3ds/vfs.hpp"
 #include "bootstrap_expectations.hpp"
+#include "mod_paths.hpp"
 #include "gpu_renderer.hpp"
 #include "p3p3ds/ge/async_renderer.hpp"
 #include "psprecomp/elf32.hpp"
@@ -825,7 +826,7 @@ int main() {
         kernel.io().mount("ms0:", std::make_shared<p3p3ds::vfs::HostFileSystem>(ms0), true);
         kernel.savedata().root = ms0 + "/PSP/SAVEDATA";
         // Read-only and unchanged while the game runs: lookups cached (vfs.hpp).
-        kernel.io().alias("ms0:/PSP/P3P", std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods", true));
+        kernel.io().alias(p3p3ds::profile::kModPrefix, std::make_shared<p3p3ds::vfs::HostFileSystem>(std::string(kBase) + "/mods", true));
         kernel.threads().init_root_thread("root", entry, sp, module->gp);
         std::set<std::uint32_t> stubs;
         std::vector<std::tuple<std::string, std::uint32_t, std::uint32_t>> imports;

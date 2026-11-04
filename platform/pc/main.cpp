@@ -9,6 +9,7 @@
 #include "host_input.hpp"
 #include "p3p3ds/profile.hpp"
 #include "sampler.hpp"
+#include "mod_paths.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -113,8 +114,8 @@ int main(int argc,char **argv) {
         } else std::cout<<"UMD image: none (disc0: unmounted)\n";
         kernel.io().trace_reads=!io_trace_path.empty();
         {
-            // ms0: memory stick root; the community Mod Support patch reads
-            // ms0:/PSP/P3P/{bind/,mod.cpk,mod1-3.cpk}, mapped onto --mods.
+            // Mount the memory stick root and optionally map the profile's
+            // Mod Support directory onto --mods.
             std::filesystem::create_directories(ms0_path);
             kernel.io().mount("ms0:",std::make_shared<p3p3ds::vfs::HostFileSystem>(ms0_path),true);
             // Saves: ms0:/PSP/SAVEDATA. The list dialogs have no window here, so
@@ -130,8 +131,8 @@ int main(int argc,char **argv) {
                 return best>=0 ? best : (d.kind==p3p3ds::hle::SavedataDialog::Kind::Save ? 0 : -1);
             };
             if(!mods_path.empty()) {
-                kernel.io().alias("ms0:/PSP/P3P",std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path,true)); // read-only: cached lookups
-                std::cout<<"Mods: ms0:/PSP/P3P -> "<<mods_path.string()<<"\n";
+                kernel.io().alias(p3p3ds::profile::kModPrefix,std::make_shared<p3p3ds::vfs::HostFileSystem>(mods_path,true)); // read-only: cached lookups
+                std::cout<<"Mods: "<<p3p3ds::profile::kModPrefix<<" -> "<<mods_path.string()<<"\n";
             }
         }
         kernel.threads().init_root_thread("root",entry,sp,module->gp);
