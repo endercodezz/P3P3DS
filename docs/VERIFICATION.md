@@ -16,6 +16,14 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## Production VFPU prefilter (#38, 2026-11-05)
+
+- [VERIFIED] `recomp/PSPRecomp/tools/codegen_main.cpp::replace_vfpu_calls` uses a literal search before matching the existing regex at each candidate. `lower_constant_vfpu_accesses` retains the order, regex patterns and replacement formats from `b35d2cc`.
+- [VERIFIED] Windows Release build (`cmake --build build --config Release --parallel 6`) generated 237 units and rewrote zero in its existing output directory. Independently, `psp_recomp profiles/p3p/game/eboot.elf --auto <fresh-dir> 0x08804000 16384 build/generated/patches.txt` took 9.26 s with the filter and 40.31 s before it. A fresh run with `--no-transfer-records` took 7.50 s. Each of the two modes matched its own original 240-file manifest by filename and SHA-256. `tools/verify_aot_layout.py <fresh-dir> 237 16384` passed for both modes. Timings, original diagnostic output, fresh outputs, manifests and build log are in `.tmp/vfpu-production/`. The earlier unmodified release output used for comparison is `.tmp/host-language-research/a`.
+- [VERIFIED] SHA-256 of the diagnostic manifest (`diagnostic-sha256.txt`) is `0f3b7406d056ad0e6e268f46bacca6f12c064c62a08a6acaadc4956a499b6ff1`. SHA-256 of the release manifest (`release-sha256.txt`) is `6ee69504bda0cb7f4ba46326564092ac108b0db0e9ebb91248e205344ee40861`.
+
+---
+
 ## Thread-entry frontier provenance micro-sprint
 
 - [VERIFIED] The `SceWaveMain` UID 5 initial context switch installs its stored entry `0x08B64FE0` without a guest JAL to that address. Evidence: `core/src/hle/threadman.cpp::start_thread`, `platform/pc/telemetry.hpp::blocker_type`, `.tmp/thread-entry-before.json` and `.tmp/thread-entry-check/report.json`. The new `thread_entry_transfer` record is one-shot and is invalidated by guest execution/transfer or another switch.
