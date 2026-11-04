@@ -94,7 +94,7 @@ For a blocker sprint:
 3. Research only the required semantics using Section 4; implement the smallest correct behavior and focused regression tests.
 4. Perform Section 7 verification; confirm the next frontier is reproducible.
 5. Update `docs/CURRENT_STATE.md` when the verified frontier materially changes. Record the next blocker and one next task.
-6. Create one NEW local commit under Sections 16-17, then STOP. Never fold a sprint into its predecessor or mix unrelated work.
+6. Create one NEW commit on the sprint's issue branch under Sections 16-17, push the branch and open (or update) its pull request, then STOP. Never fold a sprint into its predecessor or mix unrelated work.
 
 STOP means do not fix the next missing HLE/function, unsupported instruction, scheduler/callback issue, memory-semantic problem, ambiguous control flow, architectural blocker or meaningful graphics milestone in this sprint. Verification and documentation of the completed step still belong to this sprint. Research-only/instruction-only tasks retain their requested scope; they do not require runtime changes or guest execution.
 
@@ -223,26 +223,33 @@ Do not add yourself as contributor, co-author, author, committer, reviewer, or m
 
 ---
 
-## 16. Git Workflow: Commit, Then Push Without Rewriting
+## 16. Git Workflow: Issue -> Branch -> Pull Request
 
-After completing a well-defined user task or milestone, the agent must automatically create a local git commit if:
-1. The working tree contains modifications belonging to the completed task;
-2. All regression, verification, and smoke tests have passed cleanly;
-3. There is no explicit instruction from the user forbidding commits.
+Every task is tracked by a GitHub issue and lands in `master` through a pull request (maintainer decision, 2026-11-04). **Never push to `master` directly.**
+
+1. **Issue**: find the issue for the task (`gh issue list`) or open one first: what is wrong or wanted, evidence with claim tags (section 3), how it will be verified. Known issues and roadmap steps already have issues (`docs/NEXT_STEPS.md` links them).
+2. **Branch** from an up-to-date `master` (`git fetch`, `git switch -c <type>/<short-name> origin/master`), with `<type>` one of `feat`, `fix`, `perf`, `docs`, `chore`. One issue per branch.
+3. **Commit** on the branch after completing a well-defined step, if:
+   1. The working tree contains modifications belonging to the task;
+   2. All regression, verification, and smoke tests have passed cleanly;
+   3. There is no explicit instruction from the user forbidding commits.
+4. **Push** the branch (`git push -u origin <branch>`) and **open a pull request** into `master` whose body says what changed, how it was verified, and `Closes #<n>`. CI runs on the pull request.
+5. **Merge** is the maintainer's decision: the agent merges only when the user says so, with a merge commit (no squash or rebase merge, section 17). Releases are tagged on `master` after the merge.
 
 Never stage temporary files, `.claude/LOCAL.md`, credentials or game assets. The procedure and its pre/post-commit check scripts are in the `p3p3ds-commit` skill.
 
-**Allowed remote operations** (maintainer decision, 2026-10-04): `git fetch`, `git pull` (fast-forward or merge, never rebase), `git push origin <branch>` of verified commits, creating branches and pull requests (e.g. contributors' work). GitHub lists contributors by commit author, so pushing does not add the agent as one; section 15 keeps it that way.
+**Allowed remote operations**: `git fetch`, `git pull` (fast-forward or merge, never rebase), `git push origin <branch>` of verified commits on a task branch, creating issues, branches and pull requests (also for contributors' work), commenting on and labelling issues. GitHub lists contributors by commit author, so pushing does not add the agent as one; section 15 keeps it that way.
 
 **Still forbidden:**
+- pushing to `master` directly (tags for a release are pushed only when the user asks);
 - force push (`--force`, `--force-with-lease`) or deleting remote branches;
-- rewriting history (section 17), including to resolve a rejected push: fetch and merge instead;
+- rewriting history (section 17), including to resolve a rejected push or a conflict with `master`: fetch and merge `origin/master` into the branch instead;
 - changing remote URLs or remotes configuration, or Git author/committer identity;
 - pushing commits that did not pass the checks of this section.
 
 **Default Execution Loop:**
 ```text
-Work -> Verify & Test -> Local Commit -> Push (when the task is done) -> STOP
+Issue -> Branch -> Work -> Verify & Test -> Commit -> Push branch -> Pull request (Closes #n) -> STOP
 ```
 
 ---

@@ -12,28 +12,33 @@
 
 ### Known issues (New 3DS, maintainer's tests on a New 2DS XL)
 
+Every known issue is tracked on [GitHub Issues](https://github.com/endercodezz/P3P3DS/issues); the tables below are a summary.
+
 | Issue | Where | State |
 |---|---|---|
-| ATLUS and CRIWARE logos at start not shown (black since 0.3.1, gray garbage in 0.3.0); the game then continues normally | first seconds after start, 0.2.8-0.3.1 | fixed in master, not released yet: after each presented frame the first textured draw could sample the previous render target instead of its texture (shown in Azahar; hardware not tested yet) |
+| ATLUS and CRIWARE logos at start not shown (black since 0.3.1, gray garbage in 0.3.0); the game then continues normally ([#5](https://github.com/endercodezz/P3P3DS/issues/5)) | first seconds after start, 0.2.8-0.3.1 | fixed in master, not released yet: after each presented frame the first textured draw could sample the previous render target instead of its texture (shown in Azahar; hardware not tested yet) |
 | Scene transitions: one or more black frames instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)); garbage on hardware until 0.3.0 | cutscene and scene changes | since 0.3.1 black on hardware and in Azahar alike (new render targets are filled black); the missing fade itself is not fixed |
 | Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
 | 0.3.0 only: on a slow SD card the game stops for seconds every 5 s while it rewrites `report.txt` (one user: 36 % speed, `ui` about 60 %) | everywhere | fixed in 0.3.1, confirmed on hardware by the same user: 97-99 % speed, `ui 0.0`, while one rewrite still takes up to 2.6 s on that card (`sd max 2575 ms`) |
-| Battle: 16-25 fps, 63-86 % of real time (0.3.0, hardware; was 5-7.5 fps in 0.2.7) | battles | game targets 30 fps; the game's own code is now the largest share (`aot` 63-70 %) |
-| Dorm: 28-30 fps (0.3.0, hardware) | field | game targets 30 fps |
-| No sound | everywhere | not implemented on 3DS (the PC runner mixes it) |
-| Opening movie skipped | boot | no H.264 / ATRAC3plus decoder |
-| Saves stored in their own format | `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` | not compatible with PSP or PPSSPP saves |
+| Battle: 16-25 fps, 63-86 % of real time (0.3.0, hardware; was 5-7.5 fps in 0.2.7) ([#16](https://github.com/endercodezz/P3P3DS/issues/16)) | battles | game targets 30 fps; the game's own code is now the largest share (`aot` 63-70 %) |
+| Dorm: 28-30 fps (0.3.0, hardware) ([#17](https://github.com/endercodezz/P3P3DS/issues/17)) | field | game targets 30 fps |
+| No sound ([#14](https://github.com/endercodezz/P3P3DS/issues/14)) | everywhere | not implemented on 3DS (the PC runner mixes it) |
+| Opening movie skipped ([#19](https://github.com/endercodezz/P3P3DS/issues/19)) | boot | no H.264 / ATRAC3plus decoder |
+| Saves stored in their own format ([#20](https://github.com/endercodezz/P3P3DS/issues/20)) | `sdmc:/p3p3ds/ms0/PSP/SAVEDATA/` | not compatible with PSP or PPSSPP saves |
+| Old 3DS / 2DS stops at start with "Out of memory" ([#24](https://github.com/endercodezz/P3P3DS/issues/24)) | boot | not supported; needs a different approach (about 112 MB needed, at most 96 MB available) |
 
 Defects found in the code review of 2026-10-08, not fixed yet (evidence and tests: [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md), "Code review"):
 
 | Issue | Effect | State |
 |---|---|---|
-| Back-face culling uses opposite rules for 2D and 3D draws (PPSSPP uses one rule) | may hide another orientation bug; risk for scenes not yet seen | suspected |
-| Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
-| Mutexes are not released when their owner thread exits; event-flag result bits differ from the PSP on timeouts | possible deadlock or wrong wake-up | reproduced in a unit test |
-| Every file read, also from the SD card and mods, is slowed to UMD speed in game time | longer loads; a candidate cause of the dorm frame drops | suspected; test on the PC route planned |
-| Only one of the New 3DS CPU cores is used; profiling timers always on | speed left unused | fixed: GE back end on core 2 and sampled draw timers (0.3.0) |
-| Save names from the game are not checked before building SD card paths | a corrupted or modded name could write or delete outside the save folder | confirmed in code |
+| Back-face culling uses opposite rules for 2D and 3D draws (PPSSPP uses one rule) ([#6](https://github.com/endercodezz/P3P3DS/issues/6)) | may hide another orientation bug; risk for scenes not yet seen | suspected |
+| Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused ([#7](https://github.com/endercodezz/P3P3DS/issues/7)) | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
+| Mutexes are not released when their owner thread exits ([#8](https://github.com/endercodezz/P3P3DS/issues/8)); event-flag result bits differ from the PSP on timeouts ([#9](https://github.com/endercodezz/P3P3DS/issues/9)) | possible deadlock or wrong wake-up | reproduced in a unit test |
+| `sceIoOpenAsync` returns open errors at once instead of through the async result ([#10](https://github.com/endercodezz/P3P3DS/issues/10)) | a game waiting for the async result may misread a failed open | confirmed in code |
+| GE finish callbacks run too early, SIGNAL handlers are never called ([#11](https://github.com/endercodezz/P3P3DS/issues/11)) | timing differs from the PSP | confirmed in code |
+| FPU/VFPU edge cases (`vsin`/`vcos`, `divu` by zero, NaN signs) differ from hardware ([#12](https://github.com/endercodezz/P3P3DS/issues/12)) | small numeric differences | confirmed by pspautotests and host demos |
+| Every file read, also from the SD card and mods, is slowed to UMD speed in game time ([#17](https://github.com/endercodezz/P3P3DS/issues/17)) | longer loads; a candidate cause of the dorm frame drops | suspected; test on the PC route planned |
+| Save names from the game are not checked before building SD card paths ([#13](https://github.com/endercodezz/P3P3DS/issues/13)) | a corrupted or modded name could write or delete outside the save folder | confirmed in code |
 
 Reports help: the bottom screen and `sdmc:/p3p3ds/report.txt` show the build, speed and where the time goes.
 
@@ -341,7 +346,7 @@ Without the game files (no `profiles/p3p/game/eboot.elf`) both CMake projects bu
 - `.github/workflows/ci.yml`, on every push to `master` and every pull request: Linux (GCC 14) and Windows (MSYS2 UCRT64 GCC) host build + CTest, New 3DS runtime in the `devkitpro/devkitarm` container.
 - `.github/workflows/release.yml`: pushing a tag `v<version>` that matches `FileVersion` in `platform/pc/builder/builder.rc` builds the New 3DS runtime (debug info stripped), the Windows and Linux Builder packages with `make_release.py`, and publishes them as a GitHub release (an existing release of that tag gets the files replaced). Started by hand (Actions -> Release -> Run workflow, with a branch or commit) it only builds the packages as workflow artifacts, for a dry run.
 
-To release: bump the version in `builder.rc`, commit, push, then `git tag v<version>` and `git push origin v<version>`.
+To release: bump the version in `builder.rc` in a pull request; after it is merged, tag `master`: `git tag v<version>` and `git push origin v<version>`.
 
 ### Run the game on PC
 
