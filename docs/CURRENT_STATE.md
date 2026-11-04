@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Savedata rejects unsafe guest path components (2026-11-05)
+
+- [VERIFIED] `core/src/hle/savedata.cpp` validates components before accessing slot paths, including list entries, the list fallback, and the nested SIZES lookup. `tests/test_savedata.cpp` rejects separators, dot segments, drive syntax and empty delete names, preserves the populated slot on rejection, and deletes that slot for a valid request. Error values use uOFW's `SCE_UTILITY_SAVEDATA_ERROR_*_BAD_PARAMS` constants (`references/uofw/include/utility/utility_savedata.h`). [INFERRED] The mode-specific result is appropriate for these rejected paths. No matching PSP hardware transcript for these inputs was run.
+- [VERIFIED] Windows Release build, CTest 27/27 and stable bootstrap passed. Both 20M-dispatch replays reached `0x08A87150` at the dispatch budget and matched the pre-change events at SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605` (`.tmp/savedata-names-13/{run1,run2}.json`; command in `.tmp/verify-runtime-sprint.ps1`).
+
 ## Release packages depend on host tests (2026-11-05)
 
 - [VERIFIED] In `.github/workflows/release.yml`, Windows and Linux build the host tests and run CTest before packaging. Publishing depends on both packaging jobs. Parsed the workflow to verify job dependencies and step order. Local Windows Release CTest passed 27/27 (`.tmp/release-gate-25/ctest.log`).

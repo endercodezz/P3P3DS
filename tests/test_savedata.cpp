@@ -65,8 +65,7 @@ void make_param(psprecomp::GuestMemory &m, std::uint32_t mode) {
 }
 
 // Runs one utility session the way games do; returns the result word.
-std::uint32_t run(Env &e, std::uint32_t mode, int choice) {
-    make_param(e.rt.memory(), mode);
+std::uint32_t run_params(Env &e, int choice) {
     CHECK(e.call(0x50C4CD57u, {kParam}) == 0u);                 // InitStart
     CHECK(e.call(0x8874DBE0u) == 1u);                            // INIT
     CHECK(e.call(0x8874DBE0u) == 2u);                            // VISIBLE
@@ -82,6 +81,11 @@ std::uint32_t run(Env &e, std::uint32_t mode, int choice) {
     CHECK(e.call(0x8874DBE0u) == 4u);                            // FINISHED
     CHECK(e.call(0x8874DBE0u) == 0u);                            // NONE
     return e.rt.memory().load32(kParam + 0x1C);
+}
+
+std::uint32_t run(Env &e, std::uint32_t mode, int choice) {
+    make_param(e.rt.memory(), mode);
+    return run_params(e, choice);
 }
 } // namespace
 
@@ -147,6 +151,45 @@ int main() {
 
     // Out of sequence calls.
     CHECK(env.call(0x9790B33Cu) == 0x80110001u);
+
+    // Invalid paths must fail before accessing a save or publishing a list dialog.
+    make_param(m, 10);
+    put_string(m, kParam + 0x3C, "", 13);
+    put_string(m, kParam + 0x4C, "", 20);
+    CHECK(run_params(env, 0) == 0x80110348u);
+    CHECK(std::filesystem::exists(root / "ULUS10512DATA01" / "P3PSAVE.BIN"));
+
+    make_param(m, 9);
+    put_string(m, kParam + 0x4C, "", 20);
+    CHECK(run_params(env, 0) == 0x80110348u);
+
+    make_param(m, 0);
+    put_string(m, kParam + 0x3C, "A/B", 13);
+    CHECK(run_params(env, 0) == 0x80110308u);
+
+    make_param(m, 3);
+    put_string(m, kParam + 0x64, "..\\ESCAPE", 13);
+    CHECK(run_params(env, 0) == 0x80110388u);
+
+    make_param(m, 6);
+    put_string(m, kList, "..", 20);
+    CHECK(run_params(env, 0) == 0x80110348u);
+
+    make_param(m, 6);
+    m.store32(kParam + 0x60, 0);
+    put_string(m, kParam + 0x4C, "", 20);
+    CHECK(run_params(env, 0) == 0x80110348u);
+
+    make_param(m, 8);
+    m.store32(kParam + 0x5D4, kNeed);
+    put_string(m, kNeed, "C:", 13);
+    put_string(m, kNeed + 16, "DATA01", 20);
+    CHECK(run_params(env, 0) == 0x801103C8u);
+
+    make_param(m, 10);
+    put_string(m, kParam + 0x4C, "DATA01", 20);
+    CHECK(run_params(env, 0) == 0u);
+    CHECK(!std::filesystem::exists(root / "ULUS10512DATA01"));
 
     std::filesystem::remove_all(root);
     if (failures == 0) std::cout << "test_savedata: all checks passed\n";
