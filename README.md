@@ -16,7 +16,7 @@ Every known issue is tracked on [GitHub Issues](https://github.com/endercodezz/P
 
 | Issue | Where | State |
 |---|---|---|
-| ATLUS and CRIWARE logos at start not shown (black since 0.3.1, gray garbage in 0.3.0); the game then continues normally ([#5](https://github.com/endercodezz/P3P3DS/issues/5)) | first seconds after start, 0.2.8-0.3.1 | fixed in master, not released yet: after each presented frame the first textured draw could sample the previous render target instead of its texture (shown in Azahar; hardware not tested yet) |
+| ATLUS and CRIWARE startup logos were missing ([#5](https://github.com/endercodezz/P3P3DS/issues/5)) | first seconds after start, 0.2.8-0.3.1 | fixed in 0.3.2 by rebinding textures after presenting a frame. The fix was verified in Azahar, and the maintainer reported working logos on console. |
 | Scene transitions: one or more black frames instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)); garbage on hardware until 0.3.0 | cutscene and scene changes | since 0.3.1 black on hardware and in Azahar alike (new render targets are filled black); the missing fade itself is not fixed |
 | Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
 | 0.3.0 only: on a slow SD card the game stops for seconds every 5 s while it rewrites `report.txt` (one user: 36 % speed, `ui` about 60 %) | everywhere | fixed in 0.3.1, confirmed on hardware by the same user: 97-99 % speed, `ui 0.0`, while one rewrite still takes up to 2.6 s on that card (`sd max 2575 ms`) |
