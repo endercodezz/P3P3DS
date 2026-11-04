@@ -7,6 +7,11 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [VERIFIED] On Windows, three runs each of the instrumented baseline, direct C++ emission and Rust emission produced the same 240 files as the unmodified PSPRecomp. The baseline spent a median 2.31 s on the aligned-memory pass and 28.41 s on VFPU lowering out of 37.26 s wall. See the [verification record](VERIFICATION.md#psprecomp-auto-lowering-benchmark-34-2026-11-04).
 - [VERIFIED] `ctest --test-dir build -j6 --output-on-failure` passed 27/27 on the existing Windows Release build, including decoder compatibility, interpreter differential and bootstrap smoke. Log: `.tmp/psprecomp-34/ctest.log`.
 - [INFERRED] The measured Rust integration offers no established advantage for this pass. Keep the production emitter in C++. A future host-codegen task can break down the VFPU rewrites individually.
+## Builder AOT layout and runner mod paths use the P3P profile (2026-11-04)
+
+- [VERIFIED] `profiles/p3p/config/aot_layout.cmake` supplies the load base, span and count to CMake and to the Builder through its configured header. The PC and New 3DS runners use the mod alias in `profiles/p3p/config/mod_paths.hpp`, from `p3p/p3p-patches/ULUS10512.ini:6-9`.
+- [VERIFIED] Windows Release build, `ctest --test-dir build -j6 --output-on-failure` (27/27), `python tools/verify_aot_layout.py build/generated/auto 237 16384`, stable bootstrap and devkitARM `cmake --build build/3ds --target p3p3ds_objects -j4` passed.
+- [VERIFIED] Two PC runs with `--run-until-blocker --max-dispatches 20000000 --ms0 .tmp/issue27/ms0 --mods .tmp/issue27/mods --dump-events <path>` and the pre-change run all reached the dispatch limit at `0x08A87150`. Their event dumps (`.tmp/issue27/baseline.json`, `run1.json`, `run2.json` in the same directory) share SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605`. No new execution blocker was observed. [UNVERIFIED] Mod loading on physical New 3DS hardware.
 
 ## Known issues tracked on GitHub; issue -> pull request workflow (2026-11-04)
 

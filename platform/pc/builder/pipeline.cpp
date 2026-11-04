@@ -1,5 +1,6 @@
 // See pipeline.hpp.
 #include "pipeline.hpp"
+#include "aot_layout.hpp"
 
 #include "psp_eboot.hpp"
 #include "p3p3ds/vfs.hpp"
@@ -34,9 +35,6 @@ namespace fs = std::filesystem;
 namespace p3p3ds::builder {
 namespace {
 
-constexpr unsigned kUnitCount = 237;                 // profiles/p3p/config/aot_layout.cmake
-constexpr const char *kLoadBase = "0x08804000";
-constexpr const char *kUnitSpan = "16384";
 // Measured on the largest unit and the whole program (docs/3DS_PLATFORM.md
 // section 8.5): GCSE and instruction scheduling cost 27 % of the compile
 // time for 0.8 % of code size.
@@ -316,14 +314,17 @@ void Pipeline::generate() {
     std::error_code ec;
     fs::remove_all(gen_, ec);
     fs::create_directories(gen_);
-    const Args cmd = {tool(s_.sdk / "bin", "psp_recomp"), elf_, "--auto", gen_, kLoadBase, kUnitSpan, s_.sdk / "patches.txt",
+    const Args cmd = {tool(s_.sdk / "bin", "psp_recomp"), elf_, "--auto", gen_, profile::kAotLoadBase, profile::kAotUnitSpan, s_.sdk / "patches.txt",
                       "--no-transfer-records"};
     const fs::path log = s_.work / "generate.log";
     if (run_tool(cmd, log) != 0) throw std::runtime_error("Code generation failed:\n" + read_text(log));
     unsigned units = 0;
     for (const auto &e : fs::directory_iterator(gen_))
         if (e.path().filename().string().rfind("generated_unit_", 0) == 0) ++units;
-    if (units != kUnitCount) throw std::runtime_error("Code generation produced " + std::to_string(units) + " units, expected 237.");
+    if (units != profile::kAotUnitCount) {
+        throw std::runtime_error("Code generation produced " + std::to_string(units) +
+                                 " units, expected " + std::to_string(profile::kAotUnitCount) + ".");
+    }
     write_text(stamp, want);
 }
 

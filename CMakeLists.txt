@@ -143,6 +143,7 @@ add_executable(p3p_pc_bootstrap
 target_include_directories(p3p_pc_bootstrap PRIVATE
     core/include
     recomp/PSPRecomp/include
+    profiles/p3p/config
 )
 
 target_link_libraries(p3p_pc_bootstrap PRIVATE
@@ -339,6 +340,8 @@ else()
     target_link_libraries(p3p3ds_builder PRIVATE p3p3ds_builder_core p3p3ds_core)
 endif()
 set_target_properties(p3p3ds_builder PROPERTIES OUTPUT_NAME "P3P3DS-Builder")
+configure_file(profiles/p3p/config/aot_layout.hpp.in generated/aot_layout.hpp @ONLY)
+target_include_directories(p3p3ds_builder PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_executable(test_psp_eboot tests/test_psp_eboot.cpp)
 target_link_libraries(test_psp_eboot PRIVATE p3p3ds_builder_core p3p3ds_core)
 file(GLOB P3P_LOCAL_ISOS "${CMAKE_CURRENT_SOURCE_DIR}/*.iso")

@@ -1,0 +1,10 @@
+#pragma once
+
+namespace p3p3ds::profile {
+
+// Values and verification evidence come from aot_layout.cmake.
+inline constexpr unsigned kAotUnitCount = @P3P_AOT_UNIT_COUNT@;
+inline constexpr char kAotLoadBase[] = "@P3P_AOT_LOAD_BASE@";
+inline constexpr char kAotUnitSpan[] = "@P3P_AOT_UNIT_SPAN@";
+
+} // namespace p3p3ds::profile

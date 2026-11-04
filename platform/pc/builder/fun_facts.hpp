@@ -21,7 +21,7 @@ inline constexpr const wchar_t *kFunFacts[] = {
     L"Persona 3 Portable was re-released for modern consoles and PC in January 2023.",
     L"Persona 3 Reload (2024) remade the game from scratch, but without the female protagonist.",
     L"P3P3DS does not emulate the PSP processor on your 3DS: the game's 3.6 MB of MIPS code is translated to C++ and compiled to about 44 MB of ARM code - right now, on your PC.",
-    L"About 750,000 PSP instructions are being translated in this build, grouped into 237 C++ files of 16 KiB of game code each.",
+    L"About 750,000 PSP instructions are being translated in this build and split across C++ files for parallel compilation.",
     L"On the 3DS, the PICA200 graphics chip draws what the PSP's Graphics Engine drew. The 480x272 picture is scaled to the 400x240 top screen.",
     L"Your ISO stays on the SD card: P3P3DS reads the game's CPK archives from it while you play.",
     L"Mods made for the community \"Mod Support\" patch (mod.cpk, bind/) go to sdmc:/p3p3ds/mods/.",
