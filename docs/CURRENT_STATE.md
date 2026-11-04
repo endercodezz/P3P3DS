@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Builder 0.3.2 release preparation (2026-11-05)
+
+- [VERIFIED] Windows Release built from the combined 0.3.2 fixes. The rebuilt Builder reports FileVersion and ProductVersion 0.3.2. `ctest --test-dir build -j6 --output-on-failure --no-tests=error` passed 27/27 (`.tmp/release-032/ctest.log`).
+- [VERIFIED] The startup logo fix is in `4d198db`. Azahar frame dumps show the restored logos, and the maintainer reported that they work on console in [#5](https://github.com/endercodezz/P3P3DS/issues/5). Scene fades remain tracked in [#3](https://github.com/endercodezz/P3P3DS/issues/3).
+
 ## Savedata rejects unsafe guest path components (2026-11-05)
 
 - [VERIFIED] `core/src/hle/savedata.cpp` validates components before accessing slot paths, including list entries, the list fallback, and the nested SIZES lookup. `tests/test_savedata.cpp` rejects separators, dot segments, drive syntax and empty delete names, preserves the populated slot on rejection, and deletes that slot for a valid request. Error values use uOFW's `SCE_UTILITY_SAVEDATA_ERROR_*_BAD_PARAMS` constants (`references/uofw/include/utility/utility_savedata.h`). [INFERRED] The mode-specific result is appropriate for these rejected paths. No matching PSP hardware transcript for these inputs was run.
