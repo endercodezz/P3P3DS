@@ -11,6 +11,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <string_view>
 
 namespace fs = std::filesystem;
 
@@ -32,6 +33,24 @@ constexpr std::uint32_t kErrorBadState = 0x80110001u;
 enum Mode : std::uint32_t {
     AutoLoad = 0, AutoSave = 1, Load = 2, Save = 3, ListLoad = 4, ListSave = 5, ListDelete = 6, Sizes = 8, AutoDelete = 9, Delete = 10,
 };
+
+bool valid_path_component(std::string_view name) {
+    // Keep separators, drive/stream syntax and host-normalized dot segments
+    // out of paths built from the fixed-size guest fields.
+    return name.empty() || (name.back() != '.' && name.back() != ' ' &&
+        name.find_first_of("/\\:<>|\"?*") == std::string_view::npos &&
+        std::none_of(name.begin(), name.end(), [](unsigned char c) { return c < 32u; }));
+}
+
+std::uint32_t bad_name_result(std::uint32_t mode) {
+    // BAD_PARAMS values from uOFW include/utility/utility_savedata.h.
+    switch (mode) {
+    case AutoSave: case Save: case ListSave: return 0x80110388u;
+    case ListDelete: case AutoDelete: case Delete: return 0x80110348u;
+    case Sizes: return 0x801103C8u;
+    default: return 0x80110308u;
+    }
+}
 
 std::string guest_string(psprecomp::GuestMemory &m, std::uint32_t at, std::uint32_t max) {
     std::string s;
@@ -171,7 +190,21 @@ void register_savedata_module(psprecomp::Runtime &runtime, KernelState &kernel) 
         const auto p = sd.param_;
         const std::string game = guest_string(m, p + kGameName, 13);
         const std::string file = guest_string(m, p + kFileName, 13);
+        std::string save = guest_string(m, p + kSaveName, 20);
         const bool list = sd.mode_ == ListLoad || sd.mode_ == ListSave || sd.mode_ == ListDelete;
+        const bool deleting = sd.mode_ == ListDelete || sd.mode_ == AutoDelete || sd.mode_ == Delete;
+        auto finish = [&](std::uint32_t result) {
+            m.store32(p + kResult, result);
+            ++sd.operations_;
+            rt.event("savedata_done", {{"mode", sd.mode_}, {"result", result}}, game + save);
+            sd.status_ = 3;
+            sd.waiting_ = false;
+        };
+        if (sd.mode_ != Sizes && (game.empty() || !valid_path_component(game) ||
+            !valid_path_component(file) || (!list && (!valid_path_component(save) || (deleting && save.empty()))))) {
+            finish(bad_name_result(sd.mode_));
+            return;
+        }
 
         if (list && !sd.dialog_) {
             SavedataDialog dialog;
@@ -182,9 +215,19 @@ void register_savedata_module(psprecomp::Runtime &runtime, KernelState &kernel) 
             for (std::uint32_t i = 0; names && i < 100 && m.contains(names + i * 20u, 20); ++i) {
                 const auto name = guest_string(m, names + i * 20u, 20);
                 if (name.empty()) break;
+                if (!valid_path_component(name)) {
+                    finish(bad_name_result(sd.mode_));
+                    return;
+                }
                 dialog.slots.push_back(describe(sd.root, game, name, file));
             }
-            if (dialog.slots.empty()) dialog.slots.push_back(describe(sd.root, game, guest_string(m, p + kSaveName, 20), file));
+            if (dialog.slots.empty()) {
+                if (!valid_path_component(save) || (deleting && save.empty())) {
+                    finish(bad_name_result(sd.mode_));
+                    return;
+                }
+                dialog.slots.push_back(describe(sd.root, game, save, file));
+            }
             dialog.focus = 0;
             sd.dialog_ = std::move(dialog);
             const bool nothing_to_load = sd.dialog_->kind != SavedataDialog::Kind::Save &&
@@ -196,7 +239,6 @@ void register_savedata_module(psprecomp::Runtime &runtime, KernelState &kernel) 
         }
         if (sd.waiting_) return;
 
-        std::string save = guest_string(m, p + kSaveName, 20);
         std::uint32_t result = 0;
         if (list) {
             if (sd.choice_ == -3) result = kErrorLoadNoData;
@@ -266,7 +308,13 @@ void register_savedata_module(psprecomp::Runtime &runtime, KernelState &kernel) 
                     put_used(need, bytes + 0x1000); // + PARAM.SFO
                 }
                 if (const auto data = m.load32(p + kMsData); data && m.contains(data, 36 + 28)) {
-                    const fs::path existing = sd.root / (guest_string(m, data, 13) + guest_string(m, data + 16, 20));
+                    const auto used_game = guest_string(m, data, 13);
+                    const auto used_save = guest_string(m, data + 16, 20);
+                    if (used_game.empty() || !valid_path_component(used_game) || !valid_path_component(used_save)) {
+                        result = bad_name_result(sd.mode_);
+                        break;
+                    }
+                    const fs::path existing = sd.root / (used_game + used_save);
                     std::uint64_t bytes = 0;
                     if (fs::exists(existing, ec))
                         for (const auto &e : fs::directory_iterator(existing, ec)) bytes += fs::file_size(e.path(), ec);
@@ -284,10 +332,7 @@ void register_savedata_module(psprecomp::Runtime &runtime, KernelState &kernel) 
                 return;
             }
         }
-        m.store32(p + kResult, result);
-        ++sd.operations_;
-        rt.event("savedata_done", {{"mode", sd.mode_}, {"result", result}}, game + save);
-        sd.status_ = 3;
+        finish(result);
         (void)kernel;
     });
 
