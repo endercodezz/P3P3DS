@@ -219,9 +219,10 @@ void test_ringbuffer_tables() {
 } // namespace
 
 int main() {
+    test_ringbuffer_tables();
     const std::string dir = std::string(P3P_SOURCE_DIR) + "/references/pspautotests/tests/video/mpeg/";
     std::ifstream pmf_file(dir + "test.pmf", std::ios::binary);
-    if (!pmf_file) { std::cout << "SKIP: test.pmf not found\n"; return 77; }
+    if (!pmf_file) { std::cout << "SKIP: test.pmf not found\n"; return failures ? 1 : 77; }
     const std::vector<std::uint8_t> pmf((std::istreambuf_iterator<char>(pmf_file)), std::istreambuf_iterator<char>());
     const auto got = run_basic(pmf);
     const auto want = expected_lines(dir + "basic.expected");
@@ -233,7 +234,6 @@ int main() {
     }
     CHECK(mismatches == 0);
     std::cout << "basic.expected lines compared=" << want.size() << " mismatches=" << mismatches << "\n";
-    test_ringbuffer_tables();
     std::cout << (failures ? "FAILED" : "PASS") << " (" << failures << " failures)\n";
     return failures ? 1 : 0;
 }
