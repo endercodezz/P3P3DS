@@ -1,0 +1,30 @@
+# Auto-merge for the maintainer's pull requests (CLAUDE.md section 16).
+# A pull request opened by endercodezz from this repository, and not a draft,
+# gets auto-merge with a merge commit: GitHub merges it once the checks that
+# master's branch protection requires (CI: Linux, Windows, New 3DS) pass.
+# Opt out: open it as a draft, or `gh pr merge <n> --disable-auto`.
+name: Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    name: Enable auto-merge
+    if: >-
+      github.event.pull_request.user.login == 'endercodezz' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: gh pr merge --auto --merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr merge "$PR" --auto --merge -R "$REPO"

@@ -45,7 +45,7 @@ bash .claude/skills/p3p3ds-commit/scripts/postcommit_check.sh <head-before>
 gh pr create --base master --head <branch> --title "<conventional subject>" --body-file .tmp/pr_body.md
 ```
 
-The body: what changed, how it was verified (commands, counts, SHA-256), what is still [UNVERIFIED] (e.g. hardware), and `Closes #<issue>`. No AI attribution in the body either (CLAUDE.md section 15). More commits for the same issue go to the same branch; the open pull request picks them up. Merging is the maintainer's call: merge only when told, with a merge commit (`gh pr merge <n> --merge`), never squash or rebase.
+The body: what changed, how it was verified (commands, counts, SHA-256), what is still [UNVERIFIED] (e.g. hardware), and `Closes #<issue>`. No AI attribution in the body either (CLAUDE.md section 15). More commits for the same issue go to the same branch; the open pull request picks them up. A non-draft pull request from `endercodezz` (the maintainer's `gh` login, so also yours) is auto-merged as soon as CI is green (`.github/workflows/automerge.yml`): open it only when the work is finished and verified, otherwise use `--draft` and `gh pr ready <n>` later (marking it ready enables auto-merge). Stop a pending auto-merge with `gh pr merge <n> --disable-auto`. Contributors' pull requests are merged only when the user says so, with a merge commit (`gh pr merge <n> --merge`), never squash or rebase.
 
 - Then report in the CLAUDE.md section 14 format (Changed / Verified / Tests / Remaining blocker / Next smallest step) and STOP.
 
