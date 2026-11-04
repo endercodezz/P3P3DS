@@ -4,8 +4,8 @@
 Usage:
   python tools/run_autotests.py [--exe build/p3p_autotest.exe] [--jobs N] [--update] [glob ...]
 
-Globs are relative to references/pspautotests/tests (default: cpu/*/*.prx
-utility/systemparam/*.prx). The baseline tests/autotest_baseline.txt records,
+Globs are relative to references/pspautotests/tests (default: CPU, systemparam,
+and the event flag wait test). The baseline tests/autotest_baseline.txt records,
 per program, the number of output lines that differ from the hardware
 `.expected` file and how the run stopped. --check (default) fails when any
 program gets worse (more mismatching lines, or a previously clean exit now
@@ -24,12 +24,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, "references", "pspautotests", "tests")
 BASELINE = os.path.join(ROOT, "tests", "autotest_baseline.txt")
 LINE = re.compile(r'^(?P<name>\S+\.prx): stop="(?P<stop>[^"]*)" lines=(?P<lines>\d+) mismatches=(?P<mis>\d+)')
+EVENT_FLAG_WAIT = "threads/events/wait/wait.prx"
 
 
 def run(exe, prx):
     rel = os.path.relpath(prx, TESTS).replace(os.sep, "/")
+    command = [exe, prx]
+    if rel == EVENT_FLAG_WAIT:
+        command.append("--wait-for-exit")
     try:
-        out = subprocess.run([exe, prx], capture_output=True, text=True, errors="replace", timeout=900).stdout
+        out = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=900).stdout
     except subprocess.TimeoutExpired:
         return rel, ("timeout", 0, -1)
     for line in out.splitlines():
@@ -58,7 +62,7 @@ def main():
     ap.add_argument("--exe", default=os.path.join(ROOT, "build", "p3p_autotest.exe" if os.name == "nt" else "p3p_autotest"))
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     ap.add_argument("--update", action="store_true")
-    ap.add_argument("patterns", nargs="*", default=["cpu/*/*.prx", "utility/systemparam/*.prx"])
+    ap.add_argument("patterns", nargs="*", default=["cpu/*/*.prx", EVENT_FLAG_WAIT, "utility/systemparam/*.prx"])
     args = ap.parse_args()
     prxs = sorted({p for pat in args.patterns for p in glob.glob(os.path.join(TESTS, pat))})
     if not prxs:

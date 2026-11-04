@@ -11,6 +11,11 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 
 - [VERIFIED] In `.github/workflows/release.yml`, Windows and Linux build the host tests and run CTest before packaging. Publishing depends on both packaging jobs. Parsed the workflow to verify job dependencies and step order. Local Windows Release CTest passed 27/27 (`.tmp/release-gate-25/ctest.log`).
 
+## Event-flag timeouts report the hardware outBits values (2026-11-05)
+
+- [VERIFIED] `sceKernelWaitEventFlag` leaves `outBits` alone for an immediate zero timeout and copies the current flag bits when a queued wait expires. The focused ThreadMan test covers a zero timeout and a real AND|CLEAR timeout. With the same test-only status observer and root-thread exit in both runs, `wait.prx --wait-for-exit` went from 18 to 11 mismatches out of 44, with the first 30 lines identical to hardware after the fix. The remaining differences are the delete case and a later scheduling sequence that exhausts the diagnostic budget. The transcript and baseline comparison are in `.tmp/event-flag-timeout-9/`.
+- [VERIFIED] Windows Release build, CTest 27/27 and stable bootstrap passed. The two 20M-dispatch replays reached the budget at `0x08A87150` and matched the pre-change events at SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605` (`.tmp/event-flag-timeout-9/{run1,run2}.json`).
+
 ## Production AUTO generator filters VFPU regex candidates (2026-11-05)
 
 - [VERIFIED] On Windows Release, fresh diagnostic generation took 9.26 s with the C++ literal filter and 40.31 s with the pre-change generator (one run each). The release-mode output also matched. In each mode all 240 files matched the original by filename and SHA-256. The incremental build rewrote 0 of 237 generated units. See the [verification record](VERIFICATION.md#production-vfpu-prefilter-38-2026-11-05).
@@ -18,7 +23,7 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 
 ## Missing test fixtures and replay failures are reported (2026-11-05)
 
-- [VERIFIED] Windows Release CTest passed 27/27. SAS now runs from the source root and compares 53/53 ADSR curves. Direct runs without the required fixtures returned skip code 77 for SAS, graphics and EBOOT after their independent checks. MPEG runs the independent ring-buffer checks before the PMF check.
+- [VERIFIED] Windows Release CTest passed 27/27. The source-root SAS test compared 53/53 ADSR curves. Direct runs without the required fixtures returned skip code 77 for SAS, graphics and EBOOT after their independent checks. MPEG runs the independent ring-buffer checks before the PMF check.
 - [VERIFIED] `replay_check.sh` failed on the first invocation of the runner with an invalid option even when both event and WAV files already existed with identical bytes. Build, CTest and negative replay evidence: `.tmp/test-skips-26/`.
 
 ## Host recompiler experiment: typed aligned-memory lowering (2026-11-04)

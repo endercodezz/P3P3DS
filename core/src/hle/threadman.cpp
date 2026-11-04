@@ -473,6 +473,11 @@ void ThreadManager::finish_wait(psprecomp::Runtime &rt, ThreadControlBlock &t, s
         const std::uint64_t left = t.wait.deadline == kNoDeadline || t.wait.deadline <= now_us_ ? 0u : t.wait.deadline - now_us_;
         memory_->store32(t.wait.timeout_ptr, static_cast<std::uint32_t>(left));
     }
+    // pspautotests events/wait: an expired event wait reports the current bits.
+    if (result == SCE_KERNEL_ERROR_WAIT_TIMEOUT && t.wait.type == WaitType::EventFlag &&
+        t.wait.c != 0u && rt.memory().contains(t.wait.c, 4u)) {
+        if (const auto *flag = get_event_flag(t.wait.object)) rt.memory().store32(t.wait.c, flag->bits);
+    }
     if (t.callback) {
         // Woken while running callbacks: deliver the result after they finish.
         t.callback->woken = result;
@@ -995,7 +1000,6 @@ std::optional<std::int32_t> ThreadManager::wait_event_flag(psprecomp::Runtime &r
     }
     if (!flag.waiters.empty() && (flag.attr & kEvfAttrWaitMultiple) == 0u) return SCE_KERNEL_ERROR_EVF_MULTI;
     if (timeout_ptr != 0u && memory.contains(timeout_ptr, 4u) && memory.load32(timeout_ptr) == 0u) {
-        if (out_ptr != 0u && memory.contains(out_ptr, 4u)) memory.store32(out_ptr, flag.bits);
         return SCE_KERNEL_ERROR_WAIT_TIMEOUT;
     }
     insert_waiter(flag.waiters, current_thread_id_, (flag.attr & 0x100u) != 0u);

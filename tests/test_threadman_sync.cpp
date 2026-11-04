@@ -151,6 +151,24 @@ void event_flags() {
     CHECK(env.tm(0x1FB15A32u, {flag, 1u}) == e(SCE_KERNEL_ERROR_UNKNOWN_EVFID));
 }
 
+void event_flag_timeouts() {
+    Env env;
+    auto &m = env.rt.memory();
+    const auto flag = env.tm(0x55C20A00u, {kName, 0u, 0x0000FFFFu, 0u});
+    const auto timeout = kScratch + 4u;
+    m.store32(kScratch, 0xDEADBEEFu);
+    m.store32(timeout, 0u);
+    CHECK(env.tm(0x402FCF22u, {flag, 0xFFFFFFFFu, 0u, kScratch, timeout}) == e(SCE_KERNEL_ERROR_WAIT_TIMEOUT));
+    CHECK(m.load32(kScratch) == 0xDEADBEEFu);
+
+    // wait.expected: a timed-out AND|CLEAR reports the current bits without consuming them.
+    m.store32(timeout, 500u);
+    CHECK(env.tm(0x402FCF22u, {flag, 0xFFFFFFFFu, 0x20u, kScratch, timeout}) == e(SCE_KERNEL_ERROR_WAIT_TIMEOUT));
+    CHECK(m.load32(timeout) == 0u);
+    CHECK(m.load32(kScratch) == 0x0000FFFFu);
+    CHECK(env.k.threads().get_event_flag(static_cast<std::int32_t>(flag))->bits == 0x0000FFFFu);
+}
+
 void lw_mutexes() {
     Env env;
     const std::uint32_t wa = 0x08900200u;
@@ -342,6 +360,7 @@ namespace { void audio_contracts(); }
 int main() {
     semaphores();
     event_flags();
+    event_flag_timeouts();
     lw_mutexes();
     mutexes();
     delays_sleep_and_thread_end();
