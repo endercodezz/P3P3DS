@@ -10,7 +10,7 @@ export TEMP="$PWD/.tmp" TMP="$PWD/.tmp" TMPDIR="$PWD/.tmp"
 mkdir -p .tmp/replay
 for i in 1 2; do
     build/p3p_pc_bootstrap.exe --run-until-blocker --max-dispatches "$dispatches" --ms0 .tmp/ms0 \
-        --wav ".tmp/replay/run$i.wav" --dump-events ".tmp/replay/run$i.json" "$@" > ".tmp/replay/run$i.log" 2>&1 || true
+        --wav ".tmp/replay/run$i.wav" --dump-events ".tmp/replay/run$i.json" "$@" > ".tmp/replay/run$i.log" 2>&1
 done
 grep -a "Stop Reason" .tmp/replay/run1.log || true
 sha256sum .tmp/replay/run1.json .tmp/replay/run2.json .tmp/replay/run1.wav .tmp/replay/run2.wav

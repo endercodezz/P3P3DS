@@ -78,9 +78,9 @@ std::vector<std::string> run_curve(Sas &s, bool attack, int type, std::uint32_t 
     return out;
 }
 
-void adsr_curves() {
+bool adsr_curves() {
     std::ifstream src(kDir + "adsrcurve.cpp"), exp(kDir + "adsrcurve.expected");
-    if (!src || !exp) { std::cout << "adsrcurve sources absent; skipped\n"; return; }
+    if (!src || !exp) { std::cout << "SKIP: adsrcurve sources absent\n"; return false; }
     std::map<std::string, std::vector<std::string>> expected;
     std::string line, title;
     while (std::getline(exp, line)) {
@@ -121,6 +121,7 @@ void adsr_curves() {
     }
     std::cout << "adsrcurve cases=" << cases << " matched=" << matched << "\n";
     CHECK(cases >= 40 && matched == cases);
+    return true;
 }
 
 void parameters() {
@@ -204,7 +205,8 @@ int main() {
     parameters();
     key_on_off();
     vag_mix();
-    adsr_curves();
+    const bool compared_curves = adsr_curves();
     std::cout << "sascore failures=" << failures << "\n";
-    return failures == 0 ? 0 : 1;
+    if (failures) return 1;
+    return compared_curves ? 0 : 77;
 }

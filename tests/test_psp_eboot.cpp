@@ -34,7 +34,8 @@ int main(int argc, char **argv) {
             check(sha256_hex(elf) == kExpectedElfSha256, "decrypted ELF matches the reference SHA-256");
         }
     } else {
-        std::printf("no ISO given: ELF check skipped\n");
+        std::printf("SKIP: no ISO given for the ELF check\n");
+        return failures ? 1 : 77;
     }
     if (failures == 0) std::printf("test_psp_eboot: all checks passed\n");
     return failures == 0 ? 0 : 1;

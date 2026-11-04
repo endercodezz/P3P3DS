@@ -7,6 +7,11 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [VERIFIED] On Windows Release, fresh diagnostic generation took 9.26 s with the C++ literal filter and 40.31 s with the pre-change generator (one run each). The release-mode output also matched. In each mode all 240 files matched the original by filename and SHA-256. The incremental build rewrote 0 of 237 generated units. See the [verification record](VERIFICATION.md#production-vfpu-prefilter-38-2026-11-05).
 - [VERIFIED] Release build, `ctest --test-dir build -j6 --output-on-failure` (27/27) and `--verify-bootstrap --max-dispatches 100000` passed. Two runs with `--run-until-blocker --max-dispatches 20000000 --ms0 .tmp/issue27/ms0 --mods .tmp/issue27/mods --dump-events <path>` reached the dispatch budget at `0x08A87150`. Both event dumps match the pre-change replay at SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605`. Logs and dumps: `.tmp/vfpu-production/`.
 
+## Missing test fixtures and replay failures are reported (2026-11-05)
+
+- [VERIFIED] Windows Release CTest passed 27/27. SAS now runs from the source root and compares 53/53 ADSR curves. Direct runs without the required fixtures returned skip code 77 for SAS, graphics and EBOOT after their independent checks. MPEG runs the independent ring-buffer checks before the PMF check.
+- [VERIFIED] `replay_check.sh` failed on the first invocation of the runner with an invalid option even when both event and WAV files already existed with identical bytes. Build, CTest and negative replay evidence: `.tmp/test-skips-26/`.
+
 ## Host recompiler experiment: typed aligned-memory lowering (2026-11-04)
 
 - [VERIFIED] On Windows, three runs each of the instrumented baseline, direct C++ emission and Rust emission produced the same 240 files as the unmodified PSPRecomp. The baseline spent a median 2.31 s on the aligned-memory pass and 28.41 s on VFPU lowering out of 37.26 s wall. See the [verification record](VERIFICATION.md#psprecomp-auto-lowering-benchmark-34-2026-11-04).

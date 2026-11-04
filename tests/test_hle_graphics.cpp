@@ -73,7 +73,8 @@ int main() {
         CHECK(m.vram_writes().minimum==0x04000000); CHECK(m.vram_writes().maximum==0x04000006);
     }
     if (!std::filesystem::exists("profiles/p3p/game/eboot.elf")) {
-        std::cout << "local ELF absent (tools/prepare_game.py): reset-list checks skipped\n";
+        std::cout << "SKIP: local ELF absent (tools/prepare_game.py)\n";
+        return failures ? 1 : 77;
     } else {
         // Real local ELF reset list, followed by the 29-word captured setup fixture.
         psprecomp::Runtime r; GeManager g;
