@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Host recompiler experiment: typed aligned-memory lowering (2026-11-04)
+
+- [VERIFIED] On Windows, three runs each of the instrumented baseline, direct C++ emission and Rust emission produced the same 240 files as the unmodified PSPRecomp. The baseline spent a median 2.31 s on the aligned-memory pass and 28.41 s on VFPU lowering out of 37.26 s wall. See the [verification record](VERIFICATION.md#psprecomp-auto-lowering-benchmark-34-2026-11-04).
+- [VERIFIED] `ctest --test-dir build -j6 --output-on-failure` passed 27/27 on the existing Windows Release build, including decoder compatibility, interpreter differential and bootstrap smoke. Log: `.tmp/psprecomp-34/ctest.log`.
+- [INFERRED] The measured Rust integration offers no established advantage for this pass. Keep the production emitter in C++. A future host-codegen task can break down the VFPU rewrites individually.
 ## Builder AOT layout and runner mod paths use the P3P profile (2026-11-04)
 
 - [VERIFIED] `profiles/p3p/config/aot_layout.cmake` supplies the load base, span and count to CMake and to the Builder through its configured header. The PC and New 3DS runners use the mod alias in `profiles/p3p/config/mod_paths.hpp`, from `p3p/p3p-patches/ULUS10512.ini:6-9`.
