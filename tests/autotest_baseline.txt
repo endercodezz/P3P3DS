@@ -47,4 +47,5 @@ cpu/vfpu/vector.prx	3962	5329	stop:Unsupported Allegrex instruction 0xD0438480 a
 cpu/vfpu/vregs.prx	47	47	stop:Missing HLE import UtilsForUser::sceKernelIcacheInvalidateRange
 cpu/vfpu/vrnd.prx	121	122	stop:Unsupported Allegrex instruction 0xD0200000 at 0x08800398: vfpu4 not lowered yet
 cpu/vfpu/vrot.prx	356	409	exit
+threads/events/wait/wait.prx	11	44	stop:Diagnostic event budget exceeded
 utility/systemparam/systemparam.prx	0	23	exit

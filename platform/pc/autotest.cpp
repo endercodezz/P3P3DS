@@ -8,7 +8,7 @@
 // helpers with the AOT code generator, so a mismatch against hardware output
 // points at semantics both execution paths use.
 //
-//   p3p_autotest <test.prx> [--expected <file>] [--max-dispatches N] [--output <file>]
+//   p3p_autotest <test.prx> [--expected <file>] [--max-dispatches N] [--output <file>] [--wait-for-exit]
 // Exit: 0 output identical, 1 mismatch or abnormal stop, 2 usage/setup error.
 #include "p3p3ds/hle/hle_modules.hpp"
 #include "p3p3ds/interpreter.hpp"
@@ -46,7 +46,7 @@ std::string g_output;
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::cerr << "usage: p3p_autotest <test.prx> [--expected <file>] [--max-dispatches N] [--output <file>]\n";
+        std::cerr << "usage: p3p_autotest <test.prx> [--expected <file>] [--max-dispatches N] [--output <file>] [--wait-for-exit]\n";
         return 2;
     }
     const std::filesystem::path prx = argv[1];
@@ -54,11 +54,14 @@ int main(int argc, char **argv) {
     expected_path.replace_extension(".expected");
     std::filesystem::path output_path;
     std::uint64_t budget = 200'000'000u;
-    for (int i = 2; i + 1 < argc; i += 2) {
+    bool wait_for_exit = false;
+    for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
-        if (a == "--expected") expected_path = argv[i + 1];
-        else if (a == "--max-dispatches") budget = std::stoull(argv[i + 1]);
-        else if (a == "--output") output_path = argv[i + 1];
+        if (a == "--wait-for-exit") { wait_for_exit = true; continue; }
+        if (i + 1 == argc) { std::cerr << "missing argument for " << a << "\n"; return 2; }
+        if (a == "--expected") expected_path = argv[++i];
+        else if (a == "--max-dispatches") budget = std::stoull(argv[++i]);
+        else if (a == "--output") output_path = argv[++i];
         else { std::cerr << "unknown option " << a << "\n"; return 2; }
     }
     if (!std::filesystem::exists(prx)) { std::cerr << "missing " << prx.string() << "\n"; return 2; }
@@ -76,6 +79,28 @@ int main(int argc, char **argv) {
     kernel.threads().init_root_thread("root", kRootResume, kStackTop, 0u);
     kernel.threads().set_import_stubs({kStub});
     p3p3ds::hle::register_all_hle_modules(rt, kernel);
+    // events/wait prints this PSPSDK status record. Expose actual ThreadMan
+    // state to the test harness so the PRX can exercise the runtime waits.
+    rt.register_hle("ThreadManForUser", 0xA66B0120u, [&kernel](psprecomp::Runtime &r, psprecomp::AllegrexContext &c) {
+        const auto *flag = kernel.threads().get_event_flag(static_cast<std::int32_t>(c.gpr[4]));
+        if (!flag) { c.set_gpr(2, static_cast<std::uint32_t>(p3p3ds::hle::SCE_KERNEL_ERROR_UNKNOWN_EVFID)); return; }
+        auto &m = r.memory();
+        const auto address = c.gpr[5];
+        constexpr std::uint32_t size = 52u; // SceKernelEventFlagInfo
+        if (!m.contains(address, 4u)) { c.set_gpr(2, 0x800200D3u); return; }
+        if (m.load32(address) != 0u) {
+            if (!m.contains(address, size)) { c.set_gpr(2, 0x800200D3u); return; }
+            m.zero(address, size);
+            m.store32(address, size);
+            for (std::uint32_t i = 0; i < 31u && i < flag->name.size(); ++i)
+                m.store8(address + 4u + i, static_cast<std::uint8_t>(flag->name[i]));
+            m.store32(address + 36u, flag->attr);
+            m.store32(address + 40u, flag->init);
+            m.store32(address + 44u, flag->bits);
+            m.store32(address + 48u, static_cast<std::uint32_t>(flag->waiters.size()));
+        }
+        c.set_gpr(2, 0u);
+    });
     // Program exit and harness completion stop the run.
     for (const auto nid : {0x05572A5Fu, 0x2AC9954Bu}) // sceKernelExitGame, sceKernelExitGameWithStatus
         rt.register_hle("LoadExecForUser", nid, [](psprecomp::Runtime &r, psprecomp::AllegrexContext &) { r.stop("Program exited"); });
@@ -101,8 +126,17 @@ int main(int argc, char **argv) {
                       << " -> 0x" << static_cast<std::uint32_t>(uid) << " max_free=0x" << kernel.sysmem().max_free_memory() << std::dec << "\n";
             c.set_gpr(2, static_cast<std::uint32_t>(uid));
         });
-    rt.register_function(kRootResume, [](psprecomp::Runtime &r, psprecomp::AllegrexContext &) { r.stop("module_start returned to the harness"); },
-                         "autotest_root_resume");
+    if (wait_for_exit) {
+        // Let the real scheduler continue a test whose main thread is waiting.
+        rt.register_function(kRootResume, [](psprecomp::Runtime &, psprecomp::AllegrexContext &c) {
+            c.set_gpr(2, 0u);
+            c.pc = p3p3ds::hle::ThreadManager::kThreadReturnSentinel;
+        }, "autotest_root_exit");
+    } else {
+        rt.register_function(kRootResume, [](psprecomp::Runtime &r, psprecomp::AllegrexContext &) {
+            r.stop("module_start returned to the harness");
+        }, "autotest_root_resume");
+    }
     p3p3ds::Interpreter interpreter;
     p3p3ds::install_interpreter_fallback(&interpreter);
     // Diagnostics keep the faulting PC / last transfer; events are capped.
