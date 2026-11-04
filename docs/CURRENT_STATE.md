@@ -21,6 +21,11 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [VERIFIED] Windows Release CTest passed 27/27. SAS now runs from the source root and compares 53/53 ADSR curves. Direct runs without the required fixtures returned skip code 77 for SAS, graphics and EBOOT after their independent checks. MPEG runs the independent ring-buffer checks before the PMF check.
 - [VERIFIED] `replay_check.sh` failed on the first invocation of the runner with an invalid option even when both event and WAV files already existed with identical bytes. Build, CTest and negative replay evidence: `.tmp/test-skips-26/`.
 
+## Async file open reports driver errors on completion (2026-11-05)
+
+- [VERIFIED] uOFW `src/kd/iofilemgr/iofilemgr.c::open_iob` resolves the device before scheduling `open_main`. Its async worker marks a failed open for release, and `do_get_async_stat` returns the result before freeing the descriptor. `test_iofilemgr` verifies that an unknown device still fails immediately and a missing file on a mounted device returns a pending fd, then reports sign-extended `0x80010002` in the 64-bit async result and releases the fd.
+- [VERIFIED] Windows Release build, CTest 27/27 and stable bootstrap passed. Both 20M-dispatch replays matched the original event file at SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605` and reached `0x08A87150` at the dispatch budget. Evidence: `.tmp/async-open-result-10/`. The title replay did not exercise async opens.
+
 ## Host recompiler experiment: typed aligned-memory lowering (2026-11-04)
 
 - [VERIFIED] On Windows, three runs each of the instrumented baseline, direct C++ emission and Rust emission produced the same 240 files as the unmodified PSPRecomp. The baseline spent a median 2.31 s on the aligned-memory pass and 28.41 s on VFPU lowering out of 37.26 s wall. See the [verification record](VERIFICATION.md#psprecomp-auto-lowering-benchmark-34-2026-11-04).

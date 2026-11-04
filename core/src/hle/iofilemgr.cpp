@@ -92,19 +92,21 @@ IoManager::Fd *IoManager::get(std::int32_t fd) {
     return it == fds_.end() ? nullptr : &it->second;
 }
 
-std::int32_t IoManager::open(const std::string &path, std::uint32_t flags) {
+std::int32_t IoManager::open(const std::string &path, std::uint32_t flags, std::int32_t *async_result) {
     std::int32_t result = 0;
     const auto resolved = resolve(path);
     std::shared_ptr<const vfs::Source> source;
     if (!resolved) result = static_cast<std::int32_t>(SCE_ERROR_KERNEL_NO_SUCH_DEVICE);
     else if ((flags & kOpenWriteMask) != 0u && !resolved->writable) result = static_cast<std::int32_t>(SCE_ERROR_ERRNO_READ_ONLY);
     else if (!(source = resolved->fs->open(resolved->path))) result = static_cast<std::int32_t>(SCE_ERROR_ERRNO_FILE_NOT_FOUND);
-    if (result == 0) {
+    // uOFW open_iob resolves the device before scheduling open_main.
+    if (result == 0 || (async_result && resolved)) {
         std::int32_t fd = kFirstFd;
         while (fds_.contains(fd)) ++fd;
         if (fd >= kMaxFds) result = static_cast<std::int32_t>(SCE_ERROR_KERNEL_TOO_MANY_OPEN_FILES);
         else {
             fds_[fd] = Fd{path, std::move(source), 0u, false, {}, 0u, flags, -1, {}};
+            if (async_result) *async_result = result < 0 ? result : fd;
             result = fd;
         }
     }
@@ -166,11 +168,15 @@ void register_iofilemgr_module(psprecomp::Runtime &runtime, KernelState &kernel)
     reg(0x89AA9906u, [&io, &tm, start_async](psprecomp::Runtime &rt, psprecomp::AllegrexContext &ctx) { // sceIoOpenAsync
         const auto path = guest_path(rt.memory(), ctx.gpr[4]);
         if (!path) { ctx.set_gpr(2, 0x800200D3u); return; }
-        const auto result = io.open(*path, ctx.gpr[5]);
+        std::int32_t async_result = 0;
+        const auto result = io.open(*path, ctx.gpr[5], &async_result);
         if (!io.open_log.empty()) io.open_log.back().time = tm.now();
         rt.event("io_open", {{"result", u(result)}, {"flags", ctx.gpr[5]}, {"async", 1u}}, *path);
         if (result < 0) { ctx.set_gpr(2, u(result)); return; }
-        start_async(*io.get(result), result, IoManager::kCommandLatencyUs);
+        auto &fd = *io.get(result);
+        start_async(fd, async_result, IoManager::kCommandLatencyUs);
+        // The failed open stays collectable until WaitAsync or PollAsync returns its result.
+        fd.async.close_after = async_result < 0;
         ctx.set_gpr(2, u(result));
     });
     reg(0x810C4BC3u, [&io](psprecomp::Runtime &, psprecomp::AllegrexContext &ctx) { // sceIoClose

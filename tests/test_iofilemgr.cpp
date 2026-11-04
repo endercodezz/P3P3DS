@@ -129,6 +129,14 @@ int main() {
     CHECK(env.call(0x109F50BCu, {env.str("disc0:/../README.TXT"), 1u, 0u}) == SCE_ERROR_KERNEL_NO_SUCH_DEVICE);
 
     // Async open/read/poll/wait (uOFW do_get_async_stat).
+    CHECK(env.call(0x89AA9906u, {env.str("flash9:/x"), 1u, 0u}) == SCE_ERROR_KERNEL_NO_SUCH_DEVICE);
+    const auto failed_fd = env.call(0x89AA9906u, {env.str("disc0:/nope.bin"), 1u, 0u});
+    CHECK(failed_fd == 3u);
+    CHECK(env.call(0x3251EA56u, {failed_fd, kRes}) == 1u);
+    CHECK(env.call(0x6A638D83u, {failed_fd, kBuf, 1u}) == SCE_ERROR_KERNEL_ASYNC_BUSY);
+    CHECK(env.call_until_done(0xE23EEC33u, {failed_fd, kRes}) == 0u);
+    CHECK(env.res() == 0xFFFFFFFF80010002ull);
+    CHECK(env.call(0x3251EA56u, {failed_fd, kRes}) == SCE_ERROR_KERNEL_BAD_FILE_DESCRIPTOR);
     const auto afd = env.call(0x89AA9906u, {env.str("disc0:/PSP_GAME/USRDIR/DATA.BIN"), 1u, 0u});
     CHECK(afd == 3u);
     CHECK(env.call(0x3251EA56u, {afd, kRes}) == 1u);                    // pending
