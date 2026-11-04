@@ -6,6 +6,16 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## PSPRecomp AUTO lowering benchmark (#34, 2026-11-04)
+
+- [VERIFIED] The AUTO emitter calls four text passes after `emit_function_source` (`recomp/PSPRecomp/tools/codegen_main.cpp:1739-1742`). The experiment timed `analyze_program`, initial emission, each pass, and unit writes separately in a scratch copy of `generate_auto` from `db836c1`. The prototypes replaced the aligned-memory regex at its 20 emission sites with an enum for six load/store operations. One used a C++ switch, the other a Rust match behind one C ABI call per emitted access. The Rust variant included DLL loading and calls in the measured emission time. Both retained the old prefixes on the manual emission path.
+- [VERIFIED] Windows x64, GCC 16.1.0 (`-O3 -DNDEBUG -std=c++20`) and Rust 1.98.0 (`x86_64-pc-windows-msvc`, `-O --crate-type cdylib`). Three rotating rounds with a fresh directory per variant. Command shape from the repository root: `<variant.exe> profiles/p3p/game/eboot.elf --auto <fresh-dir> 0x08804000 16384 build/generated/patches.txt --no-transfer-records`. ELF SHA-256 `be2abbd43a4ae7ce5aa2f1f146083ffe0d924fc2eb1874e6fcdc21cba40d49db`; patch list SHA-256 `0c8682ea7e1e5c54aab1158d26c8543aea644b354dd1ad158a3e4762f6db49df`.
+- [VERIFIED] Median baseline stages in seconds: analysis 0.50, emission 0.58, GPR 0.21, FPR 2.39, aligned memory 2.31, VFPU 28.41, unit writes 1.03. Other work is included in wall time. Median wall time was 37.26 s baseline (37.23–38.57), 38.53 s C++ (36.46–43.28), and 35.88 s Rust (35.72–37.44). Median emission was 0.59 s for C++ and 0.87 s for Rust. Median process peak working sets were 219.8, 220.1, and 220.4 MiB respectively, including the Rust DLL in the same process.
+- [VERIFIED] The nine comparison runs and initial instrumented run matched the unmodified generator by filename and SHA-256 for all 240 outputs, including 237 units, the header, the registry and `auto_codegen_report.json`. Local artifacts: `.tmp/psprecomp-34/{build.ps1,benchmark.ps1,instrument.py,memory_lower.rs,timings.txt,output-sha256.txt}`. The SHA-256 of the manifest is `6ee69504bda0cb7f4ba46326564092ac108b0db0e9ebb91248e205344ee40861`.
+- [INFERRED] Both prototypes remove the aligned-memory text scan. Unit-write time varied from 0.72 to 5.64 s across the runs, and the timed Rust emission did not consistently beat C++ across the three rounds. This experiment does not isolate a Rust speed advantage or demonstrate a correctness improvement over typed C++. Adoption would add Rust build tooling and a DLL in the measured configuration. Decision for #34: retain the production C++ path. The largest measured opportunity is the separate VFPU pass.
+
+---
+
 ## Thread-entry frontier provenance micro-sprint
 
 - [VERIFIED] The `SceWaveMain` UID 5 initial context switch installs its stored entry `0x08B64FE0` without a guest JAL to that address. Evidence: `core/src/hle/threadman.cpp::start_thread`, `platform/pc/telemetry.hpp::blocker_type`, `.tmp/thread-entry-before.json` and `.tmp/thread-entry-check/report.json`. The new `thread_entry_transfer` record is one-shot and is invalidated by guest execution/transfer or another switch.
