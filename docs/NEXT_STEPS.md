@@ -1,42 +1,54 @@
 # P3P3DS — Next Steps
 
-Updated 2026-10-06. What is done and measured lives in [`CURRENT_STATE.md`](CURRENT_STATE.md); this file only lists what comes next, in the maintainer's priority order. Every step names how it will be verified (CLAUDE.md section 3: measure first).
+Updated 2026-11-04. What is done and measured lives in [`CURRENT_STATE.md`](CURRENT_STATE.md); this file only lists what comes next, in the maintainer's priority order. Every step names how it will be verified (CLAUDE.md section 3: measure first). Each step is tracked as a [GitHub issue](https://github.com/endercodezz/P3P3DS/issues) and lands through a pull request that closes it (CLAUDE.md section 16).
 
-## Where the project stands (0.2.8)
+## Where the project stands (0.3.1 + master)
 
 - Whole `.text` statically recompiled, HLE kernel, VFS with the mod chain, GE executor, deterministic PC runner with scripted input; the PC route plays through the first battle (maintainer's save, local route).
-- New 3DS: PICA200 renderer with a vertex shader (transform, skinning, lighting), real-time pacing, save/load menu on the bottom screen. Field 21-30 fps at about 90 % speed; the first battle renders correctly; no sound.
+- New 3DS (0.3.0/0.3.1, New 2DS XL): PICA200 renderer with a vertex shader (transform, skinning, lighting), GE back end on core 2, real-time pacing, save/load menu on the bottom screen. Dorm 28-30 fps, dialogue mostly 30, battle 16-25 fps; a user's 0.3.1 run at 97-99 % speed; no sound, no opening movie.
+- Master after 0.3.1: start logos fixed (4d198db, Azahar only).
 - P3P3DS Builder for Windows and Linux; releases built by GitHub Actions.
 
-## 1. Battle speed (priority)
+## 0. Release 0.3.2 and check it on hardware
 
-9.9 fps / 33 % speed in Azahar after the per-draw work was cut (0.2.8, `CURRENT_STATE.md`); 0.2.7 measured 5-7.5 fps on hardware. Goal: 20 fps first, then the game's full 30 (in battle the game shows 30 frames per game second).
+The logo fix is in master but not released. Release it, then confirm the logos on hardware and whether fades and transitions changed with it ([#5](https://github.com/endercodezz/P3P3DS/issues/5), [#3](https://github.com/endercodezz/P3P3DS/issues/3)).
 
-1. **Hardware report of 0.2.8** in battle (bottom-screen `draw:` and `merge` lines).
-2. **Per-draw cost, not vertex count**: the vertex cache hits 100 % but `vtx` only fell from 26.5 to 23.7 %; battle draws have a median of 4 vertices, about 2,000 per frame (`CURRENT_STATE.md`, 2026-10-09). Next measurement: an Azahar/hardware battle run with the cheaper profiling build and `sdmc:/p3p3ds/profile_seconds.txt` (top HLE imports per second on the 3DS). Candidates after that: GE command processing (`sceGeListEnQueue`, counted as `hle` on the 3DS), the ~360 `sceKernelCpuSuspendIntr`/`ResumeIntr` pairs per frame through the full HLE path, per-draw fixed work in the renderer (merging consecutive quads whose vertices are contiguous).
-3. **The game's own cost**: aot + hle are about 48 % of the time at 33 % speed, which alone caps the battle near 70 % speed. Profile a battle window on the PC production build (`--sample`, `tools/profile_symbols.py`) and on hardware (`profile_seconds.txt`); candidates: hot guest functions compiled with full optimisation, cheaper paths for the hottest HLE calls.
-4. **Do not wait for the GPU every frame** if GPU wait becomes visible on hardware (Azahar shows none).
-5. Candidates from the code review of 2026-10-08 (`CURRENT_STATE.md`, "Code review"), each to be measured before it is kept: profiling timers on raw ticks instead of `steady_clock`; raw PSP vertex bytes as PICA200 attributes (alternative to step 2); a local copy of the AOT memory view and `PSPRECOMP_AOT_ASSUME_NO_WRITE_WATCH`; `-O2` with instruction scheduling for the hottest units; a Core 2 worker (first check that a `.3dsx` can create a thread there).
+## 1. Battle speed (priority) — [#16](https://github.com/endercodezz/P3P3DS/issues/16)
 
-## 2. Field at a stable 100 %
+16-25 fps / 63-86 % of real time on hardware (0.3.0); 0.2.7 measured 5-7.5 fps. Goal: the game's full 30 (in battle the game shows 30 frames per game second). With the GE on core 2 the game's thread rarely waits for the worker (`wait` 0.0-4.3 %) and `aot` is 63-70 %: the battle is bound by the game's own code [VERIFIED, `CURRENT_STATE.md` 2026-10-11].
 
-Field draws are through mode (2D) and still take the CPU path; dorm floors run at 21-26 fps, 89-91 % speed. Verify: hardware report in the dorm. At 90 % speed 30 fps would show as 27, so frames are also lost in game time: test first whether the UMD-speed read latency applied to every file (`IoManager::transfer_us`) causes it (dorm route on the PC runner with near-zero latency).
+1. Profile a battle window on the PC production build (`--sample`, `tools/profile_symbols.py`) and on hardware (`sdmc:/p3p3ds/profile_seconds.txt`).
+2. Candidates, each measured before it is kept: hot guest units with `-O2` and instruction scheduling (AOT units build with `-Os -fno-schedule-insns2`, only size was measured); a cheaper path for the ~360 `sceKernelCpuSuspendIntr`/`ResumeIntr` pairs per frame; free heap first if larger code needs it ([#18](https://github.com/endercodezz/P3P3DS/issues/18)).
+3. Do not wait for the GPU every frame if GPU wait becomes visible on hardware.
 
-## 3. Sound
+## 2. Field at a stable 30 fps — [#17](https://github.com/endercodezz/P3P3DS/issues/17)
 
-The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers. Before that (the skipped retry of `sceAudioOutputBlocking` after a preemption is fixed), decide what the output does when the game runs below 100 % speed (the virtual clock then runs slower than the DSP).
+Dorm 28-30 fps on hardware (0.3.0). Test first whether the UMD-speed read latency applied to every file (`IoManager::transfer_us`) loses frames in game time: dorm route on the PC runner with near-zero latency.
+
+## 3. Sound — [#14](https://github.com/endercodezz/P3P3DS/issues/14)
+
+The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, maintainer-verified WAV). Missing: an `ndsp` output on the 3DS fed from the virtual-clock mixer, on a separate thread/core. Verify: audio on hardware without drops; the bottom-screen report counts late/dropped buffers. First decide what the output does when the game runs below 100 % speed (the virtual clock then runs slower than the DSP; [#15](https://github.com/endercodezz/P3P3DS/issues/15)).
+
+## Correctness defects (code review of 2026-10-08)
+
+Reproduced in unit tests or confirmed in code, not yet seen to change P3P's behaviour; fix one per pull request, each with a regression test and an unchanged replay:
+
+- HLE: thread stacks vs heap and memory reuse ([#7](https://github.com/endercodezz/P3P3DS/issues/7)), mutexes on owner exit ([#8](https://github.com/endercodezz/P3P3DS/issues/8)), event-flag `outBits` ([#9](https://github.com/endercodezz/P3P3DS/issues/9)), `sceIoOpenAsync` errors ([#10](https://github.com/endercodezz/P3P3DS/issues/10)), save-name validation ([#13](https://github.com/endercodezz/P3P3DS/issues/13)).
+- GE: culling rules ([#6](https://github.com/endercodezz/P3P3DS/issues/6)), callback and signal timing ([#11](https://github.com/endercodezz/P3P3DS/issues/11)); portrait fringe ([#4](https://github.com/endercodezz/P3P3DS/issues/4)).
+- Recompiler: FPU/VFPU edge cases ([#12](https://github.com/endercodezz/P3P3DS/issues/12)).
+- CI and tests: release without tests ([#25](https://github.com/endercodezz/P3P3DS/issues/25)), partial skips reported as passed ([#26](https://github.com/endercodezz/P3P3DS/issues/26)), game-specific values outside the profile ([#27](https://github.com/endercodezz/P3P3DS/issues/27)).
 
 ## Later
 
-- **Saves**: compatibility with PSP/PPSSPP saves (the data file is encrypted on the PSP with the key P3P passes; ours is stored plain).
-- **Opening movie**: H.264 + ATRAC3plus decoding (plan below); until then the runner skips it with START.
-- **`.cia` packaging** (larger memory mode, home-menu icon) from the Builder.
-- **Mods**: texture replacement and a Russian translation (feasibility in `3DS_PLATFORM.md` section 9 and `P3P_RESEARCH.md`); a 60 fps patch only as a separate mod (the game paces itself with `WaitVblankStartMultiCB(2)` and its logic is per frame [INFERRED]).
-- Builder: detection of devkitPro installs in other places.
+- **Saves**: compatibility with PSP/PPSSPP saves ([#20](https://github.com/endercodezz/P3P3DS/issues/20)).
+- **Opening movie**: H.264 + ATRAC3plus decoding ([#19](https://github.com/endercodezz/P3P3DS/issues/19), plan below); until then the movie is skipped.
+- **`.cia` packaging** from the Builder ([#21](https://github.com/endercodezz/P3P3DS/issues/21)).
+- **Mods**: fan translations on the 3DS and texture replacement ([#23](https://github.com/endercodezz/P3P3DS/issues/23)); a 60 fps patch only as a separate mod (the game paces itself with `WaitVblankStartMultiCB(2)` and its logic is per frame [INFERRED]).
+- Builder: detection of devkitPro installs in other places ([#22](https://github.com/endercodezz/P3P3DS/issues/22)).
 
-## Planned, but not soon: Old 3DS / 2DS
+## Planned, but not soon: Old 3DS / 2DS — [#24](https://github.com/endercodezz/P3P3DS/issues/24)
 
-Requested by many players; it needs a different approach, not tuning, so it comes after the New 3DS version is playable. Today about 112 MB of application memory are needed (44 MB code, 32 MB PSP RAM), while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache (New 3DS: 804 MHz with L2). Directions to measure first: much smaller code (compile only hot code ahead of time, interpret the rest), less host memory per PSP byte, and whether any frame rate is reachable at 268 MHz at all.
+Requested by many players; it needs a different approach, not tuning, so it comes after the New 3DS version is playable. [VERIFIED] 0.2.9 stops cleanly at start on an Old 3DS: it cannot allocate the 32 MiB PSP RAM (`CURRENT_STATE.md`, 2026-10-11). About 112 MB of application memory are needed (about 41 MB code, 32 MiB PSP RAM, 10-15 MB function tables), while the Old 3DS offers at most 96 MB and a 268 MHz CPU without L2 cache (New 3DS: 804 MHz with L2). Directions to measure first: much smaller code (compile only hot code ahead of time, interpret the rest), less host memory per PSP byte, and whether any frame rate is reachable at 268 MHz at all.
 
 ---
 

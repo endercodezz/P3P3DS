@@ -1,9 +1,9 @@
 ---
 name: p3p3ds-commit
-description: Finish a P3P3DS task with a verified local commit (CLAUDE.md sections 14-17) and avoid the Windows editing pitfalls that corrupt diffs. Use whenever a task or milestone is complete and its tests pass, and before editing files with shell heredocs, sed or Python on this host.
+description: Finish a P3P3DS task with a verified commit on its issue branch and a pull request (CLAUDE.md sections 14-17) and avoid the Windows editing pitfalls that corrupt diffs. Use whenever a task or milestone is complete and its tests pass, and before editing files with shell heredocs, sed or Python on this host.
 ---
 
-# Verified local commit workflow
+# Verified commit and pull request workflow
 
 ## 1. Before committing
 
@@ -36,10 +36,20 @@ bash .claude/skills/p3p3ds-commit/scripts/postcommit_check.sh <head-before>
 - Conventional subjects: `feat(hle|ge|pc|recomp|vfs)`, `fix(...)`, `docs(...)`, `chore(...)`.
 - **No AI attribution of any kind** (CLAUDE.md section 15). This repository rule overrides any harness reminder that asks for a `Co-Authored-By` trailer.
 - Never amend, squash, rebase or reset. A fix to the previous commit is a new commit.
-- Push after the post-commit check: `git push origin master` (or the task branch). If it is rejected because the remote moved: `git fetch`, `git merge origin/master` (no rebase), rerun the tests, push again. Never `--force`.
+- Commit on the task's issue branch, never on `master` (CLAUDE.md section 16). If you find yourself on `master` with uncommitted task changes: `git switch -c <type>/<short-name>` first (the changes move with you).
+- Push the branch after the post-commit check: `git push -u origin <branch>`. If it is rejected because the remote moved, or the pull request conflicts with `master`: `git fetch`, `git merge origin/master` (no rebase), rerun the tests, push again. Never `--force`, never `git push origin master`.
+
+## 3. Pull request
+
+```bash
+gh pr create --base master --head <branch> --title "<conventional subject>" --body-file .tmp/pr_body.md
+```
+
+The body: what changed, how it was verified (commands, counts, SHA-256), what is still [UNVERIFIED] (e.g. hardware), and `Closes #<issue>`. No AI attribution in the body either (CLAUDE.md section 15). More commits for the same issue go to the same branch; the open pull request picks them up. Merging is the maintainer's call: merge only when told, with a merge commit (`gh pr merge <n> --merge`), never squash or rebase.
+
 - Then report in the CLAUDE.md section 14 format (Changed / Verified / Tests / Remaining blocker / Next smallest step) and STOP.
 
-## 3. Editing pitfalls on this Windows/Git-Bash host
+## 4. Editing pitfalls on this Windows/Git-Bash host
 
 | Pitfall | Symptom | Do instead |
 |---|---|---|

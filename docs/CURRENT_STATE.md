@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Known issues tracked on GitHub; issue -> pull request workflow (2026-11-04)
+
+No runtime change; the frontier is the same as in the entry below (logo fix 4d198db in master, not released).
+
+- Every known issue and roadmap step is a GitHub issue: start logos #5, culling #6, SysMem stacks #7, mutexes on owner exit #8, event-flag `outBits` #9, `sceIoOpenAsync` #10, GE callbacks/signals #11, FPU/VFPU edge cases #12, save-name validation #13, sound #14, virtual-time policy #15, battle speed #16, field speed / UMD read latency #17, `Runtime::functions_` memory #18, opening movie #19, PSP save compatibility #20, `.cia` #21, devkitPro detection #22, mods #23, Old 3DS #24, release workflow without tests #25, partial test skips #26, game-specific values outside the profile #27; earlier user reports #3 (transitions) and #4 (portrait fringe). The defects of the code review below keep their evidence here; the issues link back to it.
+- CLAUDE.md / AGENTS.md section 16 and the `p3p3ds-commit` skill: work goes issue -> branch -> pull request into `master` (`Closes #n`); no direct push to `master`; merges with a merge commit by the maintainer's decision.
+
 ## Logos at start: stale texture binding after a present (2026-10-12)
 
 - [VERIFIED] (Azahar, maintainer's 0.2.6 frame dumps of 2026-10-05, build c4060fc) the logos were already missing in 0.2.8-era builds: the top screen at vblank 300 is all black, while the PC runner shows the ATLUS logo there (displayed frames 70-140 = about vblank 236-420). Not a regression of the GE thread. The maintainer's 0.3.0 report at vblank 207 was taken before the logos (the loading screen with the blue diamond, frames 0-60), so its `tex 0 up 0` says nothing about them.
