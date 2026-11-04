@@ -94,10 +94,12 @@ jobs:
           ref: ${{ env.REF }}
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build g++-14
-      - name: Build Builder and psp_recomp
+      - name: Build host tools and tests
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14
-          cmake --build build -j4 --target p3p3ds_builder psp_recomp
+          cmake --build build -j4
+      - name: Test
+        run: ctest --test-dir build -j4 --output-on-failure --no-tests=error
       - uses: actions/download-artifact@v8
         with:
           name: n3ds-runtime
@@ -131,10 +133,12 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-python
             git
-      - name: Build Builder and psp_recomp
+      - name: Build host tools and tests
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j4 --target p3p3ds_builder psp_recomp
+          cmake --build build -j4
+      - name: Test
+        run: ctest --test-dir build -j4 --output-on-failure --no-tests=error
       - uses: actions/download-artifact@v8
         with:
           name: n3ds-runtime

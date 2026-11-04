@@ -2,6 +2,10 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Release packages depend on host tests (2026-11-05)
+
+- [VERIFIED] In `.github/workflows/release.yml`, Windows and Linux build the host tests and run CTest before packaging. Publishing depends on both packaging jobs. Parsed the workflow to verify job dependencies and step order. Local Windows Release CTest passed 27/27 (`.tmp/release-gate-25/ctest.log`).
+
 ## Production AUTO generator filters VFPU regex candidates (2026-11-05)
 
 - [VERIFIED] On Windows Release, fresh diagnostic generation took 9.26 s with the C++ literal filter and 40.31 s with the pre-change generator (one run each). The release-mode output also matched. In each mode all 240 files matched the original by filename and SHA-256. The incremental build rewrote 0 of 237 generated units. See the [verification record](VERIFICATION.md#production-vfpu-prefilter-38-2026-11-05).
