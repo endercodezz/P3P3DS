@@ -74,7 +74,8 @@ public:
     [[nodiscard]] std::optional<Resolved> resolve(const std::string &psp_path) const;
 
     // Opens (without timing); returns fd or a negative PSP error.
-    std::int32_t open(const std::string &path, std::uint32_t flags);
+    // For an async open, return the reserved descriptor and write the driver result separately.
+    std::int32_t open(const std::string &path, std::uint32_t flags, std::int32_t *async_result = nullptr);
     std::int32_t open_directory(const std::string &path);
     std::int32_t close(std::int32_t fd);
     [[nodiscard]] Fd *get(std::int32_t fd);
