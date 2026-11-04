@@ -8,6 +8,12 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [VERIFIED] Windows Release build, `ctest --test-dir build -j6 --output-on-failure` (27/27), `python tools/verify_aot_layout.py build/generated/auto 237 16384`, stable bootstrap and devkitARM `cmake --build build/3ds --target p3p3ds_objects -j4` passed.
 - [VERIFIED] Two PC runs with `--run-until-blocker --max-dispatches 20000000 --ms0 .tmp/issue27/ms0 --mods .tmp/issue27/mods --dump-events <path>` and the pre-change run all reached the dispatch limit at `0x08A87150`. Their event dumps (`.tmp/issue27/baseline.json`, `run1.json`, `run2.json` in the same directory) share SHA-256 `1a5f566002148933522c869ed3febb9eae3d652764501d20e8437b3b1898e605`. No new execution blocker was observed. [UNVERIFIED] Mod loading on physical New 3DS hardware.
 
+## Host VFPU code generation experiment (2026-11-04)
+
+- [VERIFIED] The PSPRecomp AUTO VFPU pass took 29.75 s in the baseline, 0.84 s with a C++ literal prefilter and 0.36 s with a Rust parser (medians of three Windows runs each). All 240 outputs matched the unmodified generator in every run. See the [verification record](VERIFICATION.md#vfpu-text-lowering-comparison-36-2026-11-04).
+- [VERIFIED] `python tools/verify_aot_layout.py .tmp/vfpu-lowering/rust-block3 237 16384` passed. `ctest --test-dir build -j6 --output-on-failure` passed 27/27 on the existing Windows Release build. Log: `.tmp/vfpu-lowering/ctest.log`.
+- [INFERRED] The C++ filter offers most of the measured improvement. The next production candidate is the C++ filter with byte parity and the existing generator verification gates.
+
 ## Known issues tracked on GitHub; issue -> pull request workflow (2026-11-04)
 
 No runtime change; the frontier is the same as in the entry below (logo fix 4d198db in master, not released).

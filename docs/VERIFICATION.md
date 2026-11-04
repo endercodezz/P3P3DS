@@ -13,6 +13,16 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## VFPU text lowering comparison (#36, 2026-11-04)
+
+- [VERIFIED] `recomp/PSPRecomp/tools/codegen_main.cpp::lower_constant_vfpu_accesses` applies 12 ordered regex replacements to each generated unit. A Windows scratch harness based on `ddd57e1` timed each replacement. It compared the original implementation with a C++ literal-name prefilter that invokes the existing regex only at candidate offsets, and with a Rust parser that validates arguments at those offsets. All variants kept the order of the 12 rules. The Rust pass timer includes one DLL call, UTF-8 validation and the output copy per unit.
+- [VERIFIED] Three rotating rounds used fresh output directories and the same Windows executable and ULUS-10512 inputs. GCC 16.1.0 with `-O3 -DNDEBUG -std=c++20`, Rust 1.98.0 with `-O -C panic=abort --crate-type cdylib` on `x86_64-pc-windows-msvc`. Command shape from the repo root with `P3P_VFPU_EXPERIMENT` set to `baseline`, `cpp` or `rust`: `profile.exe profiles/p3p/game/eboot.elf --auto <fresh-dir> 0x08804000 16384 build/generated/patches.txt --no-transfer-records`. ELF SHA-256 `be2abbd43a4ae7ce5aa2f1f146083ffe0d924fc2eb1874e6fcdc21cba40d49db`; patch list SHA-256 `0c8682ea7e1e5c54aab1158d26c8543aea644b354dd1ad158a3e4762f6db49df`.
+- [VERIFIED] Median VFPU stage time was 29.747 s baseline (29.344–30.904), 0.835 s C++ (0.796–1.024), and 0.362 s Rust (0.351–0.368). Baseline medians for the individual replacements ranged from 2.406 s for scalar reads to 2.530 s for `vcmp`. Median generator wall times were 43.98 s (40.11–67.55), 21.11 s (13.24–23.45), and 15.05 s (9.54–18.87). File writing and other work outside the VFPU timer varied across runs. Median peak working sets were 219.9, 219.6, and 219.7 MiB respectively.
+- [VERIFIED] All nine runs matched the unmodified generator by filename and SHA-256 for all 240 outputs. The C++ filter matched each rule on the game corpus. A separate fixture exercised all 12 Rust rules, nested scalar reads/writes and unsupported argument forms against the original regex patterns. Artifacts are under `.tmp/vfpu-lowering/` (`vfpu.rs`, `instrument.py`, `build.ps1`, `benchmark.ps1`, `verify_fixture.py`, `timings.txt`, per-run stderr, `output-sha256.txt`). The manifest SHA-256 is `6ee69504bda0cb7f4ba46326564092ac108b0db0e9ebb91248e205344ee40861`.
+- [INFERRED] The literal filter accounts for about 98% of the measured reduction in VFPU stage time. The Rust parser saves another 0.47 s per complete generation compared with this C++ prototype. The prototype also replaces the 12 regex rules with a separate parser and uses a Rust-built DLL. The comparison supports evaluating the small C++ filter for production first. These are Windows generator measurements with the original C++ output.
+
+---
+
 ## Audio reservation micro-sprint
 
 - [VERIFIED] ULUS-10512 first calls `sceAudioChReserve(-1,448,0)` at `0x08B64264`; after return it tests the sign of `V0` and stores the channel number. Evidence: `build/generated/p3p_generated.cpp:L_08B64254/L_08B6426C`, `.tmp/audio-before.json`, `.tmp/audio-reserve-1.json`. A temporary register probe established `A3=0x08E10000` and `V0_before=0x08E10CA0` and was removed.
