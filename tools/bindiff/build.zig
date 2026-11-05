@@ -1,0 +1,26 @@
+const std = @import("std");
+const builtin = @import("builtin");
+
+pub fn build(b: *std.Build) void {
+    if (!std.mem.eql(u8, builtin.zig_version_string, "0.17.1"))
+        @panic("p3p-bindiff requires Zig 0.17.1");
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const exe = b.addExecutable(.{
+        .name = "p3p-bindiff",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(exe);
+    const tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/diff.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.step("test", "Test byte comparison and ELF metadata parsing").dependOn(&b.addRunArtifact(tests).step);
+}
