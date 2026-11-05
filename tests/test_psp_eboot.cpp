@@ -2,6 +2,7 @@
 // AES-128 known-answer vectors, and -- when the maintainer's ISO is given --
 // the decrypted ULUS-10512 executable must match tools/prepare_game.py's
 // reference SHA-256.
+#include "game_prep.hpp"
 #include "psp_eboot.hpp"
 #include "p3p3ds/vfs.hpp"
 
@@ -32,6 +33,11 @@ int main(int argc, char **argv) {
             source->read(0, eboot.data(), eboot.size());
             const auto elf = decrypt_eboot(eboot);
             check(sha256_hex(elf) == kExpectedElfSha256, "decrypted ELF matches the reference SHA-256");
+            // The shared ISO -> ELF path (Builder and p3p_prepare_elf) gives the same bytes.
+            const auto prepared = prepare_executable(argv[1]);
+            check(prepared.disc_id == kSupportedDiscId, "prepare_executable: DISC_ID");
+            check(prepared.eboot_sha256 == kExpectedEbootSha256, "prepare_executable: encrypted EBOOT.BIN SHA-256");
+            check(prepared.elf == elf, "prepare_executable: same ELF as decrypt_eboot");
         }
     } else {
         std::printf("SKIP: no ISO given for the ELF check\n");

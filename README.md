@@ -296,6 +296,8 @@ The tool automatically:
 3. Validates the decrypted binary against the verified reference SHA-256 (`be2abbd4...`).
 4. Extracts game assets (`USRDIR/` containing CPK archives) into `profiles/p3p/game/USRDIR/`.
 
+Steps 1-3 use `build/p3p_prepare_elf` when the host build has it (the same C++ code as the P3P3DS Builder; the host CMake project builds it without any game files). Without it, the script uses its own Python implementation. `--native-tool <path>` picks another build of the tool, `--python-only` forces the Python path.
+
 *(All extracted files in `profiles/p3p/game/` are strictly local and gitignored.)*
 
 *(Optional fallback: If you already have a pre-decrypted ELF, pass `--decrypted-eboot /path/to/eboot.elf`.)*
