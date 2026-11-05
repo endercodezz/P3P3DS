@@ -321,6 +321,31 @@ add_executable(test_texture_replacement tests/test_texture_replacement.cpp)
 target_link_libraries(test_texture_replacement PRIVATE p3p3ds_core)
 add_test(NAME p3p_texture_replacement COMMAND test_texture_replacement)
 
+# Texture pack format round trip (#63): tools/texpack (Rust) writes packs from
+# its fixtures, the runtime reader (C++) checks every texel. Needs cargo (the
+# toolchain pinned in tools/texpack/rust-toolchain.toml); skipped without it.
+add_executable(test_texture_pack_roundtrip tests/test_texture_pack_roundtrip.cpp)
+target_link_libraries(test_texture_pack_roundtrip PRIVATE p3p3ds_core)
+find_program(P3P_CARGO cargo)
+if(P3P_CARGO)
+    set(_texpack_out "${CMAKE_CURRENT_BINARY_DIR}/texpack_roundtrip")
+    foreach(_format rgba8 auto)
+        add_test(NAME p3p_texpack_build_${_format}
+                 COMMAND "${P3P_CARGO}" run --quiet --release --locked -- build
+                         "${CMAKE_CURRENT_SOURCE_DIR}/tools/texpack/tests/fixtures" "${_texpack_out}/${_format}" --format ${_format})
+        # From tools/texpack, so cargo finds its .cargo/config.toml and rust-toolchain.toml.
+        # One at a time: on a fresh runner both would install the pinned toolchain
+        # through rustup at once, and rustup's downloads race (CI failure on #64).
+        set_tests_properties(p3p_texpack_build_${_format} PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools/texpack" FIXTURES_SETUP texpack_roundtrip_packs
+            RESOURCE_LOCK texpack_cargo)
+    endforeach()
+    add_test(NAME p3p_texpack_roundtrip COMMAND test_texture_pack_roundtrip "${_texpack_out}/rgba8" "${_texpack_out}/auto")
+    set_tests_properties(p3p_texpack_roundtrip PROPERTIES FIXTURES_REQUIRED texpack_roundtrip_packs)
+else()
+    message(STATUS "cargo not found: texture pack round trip test skipped")
+endif()
+
 add_executable(test_sascore tests/test_sascore.cpp)
 target_link_libraries(test_sascore PRIVATE p3p3ds_core)
 add_test(NAME p3p_sascore COMMAND test_sascore)

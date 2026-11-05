@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Texture pack format: Rust writer and C++ reader tested together (#63, 2026-11-05)
+
+- CTest `p3p_texpack_build_rgba8` / `p3p_texpack_build_auto` run `p3p-texpack build` on `tools/texpack/tests/fixtures` (`textures.ini` there), `p3p_texpack_roundtrip` (`tests/test_texture_pack_roundtrip.cpp`) reads both packs with the runtime's `TexturePack` and compares every texel with the fixture formulas after the format's rules (header, entry order, alignment, row order, tiling, format codes, channel packing, keep-original entry). Registered only when CMake finds `cargo` (Linux CI and local builds; not the MSYS2 Windows job).
+- [VERIFIED] Passes on Windows (CTest 31/31). Three deliberate format changes each made it fail and were reverted: no row flip in `build.rs` (all RGBA8 texels differ), RGB565 green shifted in `pica.rs` (RGB565 entries differ), width read from the height field in `texture_pack.cpp` (pack rejected as invalid).
+
 ## Texture packs replace textures on the PC; 3DS path built, untested (#23, 2026-11-05)
 
 - `core/src/ge/texture_pack.cpp`: `TexturePack` reads the New 3DS pack (`index.bin` checked: magic, version, sizes, sort order; texture data read on demand) and finds an entry in PPSSPP's lookup order; `TextureReplacer` keeps the CLUT bytes and maxSeenV state and is shared by both renderers. `SoftwareRenderer::set_texture_pack` samples the replacement with the PSP texture's normalised coordinates; PC runner `--texture-pack <dir>` prints `[TEXPACK]`. New 3DS: `GpuRenderer::bind_texture` reads a replacement straight into a `C3D_Tex` of the pack's size and format when it uploads a texture (textures narrower than 8 texels keep the original); `platform/3ds/main.cpp` opens `sdmc:/p3p3ds/textures`, the report line `texpack:` shows count, replaced uploads, KiB and read time.
