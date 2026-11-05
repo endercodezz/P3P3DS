@@ -11,3 +11,6 @@ references/GLASS/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-
 references/azahar/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 references/jpcsp/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 references/azahar/dist/qt_themes/qdarkstyle_midnight_blue/LICENSE.rst conflict-marker-size=8
+
+# p3p-texpack reference texture data (tex3ds output).
+tools/texpack/tests/fixtures/*.tex binary
