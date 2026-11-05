@@ -342,11 +342,31 @@ python platform/pc/builder/make_release.py --version 0.1.0 --devkitpro <devkitPr
 
 `make_release.py` needs the host build (`psp_recomp.exe`) and the New 3DS build in `build/3ds/` (runtime objects, CWCheat patch list); it packages the build of the platform it runs on: `out/P3P3DS-Builder-<version>/` and a `.zip` on Windows, `out/P3P3DS-Builder-<version>-linux/` and a `.tar.gz` on Linux. `P3P3DS-Builder.exe --cli --iso <iso> [--devkitpro <dir>] [--jobs <n>]` runs the same build without the window. Sources: `platform/pc/builder/` (pipeline, EBOOT decryption, wizard, trivia).
 
+### BinDiff developer tool (Zig 0.17.1)
+
+`tools/bindiff` is an optional host-only CLI, separate from the CMake/runtime and Builder builds. It compares arbitrary files positionally, or decrypted ELF32 little-endian MIPS/PSP PRX headers, segments and sections with `--elf`. It does not decrypt files, apply relocations or match functions; use the existing preparation and `psp_analyze` tools for those stages.
+
+From the repository root, with Python 3.12+ and **Zig 0.17.1**:
+
+```bash
+python tools/bindiff/check.py                 # format check, Debug/safe unit tests, safe build, CLI tests
+python tools/bindiff/check.py --download      # alternatively download the pinned official Zig, verify SHA-256, then check
+build/bindiff/bin/p3p-bindiff --json old.dat new.dat
+build/bindiff/bin/p3p-bindiff --elf --json old.elf new.elf
+```
+
+On Windows use `p3p-bindiff.exe`. `--zig <path>` selects an existing compiler. The helper keeps compiler downloads and all caches under `.cache/`, temporary fixtures under `.tmp/`, and the executable under `build/bindiff/`; `--download` supports x86-64 Windows/Linux and does not modify PATH. CI uses the same helper on both systems; the compiler version is pinned in `tools/bindiff/zig-version` and enforced by `build.zig`.
+
+Exit codes: **0** byte-identical, **1** different, **2** usage/input/output error. `--help`, `--version` and `--` (for paths starting with `-`) are supported. Inputs are limited to less than 256 MiB each. Comparison is positional: an insertion can change all subsequent offsets. `changed_bytes` counts mismatches in the common prefix; `added_bytes`/`removed_bytes` count the extra tail. Ranges are half-open `[start,end)` and include missing tails. Only the first 256 ranges are emitted; `range_count` and totals remain complete and `ranges_truncated` signals the limit.
+
+JSON schema version 1 includes `mode`, input paths, byte equality, `bytes` totals/ranges, and an optional `elf` object with both headers and explicit header/segment/section changes. ELF entries are paired by table index. Added/removed entries have a null side; modified entries include both versions, with file offsets and ELF virtual addresses (no runtime load base added). `content_equal` compares file payloads and is null for missing entries or NOBITS. Section names are UTF-8 strings, or byte arrays when not valid UTF-8. Unsupported ELF class/endianness/machine, extended numbering, encrypted `~PSP`, PBP containers and malformed metadata are rejected with code 2; byte mode can still compare their raw bytes.
+
 ### Continuous integration and releases (GitHub Actions)
 
 Without the game files (no `profiles/p3p/game/eboot.elf`) both CMake projects build everything that does not come from the game: the host runtime, tools, P3P3DS Builder and tests (the AOT code, the PC runner and the tests that run game code are left out), and the New 3DS runtime the Builder ships (no `.3dsx`). GitHub Actions uses this:
 
 - `.github/workflows/ci.yml`, on every push to `master` and every pull request: Linux (GCC 14) and Windows (MSYS2 UCRT64 GCC) host build + CTest, New 3DS runtime in the `devkitpro/devkitarm` container (which also regenerates the `tools/texpack` fixtures with its `tex3ds` and fails on any difference), and `tools/texpack` clippy + tests with the pinned Rust toolchain.
+- The same workflow independently builds/tests BinDiff on Windows/Linux using SHA-256-verified Zig 0.17.1 archives and synthetic fixtures; it requires no game data.
 - `.github/workflows/automerge.yml`: a pull request opened by the maintainer (not a draft) is merged automatically, with a merge commit, once the three CI jobs pass; `master` requires them and takes changes only through pull requests.
 - `.github/workflows/release.yml`: pushing a tag `v<version>` that matches `FileVersion` in `platform/pc/builder/builder.rc` builds the New 3DS runtime (debug info stripped), the Windows and Linux Builder packages with `make_release.py`, and publishes them as a GitHub release (an existing release of that tag gets the files replaced). Started by hand (Actions -> Release -> Run workflow, with a branch or commit) it only builds the packages as workflow artifacts, for a dry run.
 

@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Optional BinDiff host CLI in Zig (#59, 2026-11-05)
+
+- [VERIFIED] `tools/bindiff/src/diff.zig::{compare,parseElf,compareElf}` and `src/main.zig::run` implement positional byte ranges/counts and ELF32 little-endian MIPS/PSP PRX header/segment/section comparison, text/JSON output and exit codes 0/1/2. Metadata entries are paired by table index, without relocation normalization or function matching. The runtime and CMake build do not depend on Zig.
+- [VERIFIED] Zig is pinned to 0.17.1 (`tools/bindiff/zig-version`, `build.zig`). `python tools/bindiff/check.py --zig <compiler>` passed format checking, 4 Debug and 4 safe unit tests, safe compilation and 14 CLI regression tests on Windows. The CLI tests compare repeated JSON bytes and use a seeded positional oracle, malformed ELF/PRX, NOBITS, Unicode paths, limits and output errors. `.github/workflows/ci.yml::bindiff` runs the same checks on Windows/Linux with pinned official archive SHA-256 verification.
+- [VERIFIED] Separate no-game Windows Release host build succeeded; `ctest --test-dir build/host -j6 --output-on-failure --no-tests=error` reported no failures: 18 tests passed, 6 skipped for missing game/reference fixtures. A local ULUS-10512 ELF self-comparison returned 0 with no changes (5,849,468 bytes, 3 segments, 54 sections). Evidence under `.tmp/bindiff-worktree/.tmp/`: `ctest-bindiff.log` and `bindiff-evidence/real-elf.json`.
+- [VERIFIED] The exact Windows CI helper path, `python tools/bindiff/check.py --download`, verified the official archive, extracted it and passed all checks (`.tmp/bindiff-worktree/.tmp/bindiff-check.log`). A safe `x86_64-linux` cross-build also passed (`.tmp/bindiff-worktree/.tmp/bindiff-linux-build.log`). [UNVERIFIED] Linux execution until the new CI matrix runs. Next step: inspect both BinDiff CI jobs; no runtime frontier change is claimed.
+
 ## Texture pack converter prototype in Rust (#56, 2026-11-05)
 
 - [VERIFIED] Existing P3P texture packs are PPSSPP packs (`textures.ini`, `hash = xxh64`, `ignoreAddress = true`, PNG; 3x/6x upscales in the 2021 Community Expansion), from the PPSSPP forum threads linked in #56. The 3DS limits (1024x1024, no palettes, 6 MiB cache budget, 1,501 KiB linear memory free in battle) mean packs must be converted on the PC; the runtime lookup is #23.

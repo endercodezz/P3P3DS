@@ -6,6 +6,14 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## BinDiff host CLI (#59, 2026-11-05)
+
+- [VERIFIED] `tools/bindiff/src/diff.zig::parseElf` checks ELF32/LE/MIPS, table and payload bounds, load sizes, address overflow and section-name termination. It accepts PSP PRX type `0xFFA0` as in `recomp/PSPRecomp/include/psprecomp/elf32.hpp::kElfTypePspPrx`. It deliberately reads metadata only; PSP loading, relocations, imports and Allegrex analysis remain in PSPRecomp. `compareElf` pairs entries by index and compares file payloads; NOBITS has no file payload.
+- [VERIFIED] Windows, Zig 0.17.1: `python tools/bindiff/check.py --zig <compiler>` passes format checking, 4/4 Debug and 4/4 safe unit tests, safe build and 14/14 Python CLI tests. `tools/bindiff/test_cli.py::pair` compares actual repeated JSON output bytes; `test_randomized_positional_oracle` checks 40 seeded file pairs against an independent Python oracle. Other cases cover structural additions/removals, content and header changes, absent section tables, non-UTF8 names, malformed inputs, read/write errors and input/report limits. No speed comparison with other languages was measured.
+- [VERIFIED] The official Windows 0.17.1 archive matches SHA-256 `b03f477a1943673e02aca0f570e8030dffd536ce1f45cbc4d3326ec31159562e` from `https://ziglang.org/download/index.json`. The installed compiler reports 0.17.1 in the installation process and a fresh PowerShell process using the persisted user PATH. Installation file lengths sum to 378,964,486 bytes (19,520 files), excluding archives/build caches.
+- [VERIFIED] A separate no-game Windows Release CMake build and full CTest completed (18 passed, 6 skipped, no failures); local evidence: `.tmp/bindiff-worktree/.tmp/ctest-bindiff.log`. Local P3P ELF self-comparison emitted no structural/byte changes and code 0 (`.tmp/bindiff-worktree/.tmp/bindiff-evidence/real-elf.json`). No proprietary fixtures are committed.
+- [VERIFIED] `python tools/bindiff/check.py --download` verified/extracted the official Windows archive and passed all checks (`.tmp/bindiff-worktree/.tmp/bindiff-check.log`). A safe `x86_64-linux` cross-build passed (`.tmp/bindiff-worktree/.tmp/bindiff-linux-build.log`). [UNVERIFIED] Linux execution before CI. `.github/workflows/ci.yml::bindiff` installs Python 3.13 and downloads official SHA-256-pinned Zig 0.17.1 for each Windows/Linux runner, then runs the shared checks without game data.
+
 ## Host time audit and Rust candidates (#50, 2026-11-05)
 
 - [VERIFIED] Commit `f876554`, Windows 11, i5-12400F (12 threads), host GCC 16.1 (WinLibs), devkitARM GCC 16.1. Each process was measured on its own, single runs unless noted. Logs and the summary are under `.tmp/rust-audit/` (`REPORT.md`, `builder_run1.log`, `ninja_stats.txt`, `ctest.log`, `interp_diff*.txt`/`.log`, `run/`, `python_tools.txt`).
