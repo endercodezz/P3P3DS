@@ -6,12 +6,15 @@
 //   on synthetic register files and guest memory.
 // The end-to-end check is the hit rate of a real pack on the PC runner
 // (--texture-keys, docs/CURRENT_STATE.md).
+#include "p3p3ds/ge/texture_pack.hpp"
 #include "p3p3ds/ge/texture_replacement.hpp"
 #include "p3p3ds/ge/xxhash.hpp"
 #include "psprecomp/guest_memory.hpp"
 
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 using namespace p3p3ds::ge;
@@ -76,6 +79,23 @@ const Vector kVectors[] = {
 };
 
 void set_reg(GeRegisters &regs, std::uint32_t op, std::uint32_t value) { regs.reg[op] = value & 0xFFFFFFu; }
+
+void put16(std::vector<std::uint8_t> &v, std::uint32_t x) { v.push_back(static_cast<std::uint8_t>(x)); v.push_back(static_cast<std::uint8_t>(x >> 8)); }
+void put32(std::vector<std::uint8_t> &v, std::uint32_t x) { put16(v, x & 0xFFFFu); put16(v, x >> 16); }
+void put64(std::vector<std::uint8_t> &v, std::uint64_t x) { put32(v, static_cast<std::uint32_t>(x)); put32(v, static_cast<std::uint32_t>(x >> 32)); }
+void write_file(const std::filesystem::path &p, const std::vector<std::uint8_t> &bytes) {
+    std::ofstream(p, std::ios::binary).write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+}
+struct EntrySpec { std::uint64_t cachekey; std::uint32_t hash, offset, size; std::uint16_t w, h; std::uint8_t format; };
+std::vector<std::uint8_t> make_index(const std::vector<EntrySpec> &entries, std::uint32_t flags = 1) {
+    std::vector<std::uint8_t> v = {'P', '3', 'T', 'X', 'P', 'A', 'C', 'K'};
+    put32(v, 1); put32(v, flags); put32(v, static_cast<std::uint32_t>(entries.size())); put32(v, 0);
+    for (const auto &e : entries) {
+        put64(v, e.cachekey); put32(v, e.hash); put32(v, e.offset); put32(v, e.size); put16(v, e.w); put16(v, e.h);
+        v.push_back(e.format); v.push_back(0); put16(v, 0); put32(v, 0);
+    }
+    return v;
+}
 } // namespace
 
 int main() {
@@ -166,6 +186,59 @@ int main() {
     check(k1.hash == replacement_data_hash(memory, tex, 272), "first through-mode use hashes 272 rows");
     const auto k2 = keys.key(memory, tex, clut, true, 300);
     check(k2.hash == replacement_data_hash(memory, tex, 512), "a taller draw switches to all 512 rows");
+
+    // New 3DS pack (tools/texpack/src/build.rs format): lookup, read, decode.
+    {
+        const std::filesystem::path dir = "texture_pack_test";
+        std::filesystem::remove_all(dir);
+        std::filesystem::create_directories(dir);
+        // Entry 0: 8x8 RGBA8, texel (x, y) = (x, y, 7, 255), stored rows bottom-up.
+        std::vector<std::uint8_t> data(8 * 8 * 4);
+        for (std::uint32_t y = 0; y < 8; ++y)
+            for (std::uint32_t x = 0; x < 8; ++x) {
+                const std::uint32_t row = 7 - y; // memory row of image row y
+                const std::uint32_t m = (x & 1u) | ((row & 1u) << 1) | ((x & 2u) << 1) | ((row & 2u) << 2) | ((x & 4u) << 2) | ((row & 4u) << 3);
+                std::uint8_t *t = &data[m * 4];
+                t[0] = 255; t[1] = 7; t[2] = static_cast<std::uint8_t>(y); t[3] = static_cast<std::uint8_t>(x);
+            }
+        // Entry 1: 8x8 RGB565, all red (0xF800).
+        std::vector<std::uint8_t> red;
+        for (int i = 0; i < 64; ++i) put16(red, 0xF800u);
+        data.insert(data.end(), red.begin(), red.end());
+        write_file(dir / "textures.bin", data);
+        write_file(dir / "index.bin", make_index({{0x100, 0xAABBCCDD, 0, 256, 8, 8, 0}, {0x200, 0, 256, 128, 8, 8, 3}, {0x300, 0x5, 0, 0, 0, 0, 0}}));
+        std::string error;
+        auto pack = TexturePack::open(dir, error);
+        check(pack != nullptr && pack->size() == 3 && pack->ignore_address(), "open pack");
+        if (pack) {
+            const PackEntry *e = pack->find({0x0900'0000'0000'0100ull, 0xAABBCCDDu}); // address bits ignored
+            check(e && e->width == 8 && e->format == 0, "find exact key");
+            std::vector<std::uint8_t> bytes;
+            std::vector<std::uint32_t> rgba;
+            check(e && pack->read(*e, bytes), "read entry");
+            if (e) decode_pack_texture(*e, bytes, rgba);
+            check(rgba.size() == 64 && rgba[3 * 8 + 5] == (5u | 3u << 8 | 7u << 16 | 255u << 24), "RGBA8 decode, rows bottom-up");
+            const PackEntry *red_entry = pack->find({0x200, 0x12345678u}); // falls back to the CLUT-only key
+            check(red_entry && red_entry->format == 3, "CLUT-only fallback");
+            if (red_entry && pack->read(*red_entry, bytes)) decode_pack_texture(*red_entry, bytes, rgba);
+            check(rgba.size() == 64 && rgba[0] == (255u | 255u << 24), "RGB565 decode");
+            const PackEntry *keep = pack->find({0x300, 0x5});
+            check(keep && keep->width == 0, "keep-original entry");
+            check(!pack->find({0x400, 1}), "unknown key");
+        }
+        pack.reset();
+        write_file(dir / "index.bin", make_index({{0x200, 0, 0, 128, 8, 8, 3}, {0x100, 0, 0, 128, 8, 8, 3}}));
+        check(!TexturePack::open(dir, error) && error.find("sorted") != std::string::npos, "reject unsorted index");
+        write_file(dir / "index.bin", make_index({{0x100, 0, 0, 100, 8, 8, 3}}));
+        check(!TexturePack::open(dir, error), "reject wrong data size");
+        write_file(dir / "index.bin", make_index({{0x100, 0, 0, 12 * 8 * 2, 12, 8, 3}}));
+        check(!TexturePack::open(dir, error), "reject non-power-of-two size");
+        std::vector<std::uint8_t> bad = make_index({});
+        bad[0] = 'X';
+        write_file(dir / "index.bin", bad);
+        check(!TexturePack::open(dir, error), "reject bad magic");
+        std::filesystem::remove_all(dir);
+    }
 
     if (failures == 0) std::printf("test_texture_replacement: all checks passed\n");
     return failures == 0 ? 0 : 1;

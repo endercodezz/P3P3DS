@@ -16,6 +16,7 @@
 #include "p3p3ds/ge/geometry.hpp"
 #include "p3p3ds/ge/model_batch.hpp"
 #include "p3p3ds/ge/renderer.hpp"
+#include "p3p3ds/ge/texture_pack.hpp"
 #include "p3p3ds/ge/vertex_cache.hpp"
 #include "p3p3ds/hle/display.hpp"
 
@@ -25,6 +26,7 @@
 #include <cstdint>
 #include <atomic>
 #include <cstdio>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -52,6 +54,9 @@ struct GpuStats {
     std::uint64_t fast_draws{};    // model draws that joined a batch on the fast path
     std::uint64_t model_runs{};    // vertex blocks filled for runs of contiguous model draws
     std::uint64_t run_draws{};     // model draws that went into such a run
+    // Texture pack (#23): uploads served from the pack, their bytes and the
+    // CPU time spent finding and reading them (SD card reads included).
+    std::uint64_t replaced_uploads{}, replaced_bytes{}, replace_ticks{};
     std::uint32_t textures{}, targets{};
 };
 
@@ -77,6 +82,10 @@ public:
     bool read_top_screen(std::vector<std::uint8_t> &rgb);
 
     [[nodiscard]] const GpuStats &gpu_stats() const { return gpu_stats_; }
+    // Texture replacement from a New 3DS pack (sdmc:/p3p3ds/textures); nullptr: off.
+    void set_texture_pack(std::shared_ptr<const ge::TexturePack> pack) {
+        replacer_ = pack ? std::make_unique<ge::TextureReplacer>(std::move(pack)) : nullptr;
+    }
     [[nodiscard]] const ge::VertexCacheStats &vertex_cache_stats() const { return vertex_cache_.stats(); }
     [[nodiscard]] bool vertex_cache_enabled() const { return vertex_cache_enabled_; }
     // The last presented picture came from guest memory (CPU-written, e.g. a movie frame).
@@ -123,7 +132,8 @@ private:
     void upload_guest_framebuffer(psprecomp::GuestMemory &memory, std::uint32_t address, std::uint32_t stride,
                                   std::uint32_t format);
     void blit(C3D_Tex &source, float src_w, float src_h, bool to_screen);
-    const C3D_Tex *bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v);
+    const C3D_Tex *bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v,
+                                bool through, std::uint16_t max_v);
     void apply_fragment_state(const ge::GeRegisters &regs, bool textured, bool clear_mode, bool no_cull);
     Vertex *alloc_vertices(std::uint32_t count, std::uint32_t &first);
     void *alloc_linear(std::uint32_t bytes, std::uint32_t align);
@@ -236,6 +246,7 @@ private:
     std::uint32_t trace_left_{};
     std::vector<ge::ScreenVertex> screen_;
     std::vector<std::uint32_t> rgba_;
+    std::unique_ptr<ge::TextureReplacer> replacer_;
     // What fallback_ holds: guest framebuffer address and the target's cpu_seq
     // at upload time (re-upload only after new CPU writes).
     std::uint32_t fallback_address_{};
