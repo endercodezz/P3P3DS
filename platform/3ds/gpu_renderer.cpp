@@ -450,7 +450,8 @@ void GpuRenderer::evict_textures(std::uint32_t needed) {
     }
 }
 
-const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v) {
+const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const ge::GeRegisters &regs, float &scale_u, float &scale_v,
+                                         bool through, std::uint16_t max_v) {
     const auto info = ge::texture_info(regs);
     // Render-to-texture: a texture that starts at a GPU-drawn framebuffer.
     const std::uint32_t canonical = psprecomp::GuestMemory::canonical(info.address);
@@ -489,26 +490,53 @@ const C3D_Tex *GpuRenderer::bind_texture(psprecomp::GuestMemory &memory, const g
                 else C3D_TexDelete(&it->second.tex);
                 textures_.erase(it);
             }
-            const auto fmt = pica_format(info);
             const std::uint32_t tw = std::max<std::uint32_t>(info.width, 8u), th = std::max<std::uint32_t>(info.height, 8u);
-            const std::uint32_t bytes = tw * th * (fmt == GPU_RGBA8 ? 4u : 2u);
-            evict_textures(bytes);
             CachedTexture entry;
-            if (!C3D_TexInit(&entry.tex, static_cast<u16>(tw), static_cast<u16>(th), fmt)) {
-                evict_textures(kTextureBudget); // free everything not used by this frame and retry
-                if (!C3D_TexInit(&entry.tex, static_cast<u16>(tw), static_cast<u16>(th), fmt)) return nullptr;
-            }
-            const u64 upload_start = svcGetSystemTick();
-            ge::decode_texture(memory, regs, info, rgba_);
-            for (std::uint32_t y = 0; y < th; ++y)
-                for (std::uint32_t x = 0; x < tw; ++x) {
-                    const std::uint32_t c = rgba_[static_cast<std::size_t>(y % info.height) * info.width + (x % info.width)];
-                    const std::uint32_t at = tiled_index(x, tiled_row(y, th), tw);
-                    if (fmt == GPU_RGBA8) static_cast<std::uint32_t *>(entry.tex.data)[at] = to_rgba8(c);
-                    else static_cast<std::uint16_t *>(entry.tex.data)[at] = to_16(c, fmt);
+            std::uint32_t bytes = 0;
+            // Texture pack (#23): a replacement covers the whole PSP texture and is
+            // sampled with the same normalised coordinates (scale from tw/th below).
+            // Textures narrower than 8 texels are repeated to 8 here, so they keep the original.
+            if (replacer_ && info.width >= 8u && info.height >= 8u) {
+                const u64 start = svcGetSystemTick();
+                if (const ge::PackEntry *rep = replacer_->find(memory, regs, through, max_v)) {
+                    evict_textures(rep->size);
+                    const auto rfmt = static_cast<GPU_TEXCOLOR>(rep->format);
+                    bool ok = C3D_TexInit(&entry.tex, rep->width, rep->height, rfmt);
+                    if (!ok) {
+                        evict_textures(kTextureBudget);
+                        ok = C3D_TexInit(&entry.tex, rep->width, rep->height, rfmt);
+                    }
+                    if (ok && replacer_->pack().read_into(*rep, entry.tex.data)) {
+                        C3D_TexFlush(&entry.tex);
+                        bytes = rep->size;
+                        ++gpu_stats_.replaced_uploads;
+                        gpu_stats_.replaced_bytes += bytes;
+                    } else if (ok) {
+                        C3D_TexDelete(&entry.tex);
+                    }
                 }
-            C3D_TexFlush(&entry.tex);
-            gpu_stats_.upload_ticks += svcGetSystemTick() - upload_start;
+                gpu_stats_.replace_ticks += svcGetSystemTick() - start;
+            }
+            if (bytes == 0) {
+                const auto fmt = pica_format(info);
+                bytes = tw * th * (fmt == GPU_RGBA8 ? 4u : 2u);
+                evict_textures(bytes);
+                if (!C3D_TexInit(&entry.tex, static_cast<u16>(tw), static_cast<u16>(th), fmt)) {
+                    evict_textures(kTextureBudget); // free everything not used by this frame and retry
+                    if (!C3D_TexInit(&entry.tex, static_cast<u16>(tw), static_cast<u16>(th), fmt)) return nullptr;
+                }
+                const u64 upload_start = svcGetSystemTick();
+                ge::decode_texture(memory, regs, info, rgba_);
+                for (std::uint32_t y = 0; y < th; ++y)
+                    for (std::uint32_t x = 0; x < tw; ++x) {
+                        const std::uint32_t c = rgba_[static_cast<std::size_t>(y % info.height) * info.width + (x % info.width)];
+                        const std::uint32_t at = tiled_index(x, tiled_row(y, th), tw);
+                        if (fmt == GPU_RGBA8) static_cast<std::uint32_t *>(entry.tex.data)[at] = to_rgba8(c);
+                        else static_cast<std::uint16_t *>(entry.tex.data)[at] = to_16(c, fmt);
+                    }
+                C3D_TexFlush(&entry.tex);
+                gpu_stats_.upload_ticks += svcGetSystemTick() - upload_start;
+            }
             entry.hash = hash;
             entry.width = tw;
             entry.height = th;
@@ -726,7 +754,11 @@ void GpuRenderer::draw(psprecomp::GuestMemory &memory, const ge::GeRegisters &re
     const bool textured = ge::draw_is_textured(regs, layout);
 
     float su = 1.0f, sv = 1.0f;
-    C3D_Tex *tex = textured ? const_cast<C3D_Tex *>(bind_texture(memory, regs, su, sv)) : nullptr;
+    // maxSeenV of a 512-tall through-mode texture keys a pack replacement (#23).
+    std::uint16_t max_v = 0;
+    if (textured && replacer_ && layout.through && ((r24(regs, 0xB8) >> 8) & 0xFu) == 9u)
+        max_v = ge::through_max_v(memory, regs, count, vertex_address, index_address);
+    C3D_Tex *tex = textured ? const_cast<C3D_Tex *>(bind_texture(memory, regs, su, sv, layout.through, max_v)) : nullptr;
     const bool sprites = prim == ge::Prim::Sprites;
     if (trace_ && (layout.through || clear_mode || sprites)) {
         const auto ti = ge::texture_info(regs);

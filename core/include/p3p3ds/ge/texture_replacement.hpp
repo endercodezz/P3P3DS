@@ -63,6 +63,8 @@ struct PpssppClut {
 [[nodiscard]] std::uint32_t replacement_data_hash(const psprecomp::GuestMemory &memory, const GeRegisters &regs, std::uint16_t max_seen_v);
 
 // PPSSPP's lookup order with fallbacks to keys with zeroed parts.
+[[nodiscard]] std::optional<ReplacementKey> find_replacement(const std::function<bool(const ReplacementKey &)> &contains, ReplacementKey key,
+                                                             bool ignore_address);
 [[nodiscard]] std::optional<ReplacementKey> find_replacement(const ReplacementKeySet &pack, ReplacementKey key, bool ignore_address);
 
 // Per-texture state PPSSPP keeps between draws (maxSeenV of 512-tall textures).

@@ -4,12 +4,15 @@
 // (primitives with any vertex behind the eye are dropped, no near clipping).
 #include "p3p3ds/ge/renderer.hpp"
 #include "p3p3ds/ge/geometry.hpp"
+#include "p3p3ds/ge/texture_pack.hpp"
+#include "p3p3ds/ge/texture_replacement.hpp"
 
 #include "psprecomp/guest_memory.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <unordered_map>
 
 namespace p3p3ds::ge {
 namespace {
@@ -23,9 +26,17 @@ std::uint32_t pack(const std::array<std::uint8_t, 4> &c, std::uint32_t format) {
     }
 }
 
+// A replacement image covering the whole PSP texture (sampled with the
+// PSP texture's normalised coordinates).
+struct ReplacementImage {
+    std::uint32_t width{}, height{};
+    std::vector<std::uint32_t> rgba; // r in the low byte, row 0 first
+};
+
 struct Context {
     psprecomp::GuestMemory &memory;
     const GeRegisters &g;
+    const ReplacementImage *replacement{};
     std::uint32_t r(std::uint32_t i) const { return g.reg[i] & 0xFFFFFFu; }
     bool enabled(std::uint32_t i) const { return (g.reg[i] & 1u) != 0u; }
 };
@@ -42,6 +53,14 @@ std::array<std::uint8_t, 4> sample(const Context &c, const Texture &t, float u, 
         if (clamp) return std::clamp<std::int32_t>(i, 0, static_cast<std::int32_t>(size) - 1);
         return static_cast<std::int32_t>(static_cast<std::uint32_t>(i) & (size - 1u));
     };
+    if (const ReplacementImage *r = c.replacement) {
+        const float su = u * static_cast<float>(r->width) / static_cast<float>(t.width);
+        const float sv = v * static_cast<float>(r->height) / static_cast<float>(t.height);
+        const std::uint32_t texel = r->rgba[static_cast<std::size_t>(coord(sv, r->height, (wrap >> 8) & 1u)) * r->width +
+                                            static_cast<std::size_t>(coord(su, r->width, wrap & 1u))];
+        return {static_cast<std::uint8_t>(texel), static_cast<std::uint8_t>(texel >> 8), static_cast<std::uint8_t>(texel >> 16),
+                static_cast<std::uint8_t>(texel >> 24)};
+    }
     return fetch_texel(c.memory, c.g, t, coord(u, t.width, wrap & 1u), coord(v, t.height, (wrap >> 8) & 1u));
 }
 
@@ -205,6 +224,49 @@ VertexLayout vertex_layout(std::uint32_t vtype) {
     return l;
 }
 
+struct SoftwareRenderer::Replacements {
+    explicit Replacements(std::shared_ptr<const TexturePack> pack) : replacer(std::move(pack)) {}
+    TextureReplacer replacer;
+    // Pack entry -> decoded image (nullptr: read error).
+    std::unordered_map<const PackEntry *, std::shared_ptr<const ReplacementImage>> images;
+    ReplacementStats stats;
+
+    const ReplacementImage *lookup(psprecomp::GuestMemory &memory, const GeRegisters &regs, bool through, std::uint16_t max_v) {
+        ++stats.textured_draws;
+        const PackEntry *entry = replacer.find(memory, regs, through, max_v);
+        if (!entry) return nullptr;
+        auto [it, inserted] = images.try_emplace(entry);
+        if (inserted) {
+            std::vector<std::uint8_t> data;
+            if (replacer.pack().read(*entry, data)) {
+                auto image = std::make_shared<ReplacementImage>();
+                image->width = entry->width;
+                image->height = entry->height;
+                decode_pack_texture(*entry, data, image->rgba);
+                it->second = std::move(image);
+                ++stats.loaded;
+            } else {
+                ++stats.read_errors;
+            }
+        }
+        if (it->second) ++stats.replaced_draws;
+        return it->second.get();
+    }
+};
+
+SoftwareRenderer::SoftwareRenderer() = default;
+SoftwareRenderer::~SoftwareRenderer() = default;
+
+void SoftwareRenderer::set_texture_pack(std::shared_ptr<const TexturePack> pack) {
+    if (!pack) {
+        replacements_.reset();
+        return;
+    }
+    replacements_ = std::make_unique<Replacements>(std::move(pack));
+}
+
+ReplacementStats SoftwareRenderer::replacement_stats() const { return replacements_ ? replacements_->stats : ReplacementStats{}; }
+
 void SoftwareRenderer::draw(psprecomp::GuestMemory &memory, const GeRegisters &regs, Prim prim, std::uint32_t count,
                             std::uint32_t vertex_address, std::uint32_t index_address) {
     Context c{memory, regs};
@@ -232,6 +294,13 @@ void SoftwareRenderer::draw(psprecomp::GuestMemory &memory, const GeRegisters &r
     const bool flat = (c.r(0x50) & 1u) == 0u;
     if ((c.r(0xD3) & 1u) != 0u) ++stats_.clears;
     const Texture *tex = textured ? &texture : nullptr;
+    if (textured && replacements_) {
+        // Largest V of the draw (texels in through mode) feeds PPSSPP's maxSeenV.
+        std::uint16_t max_v = 0;
+        if (layout.through)
+            for (const auto &v : vertices) max_v = std::max<std::uint16_t>(max_v, static_cast<std::uint16_t>(std::clamp(v.v, 0.0f, 65535.0f)));
+        c.replacement = replacements_->lookup(memory, regs, layout.through, max_v);
+    }
 
     auto sprite = [&](const Vertex &a, const Vertex &b) {
         ++stats_.sprites;

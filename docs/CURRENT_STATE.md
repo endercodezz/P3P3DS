@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Texture packs replace textures on the PC; 3DS path built, untested (#23, 2026-11-05)
+
+- `core/src/ge/texture_pack.cpp`: `TexturePack` reads the New 3DS pack (`index.bin` checked: magic, version, sizes, sort order; texture data read on demand) and finds an entry in PPSSPP's lookup order; `TextureReplacer` keeps the CLUT bytes and maxSeenV state and is shared by both renderers. `SoftwareRenderer::set_texture_pack` samples the replacement with the PSP texture's normalised coordinates; PC runner `--texture-pack <dir>` prints `[TEXPACK]`. New 3DS: `GpuRenderer::bind_texture` reads a replacement straight into a `C3D_Tex` of the pack's size and format when it uploads a texture (textures narrower than 8 texels keep the original); `platform/3ds/main.cpp` opens `sdmc:/p3p3ds/textures`, the report line `texpack:` shows count, replaced uploads, KiB and read time.
+- [VERIFIED] PC, Community Expansion 3x pack converted at max 512: 20M title replay 10,288 of 10,341 textured draws replaced (7 textures loaded, 0 read errors), first-battle route 6,910,728 of 8,713,539 (0 read errors), the same draws the key probe matched. Guest execution unchanged: same stop PC, same event types and counts; only `frame` event fields differ (frame hashes). Frame dumps show the pack's art in place and aligned (title logo, Dark Hour scenes, Yukari portrait, font, hospital background): comparisons in `.tmp/texpacks/cmp_*.png`, `.tmp/texpacks/compare_title.png`.
+- [VERIFIED] `test_texture_replacement`: pack index parsing, lookup with the CLUT-only fallback, keep-original entries, RGBA8/RGB565 decode with bottom-up rows, rejection of bad magic, unsorted entries, wrong data size and non-power-of-two sizes. CTest 28/28; devkitARM build of `p3p3ds.3dsx` passes.
+- [UNVERIFIED] The New 3DS path (Azahar or hardware): picture, memory use and SD read stalls on the render thread. Test files: `.tmp/texpacks/for_3ds/` (`p3p3ds.3dsx`, `p3p3ds/textures/` = the pack at max 256, 302 MB).
+
 ## New 3DS texture pack format: `p3p-texpack build` (#56, 2026-11-05)
 
 - [VERIFIED] In the Community Expansion 3x pack every replacement matched on the battle route is a uniform multiple of the full PSP texture (192 checked: 166 at 3x, 23 at 2x, 3 at 4.5x; same aspect ratio, not cropped to maxSeenV). So a replacement can be stored at any power-of-two size with that aspect ratio and sampled with the PSP texture's normalised coordinates.

@@ -8,6 +8,7 @@
 // PPSSPP GPU/ge_constants.h was a behavioural cross-check only.
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace psprecomp { class GuestMemory; }
@@ -66,15 +67,28 @@ struct VertexLayout {
 };
 [[nodiscard]] VertexLayout vertex_layout(std::uint32_t vtype);
 
+class TexturePack;
+
+struct ReplacementStats {
+    std::uint64_t textured_draws{}, replaced_draws{}, loaded{}, read_errors{};
+};
+
 class SoftwareRenderer final : public GeRenderer {
 public:
+    SoftwareRenderer();
+    ~SoftwareRenderer() override;
     void draw(psprecomp::GuestMemory &memory, const GeRegisters &regs, Prim prim, std::uint32_t count,
               std::uint32_t vertex_address, std::uint32_t index_address) override;
     void transfer(psprecomp::GuestMemory &memory, const GeRegisters &regs) override;
     [[nodiscard]] const DrawStats &stats() const override { return stats_; }
+    // Texture replacement from a New 3DS pack (texture_pack.hpp); nullptr turns it off.
+    void set_texture_pack(std::shared_ptr<const TexturePack> pack);
+    [[nodiscard]] ReplacementStats replacement_stats() const;
 
 private:
+    struct Replacements;
     DrawStats stats_;
+    std::unique_ptr<Replacements> replacements_;
 };
 
 // 24-bit GE float argument -> float.

@@ -108,6 +108,11 @@ std::uint32_t replacement_data_hash(const psprecomp::GuestMemory &memory, const 
 }
 
 std::optional<ReplacementKey> find_replacement(const ReplacementKeySet &pack, ReplacementKey key, bool ignore_address) {
+    return find_replacement([&pack](const ReplacementKey &k) { return pack.contains(k); }, key, ignore_address);
+}
+
+std::optional<ReplacementKey> find_replacement(const std::function<bool(const ReplacementKey &)> &contains, ReplacementKey key,
+                                               bool ignore_address) {
     if (ignore_address) key.cachekey &= 0xFFFFFFFFull;
     const std::uint64_t ck = key.cachekey;
     const std::uint32_t hash = key.hash;
@@ -124,7 +129,7 @@ std::optional<ReplacementKey> find_replacement(const ReplacementKeySet &pack, Re
     const bool needs_address[] = {false, false, true, false, true, true, false};
     for (std::size_t i = 0; i < std::size(tries); ++i) {
         if (needs_address[i] && ignore_address) continue;
-        if (pack.contains(tries[i])) return tries[i];
+        if (contains(tries[i])) return tries[i];
     }
     return std::nullopt;
 }

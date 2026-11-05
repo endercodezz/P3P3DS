@@ -220,6 +220,8 @@ public:
 };
 
 p3p3ds::n3ds::GpuRenderer *g_gpu = nullptr;
+// Texture pack state for the report: "<n> textures", an error, or empty (no pack).
+std::string g_texture_pack;
 // The GE back end on core 2 (nullptr: the renderer runs on the game's thread).
 // Everything that touches citro3d goes through it: posted in order, or called
 // once the worker is idle.
@@ -421,13 +423,14 @@ void write_bmp(const char *path, const std::vector<std::uint8_t> &rgb, std::uint
 std::string gpu_text() {
     if (g_gpu == nullptr) return {};
     const auto &g = g_gpu->gpu_stats();
-    char buf[384];
+    char buf[512];
     std::snprintf(buf, sizeof buf,
         "gpu    : draws %llu tris %llu skip %llu\n"
         "         tex %lu up %llu hit %llu rtt %llu\n"
         "         present gpu %llu cpu %llu same %llu\n"
         "         flush cmd %llu arena %llu w/draw %llu\n"
-        "movie  : skip %llu rtt %llu merge %lluk>%lluk f%lluk\n",
+        "movie  : skip %llu rtt %llu merge %lluk>%lluk f%lluk\n"
+        "texpack: %s up %llu %llu KiB %llu ms\n",
         static_cast<unsigned long long>(g.draws), static_cast<unsigned long long>(g.triangles),
         static_cast<unsigned long long>(g.skipped_prims), static_cast<unsigned long>(g.textures),
         static_cast<unsigned long long>(g.texture_uploads), static_cast<unsigned long long>(g.texture_hits),
@@ -437,7 +440,9 @@ std::string gpu_text() {
         static_cast<unsigned long long>(g.counted_draws != 0u ? g.command_words / g.counted_draws : 0u),
         static_cast<unsigned long long>(g_skip_presses), static_cast<unsigned long long>(g.cpu_to_target),
         static_cast<unsigned long long>(g.model_draws / 1000u), static_cast<unsigned long long>(g.model_batches / 1000u),
-        static_cast<unsigned long long>(g.fast_draws / 1000u));
+        static_cast<unsigned long long>(g.fast_draws / 1000u), g_texture_pack.empty() ? "off" : g_texture_pack.c_str(),
+        static_cast<unsigned long long>(g.replaced_uploads), static_cast<unsigned long long>(g.replaced_bytes / 1024u),
+        static_cast<unsigned long long>(ticks_to_s(g.replace_ticks) * 1000.0));
     const auto &c = g_gpu->vertex_cache_stats();
     char vc[192];
     std::snprintf(vc, sizeof vc, "vcache : %lu KiB %lu src hit %lluk\n         miss %lluk vol %lluk full %lluk\nruns   : %lluk draws in %lluk runs\n",
@@ -844,6 +849,17 @@ int main() {
         stage = "init gpu";
         auto gpu = std::make_unique<p3p3ds::n3ds::GpuRenderer>();
         g_gpu = gpu.get();
+        // Texture pack (#23): sdmc:/p3p3ds/textures/{index.bin,textures.bin}, made
+        // from a PPSSPP pack by `p3p-texpack build` (tools/texpack).
+        {
+            std::string error;
+            if (std::shared_ptr<const p3p3ds::ge::TexturePack> pack = p3p3ds::ge::TexturePack::open("sdmc:/p3p3ds/textures", error)) {
+                g_texture_pack = std::to_string(pack->size()) + " textures";
+                gpu->set_texture_pack(std::move(pack));
+            } else if (error.find("cannot open sdmc:/p3p3ds/textures/index.bin") == std::string::npos) {
+                g_texture_pack = error; // a pack is there but unusable
+            }
+        }
         // sdmc:/p3p3ds/gpu_trace.txt present: presents and screen-space draws of the
         // first 1,200 presents (about 20 s) to sdmc:/p3p3ds/gpu_trace.log.
         if (FILE *f = std::fopen("sdmc:/p3p3ds/gpu_trace.txt", "r")) {
