@@ -1,6 +1,7 @@
 //! p3p-texpack: PPSSPP texture packs -> P3P3DS (New 3DS) textures. Host tool.
 //!
 //!   p3p-texpack inspect <pack dir>
+//!   p3p-texpack keys <pack dir>
 //!   p3p-texpack encode <image.png> --format <fmt> --out <file>
 //!
 //! `encode` writes PICA200 texture data (no header), the same bytes as
@@ -15,7 +16,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: p3p-texpack inspect <pack dir>\n       p3p-texpack encode <image.png> --format <fmt> --out <file>\n\
+const USAGE: &str = "usage: p3p-texpack inspect <pack dir>\n       p3p-texpack keys <pack dir>\n       p3p-texpack encode <image.png> --format <fmt> --out <file>\n\
                      formats: rgba8 rgb8 rgb565 rgba5551 rgba4";
 
 /// Largest source image accepted (packs ship upscales; the 3DS limit applies at encode).
@@ -106,6 +107,19 @@ fn inspect(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// One `<16 hex><8 hex>` key per line (all mip levels and "do not replace"
+/// entries included): the list the PC runner checks with --texture-keys.
+fn keys(dir: &Path) -> Result<(), String> {
+    let pack = pack::load(dir).map_err(|e| e.to_string())?;
+    if pack.options.ignore_address {
+        println!("# ignoreAddress");
+    }
+    for key in pack.entries.keys() {
+        println!("{key}");
+    }
+    Ok(())
+}
+
 fn encode(input: &Path, format: pica::Format, out: &Path) -> Result<(), String> {
     let image = load_png(input)?;
     let data = pica::encode(&image, format).map_err(|e| format!("{}: {e}", input.display()))?;
@@ -118,6 +132,7 @@ fn encode(input: &Path, format: pica::Format, out: &Path) -> Result<(), String> 
 fn run(args: &[String]) -> Result<Result<(), String>, ()> {
     match args {
         [cmd, dir] if cmd == "inspect" => Ok(inspect(Path::new(dir))),
+        [cmd, dir] if cmd == "keys" => Ok(keys(Path::new(dir))),
         [cmd, input, rest @ ..] if cmd == "encode" => {
             let (mut format, mut out) = (None, None);
             let mut it = rest.iter();

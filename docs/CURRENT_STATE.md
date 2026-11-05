@@ -2,6 +2,14 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## PPSSPP-compatible texture keys find a real P3P pack (#23, 2026-11-05)
+
+- `core/src/ge/xxhash.cpp` (XXH32/XXH64 from the specification) and `core/src/ge/texture_replacement.cpp`: the texture key PPSSPP packs use, reproduced from PPSSPP's behaviour (`references/ppsspp/GPU/Common/TextureCacheCommon.cpp`, `TextureReplacer.cpp`; behavioural reference only). cachekey = (address << 32 | TEXSIZE & 0xF0F) ^ CLUT hash; CLUT hash = XXH32 of min(last load + start index bytes, largest load) palette bytes, seed 0xC0108888, xored with the CLUTFORMAT command word including its 0xC5 byte; data hash = low 32 bits of XXH64, seed 0xBACD7814, row-wise when the buffer is wider, maxSeenV rows for 512-tall textures; lookup order with zeroed-part fallbacks. PC runner: `--texture-keys <file>` (keys from `p3p-texpack keys`) and `--texture-keys-report <csv>` wrap the renderer and report matches; nothing is replaced yet.
+- [VERIFIED] With the 2021 Community Expansion 3x v3.0 pack (4,590 keys, `ignoreAddress = true`; downloaded to `.tmp/texpacks/`, not tracked): 20M title replay 10,288 of 10,341 textured draws matched, 7 of 7 textures outside VRAM; the 52 unmatched textures are all render targets in VRAM (0x04000000/0x04088000), which PPSSPP does not replace. First-battle route (`first_battle.txt`, 100M dispatches, 1,005 s): 192 pack textures matched by exact key (6.91 M of 8.71 M textured draws), including CLUT4/CLUT8 2D art, fonts and 3D model textures; every texture of the pack folders seen on the route matched (Dorm Roof 12/12, Orpheus F 5/5, Thanatos 6/6, Title Screen 6/6). Report: `.tmp/texpacks/battle_keys.csv`.
+- [INFERRED] The 46 unmatched RAM textures of that route (1.75 M draws, mostly 32x32-64x64 CLUT model textures in transform mode) are not in the pack. One 256x512 texture matched only once maxSeenV reached 512: PPSSPP updates maxSeenV on its rehash schedule, this code on every draw, so first-use keys of 512-tall textures can differ.
+- [VERIFIED] `test_texture_replacement`: 42 XXH32/XXH64 vectors from the xxhash-rust crate, key parsing, lookup order, CLUT bytes rules, row-wise and maxSeenV hashing. CTest 28/28. The 20M replay event SHA-256 stays `1a5f566002148933...` with and without `--texture-keys`.
+- Next (#23, #56): pack format for the 3DS (keys + converted textures) and the lookup in the 3DS renderer.
+
 ## Texture pack converter prototype in Rust (#56, 2026-11-05)
 
 - [VERIFIED] Existing P3P texture packs are PPSSPP packs (`textures.ini`, `hash = xxh64`, `ignoreAddress = true`, PNG; 3x/6x upscales in the 2021 Community Expansion), from the PPSSPP forum threads linked in #56. The 3DS limits (1024x1024, no palettes, 6 MiB cache budget, 1,501 KiB linear memory free in battle) mean packs must be converted on the PC; the runtime lookup is #23.

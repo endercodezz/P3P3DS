@@ -15,6 +15,7 @@
 #include <chrono>
 #include <thread>
 #include "p3p3ds/ge/async_renderer.hpp"
+#include "texture_key_probe.hpp"
 #include "p3p3ds/vram_activity.hpp"
 #include <fstream>
 #include <iostream>
@@ -29,6 +30,7 @@ int main(int argc,char **argv) {
     try {
         std::filesystem::path elf_path="profiles/p3p/game/eboot.elf", events_path, umd_path, io_trace_path,
             ms0_path="out/ms0", mods_path, frames_dir, wav_path, input_path, sample_path, draw_log_path;
+        std::string texture_keys_path, texture_keys_report;
         std::string savedata_policy="latest";
         std::uint64_t frame_every=30, render_from=0, sample_from=0, draw_log_from=0, stop_vblank=0;
         std::uint64_t budget=100000;
@@ -60,6 +62,8 @@ int main(int argc,char **argv) {
             else if(a=="--ge-thread") ge_thread=true;
             else if(a=="--draw-log") draw_log_path=value();
             else if(a=="--draw-log-from") draw_log_from=std::stoull(value());
+            else if(a=="--texture-keys") texture_keys_path=value();
+            else if(a=="--texture-keys-report") texture_keys_report=value();
             else if(a=="--savedata") savedata_policy=value();
             else if(a=="--frame-every") frame_every=std::stoull(value());
             else if(a=="--render-from") render_from=std::stoull(value()); // debug fast-forward: no pixels before that vblank
@@ -80,6 +84,7 @@ int main(int argc,char **argv) {
                          <<"--stop-vblank <vblank> (end the run at that vblank, e.g. the end of a sampled scene)\n"
                          <<"--ge-thread (GE renderer on a worker thread, drained after every list: must give the same run)\n"
                          <<"--draw-log <file> --draw-log-from <frame> (one line per GE draw of the 2 displayed frames after that frame index)\n"
+                         <<"--texture-keys <file> [--texture-keys-report <csv>] (check textured draws against a pack's keys: p3p-texpack keys)\n"
                          <<"--savedata latest|cancel|<slot index> (choice in the save/load list dialogs; default latest)\n";return 0;
             } else throw std::runtime_error("unknown option: "+a);
         }
@@ -201,6 +206,14 @@ int main(int argc,char **argv) {
             kernel.ge().set_renderer(std::make_unique<p3p3ds::ge::AsyncRenderer>(std::make_unique<p3p3ds::ge::SoftwareRenderer>(),
                                                                                 std::size_t{4}<<20,std::move(hooks),true));
         }
+        // --texture-keys: PPSSPP-compatible keys of every textured draw (#23).
+        p3p3ds::pc::TextureKeyProbe *texture_keys=nullptr;
+        if(!texture_keys_path.empty()) {
+            if(ge_thread) throw std::runtime_error("--texture-keys does not combine with --ge-thread");
+            auto probe=std::make_unique<p3p3ds::pc::TextureKeyProbe>(std::make_unique<p3p3ds::ge::SoftwareRenderer>(),texture_keys_path);
+            texture_keys=probe.get();
+            kernel.ge().set_renderer(std::move(probe));
+        }
         rt.event_observer=[&] {
             if(kernel.ge().skip_rasterization && kernel.threads().vblank_count()>=render_from) kernel.ge().skip_rasterization=false;
             if(trace_from && !trace_reset && kernel.threads().now()>=std::stoull(trace_from)) {
@@ -321,6 +334,7 @@ int main(int argc,char **argv) {
         mixer.finish();
         rt.event("audio_summary",{{"buffers",mixer.buffers()},{"frames",mixer.frames()},{"nonzero_frames",mixer.nonzero_frames()},
             {"peak",mixer.peak()},{"late_frames",mixer.late_frames()},{"clipped",mixer.clipped()}});
+        if(texture_keys) { std::cout.flush(); texture_keys->report(texture_keys_report); std::fflush(stdout); }
         std::cout<<"[AUDIO] buffers="<<mixer.buffers()<<" frames="<<mixer.frames()<<" nonzero="<<mixer.nonzero_frames()
                  <<" peak="<<mixer.peak()<<" late="<<mixer.late_frames()<<" clipped="<<mixer.clipped()<<"\n";
         {

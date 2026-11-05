@@ -17,6 +17,8 @@ set(P3P3DS_CORE_SOURCES
     core/src/ge/async_renderer.cpp
     core/src/ge/geometry.cpp
     core/src/ge/software_renderer.cpp
+    core/src/ge/texture_replacement.cpp
+    core/src/ge/xxhash.cpp
     core/src/hle/sysmem.cpp
     core/src/hle/hle_modules.cpp
     core/src/hle/threadman.cpp
