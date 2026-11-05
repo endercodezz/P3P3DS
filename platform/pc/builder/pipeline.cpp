@@ -2,6 +2,7 @@
 #include "pipeline.hpp"
 #include "aot_layout.hpp"
 
+#include "game_prep.hpp"
 #include "psp_eboot.hpp"
 #include "p3p3ds/vfs.hpp"
 
@@ -176,31 +177,6 @@ std::string read_text(const fs::path &p, std::size_t limit = 4000) {
     return s;
 }
 void write_text(const fs::path &p, const std::string &text) { std::ofstream(p, std::ios::binary) << text; }
-std::vector<std::uint8_t> read_source(const std::shared_ptr<const vfs::Source> &src) {
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(src->size()));
-    if (!bytes.empty()) src->read(0, bytes.data(), bytes.size());
-    return bytes;
-}
-
-// PARAM.SFO -> value of `key` (string entries only).
-std::string sfo_string(const std::vector<std::uint8_t> &d, const std::string &key) {
-    auto le16 = [&](std::size_t o) { return static_cast<std::uint32_t>(d[o] | (d[o + 1] << 8)); };
-    auto le32 = [&](std::size_t o) { return d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | (static_cast<std::uint32_t>(d[o + 3]) << 24); };
-    if (d.size() < 20 || std::memcmp(d.data(), "\0PSF", 4) != 0) return {};
-    const std::uint32_t keys = le32(8), values = le32(12), count = le32(16);
-    for (std::uint32_t i = 0; i < count && 20 + i * 16 + 16 <= d.size(); ++i) {
-        const std::size_t e = 20 + i * 16;
-        const std::size_t name_at = keys + le16(e);
-        if (name_at >= d.size()) continue;
-        const std::string name(reinterpret_cast<const char *>(&d[name_at]));
-        if (name != key) continue;
-        const std::size_t at = values + le32(e + 12), len = le32(e + 4);
-        if (at + len > d.size()) return {};
-        return std::string(reinterpret_cast<const char *>(&d[at]), strnlen(reinterpret_cast<const char *>(&d[at]), len));
-    }
-    return {};
-}
-
 std::uint64_t file_size_or_zero(const fs::path &p) {
     std::error_code ec;
     const auto n = fs::file_size(p, ec);
@@ -288,13 +264,10 @@ int Pipeline::run_tool(const Args &argv, const fs::path &log_file) {
 void Pipeline::decrypt() {
     progress("Reading the game image", 0.0);
     if (const auto problem = check_iso(s_.iso); !problem.empty()) throw std::runtime_error(problem);
-    vfs::IsoFileSystem fsys(s_.iso);
-    const auto eboot = read_source(fsys.open("PSP_GAME/SYSDIR/EBOOT.BIN"));
     progress("Decrypting the game executable", 0.01);
-    const auto elf = decrypt_eboot(eboot);
-    const auto sha = sha256_hex(elf);
-    if (sha != kExpectedElfSha256)
-        throw std::runtime_error("The decrypted executable does not match ULUS-10512 (SHA-256 " + sha + "). Is the image modified?");
+    // Same ISO -> ELF path as the developer setup (p3p_prepare_elf, game_prep.hpp).
+    const auto elf = prepare_executable(s_.iso).elf;
+    const std::string sha = kExpectedElfSha256;
     elf_ = s_.work / "eboot.elf";
     if (!fs::exists(elf_) || sha256_hex([&] { std::ifstream in(elf_, std::ios::binary); return std::vector<std::uint8_t>((std::istreambuf_iterator<char>(in)), {}); }()) != sha) {
         std::ofstream(elf_, std::ios::binary).write(reinterpret_cast<const char *>(elf.data()), static_cast<std::streamsize>(elf.size()));

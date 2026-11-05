@@ -6,6 +6,7 @@ DISC_ID validation, and error handling without using proprietary files.
 """
 
 import io
+import os
 import struct
 import unittest
 import tempfile
@@ -21,6 +22,7 @@ from tools.prepare_game import (
     IsoReader,
     prepare_p3p_game,
     decrypt_eboot,
+    find_native_tool,
     SUPPORTED_DISC_ID
 )
 
@@ -187,14 +189,14 @@ class TestPrepareGame(unittest.TestCase):
 
         try:
             with self.assertRaises(ValueError) as ctx:
-                prepare_p3p_game(tmp_path, check_only=True, verbose=False)
+                prepare_p3p_game(tmp_path, check_only=True, verbose=False, native_tool=None)
             self.assertIn("Unsupported game disc ID", str(ctx.exception))
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
     def test_missing_iso_raises(self):
         with self.assertRaises(FileNotFoundError):
-            prepare_p3p_game("non_existent_disc_image_12345.iso", verbose=False)
+            prepare_p3p_game("non_existent_disc_image_12345.iso", verbose=False, native_tool=None)
 
     def test_decrypt_eboot_validation(self):
         with self.assertRaises(ValueError) as ctx:
@@ -207,6 +209,84 @@ class TestPrepareGame(unittest.TestCase):
             decrypt_eboot(fake_header)
         self.assertIn("header magic mismatch", str(ctx.exception))
 
+
+
+def write_temp(data: bytes, suffix: str) -> str:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        return tmp.name
+
+
+class TestNativeParity(unittest.TestCase):
+    """The native p3p_prepare_elf path (shared with the Builder) must accept and
+    reject the same images as the Python implementation, with the same message."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tool = find_native_tool()
+        if cls.tool is None or not cls.tool.is_file():
+            raise unittest.SkipTest("p3p_prepare_elf not built")
+
+    def outcome(self, iso_path, native, **kwargs):
+        try:
+            prepare_p3p_game(iso_path, check_only=True, verbose=False,
+                             native_tool=self.tool if native else None, **kwargs)
+            return ("ok", "")
+        except Exception as e:  # compare type and message across both paths
+            return (type(e).__name__, str(e))
+
+    def assert_same(self, iso_bytes, expect_in, suffix=".iso", **kwargs):
+        path = write_temp(iso_bytes, suffix)
+        try:
+            python = self.outcome(path, False, **kwargs)
+            native = self.outcome(path, True, **kwargs)
+            self.assertEqual(python, native)
+            self.assertIn(expect_in, python[1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_not_an_iso(self):
+        self.assert_same(b"\x00" * 40960, "Not a valid ISO9660")
+
+    def test_missing_param_sfo(self):
+        self.assert_same(create_synthetic_iso({"TEST.TXT": b"x"}), "PARAM.SFO not found")
+
+    def test_wrong_disc_id(self):
+        sfo = create_synthetic_param_sfo({"DISC_ID": "ULES-01523", "TITLE": "Other Game"})
+        self.assert_same(create_synthetic_iso({"PSP_GAME/PARAM.SFO": sfo}), "Unsupported game disc ID: ULES01523")
+
+    def test_missing_eboot(self):
+        sfo = create_synthetic_param_sfo({"DISC_ID": "ULUS-10512", "TITLE": "Persona3 PORTABLE"})
+        self.assert_same(create_synthetic_iso({"PSP_GAME/PARAM.SFO": sfo}), "EBOOT.BIN not found inside ISO")
+
+    def test_override_with_wrong_hash(self):
+        sfo = create_synthetic_param_sfo({"DISC_ID": "ULUS10512"})
+        elf = write_temp(b"\x7fELF" + b"\x00" * 60, ".elf")
+        try:
+            self.assert_same(create_synthetic_iso({"PSP_GAME/PARAM.SFO": sfo}), "Executable SHA-256 mismatch",
+                             decrypted_eboot_path=elf)
+        finally:
+            Path(elf).unlink(missing_ok=True)
+
+    def test_usage_error(self):
+        import subprocess
+        self.assertEqual(subprocess.run([str(self.tool)], capture_output=True).returncode, 2)
+
+    def test_local_iso(self):
+        iso = os.environ.get("P3P_LOCAL_ISO")
+        if not iso or not Path(iso).is_file():
+            self.skipTest("no local ULUS-10512 ISO (P3P_LOCAL_ISO)")
+        import contextlib
+        logs = {}
+        for native in (False, True):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                self.assertTrue(prepare_p3p_game(iso, check_only=True, verbose=True,
+                                                 native_tool=self.tool if native else None))
+            logs[native] = [line for line in buffer.getvalue().splitlines()
+                            if "Using native preparation tool" not in line]
+        self.assertEqual(logs[False], logs[True])
+        self.assertIn("  Decrypted SHA-256: be2abbd43a4ae7ce5aa2f1f146083ffe0d924fc2eb1874e6fcdc21cba40d49db", logs[True])
 
 if __name__ == "__main__":
     unittest.main()

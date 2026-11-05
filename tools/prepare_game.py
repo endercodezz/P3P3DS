@@ -13,11 +13,18 @@ Options:
   --decrypted-eboot <path> Optional path to pre-decrypted eboot.elf (bypasses AES decryption)
   --check-only             Validate ISO identity and hashes without extracting files
   --force                  Overwrite existing files in destination directory
+  --native-tool <path>     p3p_prepare_elf to use (default: $P3P_PREPARE_ELF, then build/)
+  --python-only            Prepare the executable with this script's own implementation
+
+The identity check and decryption use the host build's p3p_prepare_elf when it
+exists (the same C++ code as the P3P3DS Builder); otherwise this script's own
+implementation. Asset extraction is always done here.
 """
 
 import os
 import sys
 import struct
+import subprocess
 import hashlib
 import shutil
 import argparse
@@ -268,7 +275,11 @@ class IsoReader:
             self.file = open(file_path_or_obj, "rb")
             self._should_close = True
 
-        self.root_record = self._parse_volume_descriptor()
+        try:
+            self.root_record = self._parse_volume_descriptor()
+        except Exception:
+            self.close()
+            raise
 
     def close(self):
         if self._should_close:
@@ -343,14 +354,55 @@ def sanitize_iso_path(iso_path: str) -> str:
         parts.append(segment)
     return "/".join(parts)
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+NATIVE_TOOL_ENV = "P3P_PREPARE_ELF"
+
+def find_native_tool():
+    """The host build's p3p_prepare_elf (the Builder's ISO -> ELF path), or None.
+
+    Looked up in $P3P_PREPARE_ELF, then build/ of this checkout. Without it the
+    Python implementation below prepares the executable.
+    """
+    env = os.environ.get(NATIVE_TOOL_ENV)
+    if env:
+        return Path(env)
+    for name in ("p3p_prepare_elf.exe", "p3p_prepare_elf"):
+        candidate = REPO_ROOT / "build" / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+def run_native_prepare(tool: Path, iso_file: Path, decrypted_eboot_path: str = None):
+    """Runs p3p_prepare_elf; returns (key=value report, verified ELF bytes)."""
+    scratch = Path(".tmp/prepare_game_native").resolve()
+    if scratch.exists():
+        shutil.rmtree(scratch)
+    scratch.mkdir(parents=True)
+    try:
+        command = [str(tool), str(iso_file), "--output", str(scratch / "eboot.elf")]
+        if decrypted_eboot_path:
+            command += ["--decrypted-eboot", str(decrypted_eboot_path)]
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            message = result.stderr.strip()
+            if message.startswith("error: "):
+                message = message[len("error: "):]
+            raise ValueError(message or f"{tool.name} failed with exit code {result.returncode}")
+        report = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        return report, (scratch / "eboot.elf").read_bytes()
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
 def prepare_p3p_game(
     iso_path: str,
     output_dir: str = "profiles/p3p/game",
     decrypted_eboot_path: str = None,
     check_only: bool = False,
     force: bool = False,
-    verbose: bool = True
+    verbose: bool = True,
+    native_tool="auto"
 ) -> bool:
+    """native_tool: "auto" (find_native_tool), a path, or None for the Python path."""
     iso_file = Path(iso_path)
     if not iso_file.exists():
         raise FileNotFoundError(f"ISO file not found: {iso_path}")
@@ -364,23 +416,38 @@ def prepare_p3p_game(
         print(f"ISO Image:        {iso_file.name}")
         print(f"Destination:      {out_dir}")
 
+    if decrypted_eboot_path and not Path(decrypted_eboot_path).exists():
+        raise FileNotFoundError(f"Supplied decrypted EBOOT not found: {decrypted_eboot_path}")
+
+    tool = find_native_tool() if native_tool == "auto" else (Path(native_tool) if native_tool else None)
+    if tool is not None and not tool.is_file():
+        raise FileNotFoundError(f"Native preparation tool not found: {tool}")
+
+    native = None
+    if tool is not None:
+        # 1-2. Identity and executable through the Builder's C++ path.
+        native, native_elf = run_native_prepare(tool, iso_file, decrypted_eboot_path)
+
     with IsoReader(iso_file) as reader:
         file_catalog = {}
         for path, lba, size in reader.walk_files():
             file_catalog[path.upper()] = (path, lba, size)
 
-        # 1. Locate and parse PARAM.SFO
-        sfo_key = "/PSP_GAME/PARAM.SFO"
-        if sfo_key not in file_catalog:
-            raise ValueError("PARAM.SFO not found inside ISO (not a valid PSP game disc)")
+        if native is not None:
+            disc_id, title, version = native["disc_id"], native["title"], native["version"]
+        else:
+            # 1. Locate and parse PARAM.SFO
+            sfo_key = "/PSP_GAME/PARAM.SFO"
+            if sfo_key not in file_catalog:
+                raise ValueError("PARAM.SFO not found inside ISO (not a valid PSP game disc)")
 
-        _, sfo_lba, sfo_size = file_catalog[sfo_key]
-        sfo_bytes = reader.read_file(sfo_lba, sfo_size)
-        sfo = parse_param_sfo(sfo_bytes)
+            _, sfo_lba, sfo_size = file_catalog[sfo_key]
+            sfo_bytes = reader.read_file(sfo_lba, sfo_size)
+            sfo = parse_param_sfo(sfo_bytes)
 
-        disc_id = str(sfo.get("DISC_ID", "")).strip().replace("-", "")
-        title = str(sfo.get("TITLE", "")).strip()
-        version = str(sfo.get("DISC_VERSION", sfo.get("APP_VER", "1.00"))).strip()
+            disc_id = str(sfo.get("DISC_ID", "")).strip().replace("-", "")
+            title = str(sfo.get("TITLE", "")).strip()
+            version = str(sfo.get("DISC_VERSION", sfo.get("APP_VER", "1.00"))).strip()
 
         if verbose:
             print("\nDetected Disc Metadata:")
@@ -397,23 +464,26 @@ def prepare_p3p_game(
         # 2. Check & Prepare Executable (eboot.elf)
         if verbose:
             print("\nPreparing Executable...")
+            if native is not None:
+                print(f"  Using native preparation tool: {tool.name}")
 
         decrypted_elf_bytes = None
 
         if decrypted_eboot_path:
             dec_path = Path(decrypted_eboot_path)
-            if not dec_path.exists():
-                raise FileNotFoundError(f"Supplied decrypted EBOOT not found: {decrypted_eboot_path}")
-            decrypted_elf_bytes = dec_path.read_bytes()
+            decrypted_elf_bytes = native_elf if native is not None else dec_path.read_bytes()
             if verbose:
                 print(f"  Using supplied external ELF: {dec_path.name}")
         else:
-            eboot_key = "/PSP_GAME/SYSDIR/EBOOT.BIN"
-            if eboot_key not in file_catalog:
-                raise ValueError("EBOOT.BIN not found inside ISO")
-            _, eboot_lba, eboot_size = file_catalog[eboot_key]
-            eboot_bytes = reader.read_file(eboot_lba, eboot_size)
-            enc_hash = hashlib.sha256(eboot_bytes).hexdigest()
+            if native is not None:
+                eboot_size, enc_hash = int(native["eboot_size"]), native["eboot_sha256"]
+            else:
+                eboot_key = "/PSP_GAME/SYSDIR/EBOOT.BIN"
+                if eboot_key not in file_catalog:
+                    raise ValueError("EBOOT.BIN not found inside ISO")
+                _, eboot_lba, eboot_size = file_catalog[eboot_key]
+                eboot_bytes = reader.read_file(eboot_lba, eboot_size)
+                enc_hash = hashlib.sha256(eboot_bytes).hexdigest()
 
             if verbose:
                 print(f"  Extracted EBOOT.BIN from ISO ({eboot_size:,} bytes)")
@@ -424,9 +494,15 @@ def prepare_p3p_game(
 
             if verbose:
                 print("  Decrypting Allegrex executable via PSP AES-128 engine...")
-            decrypted_elf_bytes = decrypt_eboot(eboot_bytes)
+            decrypted_elf_bytes = native_elf if native is not None else decrypt_eboot(eboot_bytes)
 
+        # Independent of the tool that produced the ELF.
         actual_elf_hash = hashlib.sha256(decrypted_elf_bytes).hexdigest()
+        if native is not None and native["elf_sha256"] != actual_elf_hash:
+            raise ValueError(
+                f"Native preparation tool reported SHA-256 {native['elf_sha256']}, "
+                f"but its ELF hashes to {actual_elf_hash}"
+            )
         if verbose:
             print(f"  Decrypted SHA-256: {actual_elf_hash}")
 
@@ -541,6 +617,17 @@ def main():
         action="store_true",
         help="Overwrite existing files in the output directory"
     )
+    native = parser.add_mutually_exclusive_group()
+    native.add_argument(
+        "--native-tool",
+        default=None,
+        help=f"p3p_prepare_elf to use (default: ${NATIVE_TOOL_ENV}, then build/p3p_prepare_elf)"
+    )
+    native.add_argument(
+        "--python-only",
+        action="store_true",
+        help="Prepare the executable with this script's own implementation"
+    )
 
     args = parser.parse_args()
 
@@ -551,7 +638,8 @@ def main():
             decrypted_eboot_path=args.decrypted_eboot,
             check_only=args.check_only,
             force=args.force,
-            verbose=True
+            verbose=True,
+            native_tool=None if args.python_only else (args.native_tool or "auto")
         )
         sys.exit(0 if success else 1)
     except Exception as e:

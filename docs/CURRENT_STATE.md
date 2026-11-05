@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Game preparation uses the Builder's C++ ISO -> ELF path (#33, 2026-11-05)
+
+- `platform/pc/builder/game_prep.{hpp,cpp}` (`prepare_executable`): PARAM.SFO identity, EBOOT.BIN decryption and the reference SHA-256 check, used by the Builder's `Pipeline::decrypt` and by the new host command `p3p_prepare_elf`. `tools/prepare_game.py` delegates identity and decryption to `build/p3p_prepare_elf` when it exists (`$P3P_PREPARE_ELF`, `--native-tool`), re-hashes the returned ELF itself, and keeps its Python implementation as the fallback (`--python-only`). Asset extraction stays in Python.
+- [VERIFIED] Windows Release: a full `prepare_game.py` run through the native tool and one with `--python-only` produced the same 10 files (manifest SHA-256 `602f0c5b3db33a116ea644e732ab1f9e014ff410f41f892f6407ec63a87c045c`) and the same log apart from the destination path; 36.9 s and 39.0 s. A configure without `profiles/p3p/game/eboot.elf` ("building without the game-derived targets") built `p3p_prepare_elf`, and `--check-only` through it verified `be2abbd4...`.
+- [VERIFIED] `tests/test_prepare_game.py` compares both paths on synthetic images (not an ISO, no PARAM.SFO, wrong DISC_ID, no EBOOT.BIN, override with a wrong hash, usage error) and, with the local ISO (`P3P_LOCAL_ISO`, set by CTest), compares the `--check-only` output line by line. `test_psp_eboot` checks that `prepare_executable` returns the same ELF as `decrypt_eboot` and the reference encrypted EBOOT.BIN SHA-256. CTest 27/27. [UNVERIFIED] Linux.
+- [VERIFIED] Builder CLI from a package built with this change: the `.3dsx` is byte-identical to the one built before it (SHA-256 `936c38ec78075c84...`, 47,193,444 bytes). That run chose 1 parallel job (low free RAM) and took 1,258 s, against 282 s with 7 jobs earlier the same day; see #47.
+
 ## Host time audit: no measured case for Rust (2026-11-05)
 
 - [VERIFIED] Clean Builder run 282 s: devkitARM GCC 252.1 s (89.4 %), link 19.6 s, our decryption and generation 8.5 s together. CTest 27/27 in 57 s, 50 s of it `p3p_interpreter_differential`. 20M PC replay 52 s (29.5 s without rasterization), event SHA-256 unchanged (`1a5f5660...`). See the [verification record](VERIFICATION.md#host-time-audit-and-rust-candidates-50-2026-11-05).
