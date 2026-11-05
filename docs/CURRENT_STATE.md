@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Builder shows when a newer release exists (#67, 2026-11-05)
+
+- `platform/pc/builder/update_check.cpp` (version parsing, top-level `tag_name` of a GitHub releases/latest response, comparison; no network code) and the wizard (`builder_main.cpp`): on start a detached thread GETs `https://api.github.com/repos/endercodezz/P3P3DS/releases/latest` with WinHTTP (5 s timeouts, `User-Agent: P3P3DS-Builder/<version>`), and a newer tag shows a bottom-left button that opens `https://github.com/endercodezz/P3P3DS/releases/tag/<tag>`. The page URL is built from the validated tag, never taken from the response. Off with `--no-update-check` or `P3P3DS_NO_UPDATE_CHECK`; `--cli` never checks; `--check-update` prints the result; `P3P3DS_UPDATE_URL` overrides the URL for tests. The version comes from `builder.rc` FileVersion through CMake, so a release still bumps one place.
+- [VERIFIED] Windows: real API: "latest release: v0.3.2; no update" in about 1 s. Local test server returning `v9.9.9` (with a foreign `html_url` and a nested `tag_name`): banner "Update: Builder 9.9.9 is available" (window capture `.tmp/upd/banner.png`), page built from the tag. Unreachable server: no banner, `--check-update` returns after about 2 s. Server log: 0 requests from `--cli`, `--no-update-check` and `P3P3DS_NO_UPDATE_CHECK=1`. Imports: system DLLs and UCRT only, plus `WINHTTP.dll`. `test_update_check` and CTest 32/32. [UNVERIFIED] Linux console Builder: only `--version`, no check.
+
 ## Texture pack format: Rust writer and C++ reader tested together (#63, 2026-11-05)
 
 - CTest `p3p_texpack_build_rgba8` / `p3p_texpack_build_auto` run `p3p-texpack build` on `tools/texpack/tests/fixtures` (`textures.ini` there), `p3p_texpack_roundtrip` (`tests/test_texture_pack_roundtrip.cpp`) reads both packs with the runtime's `TexturePack` and compares every texel with the fixture formulas after the format's rules (header, entry order, alignment, row order, tiling, format codes, channel packing, keep-original entry). Registered only when CMake finds `cargo` (Linux CI and local builds; not the MSYS2 Windows job).

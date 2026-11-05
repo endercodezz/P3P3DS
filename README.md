@@ -115,6 +115,8 @@ You need:
 3. Wait about 5-15 minutes: the game's code is translated to C++ and compiled for the 3DS on all CPU cores, with a progress bar, a time estimate and Persona 3 trivia. An interrupted build continues where it stopped.
 4. The builder can copy everything to your SD card itself; otherwise copy as shown below.
 
+When a newer Builder is released, the window shows **Update: Builder X.Y.Z is available** in its bottom left corner; the button opens the release page. The Windows wizard only asks GitHub for the latest release tag when it starts (nothing is downloaded or installed, no identifiers are sent); `--no-update-check` or the environment variable `P3P3DS_NO_UPDATE_CHECK=1` turns that off, and `--cli` builds never check. `P3P3DS-Builder.exe --check-update` prints the result in a console, `--version` shows the version.
+
 On Linux the builder is a console program (`P3P3DS-Builder-<version>-linux.tar.gz`): `./P3P3DS-Builder --iso <iso> [--devkitpro <dir>] [--out <file>] [--jobs <n>]`; devkitPro is looked up in `$DEVKITPRO`, then `/opt/devkitpro`. On NixOS run it inside `p3p-3ds` from `shell.nix`, where devkitPro's prebuilt binaries work.
 
 The builder package (about 2 MB zipped) contains no game data: only the prebuilt P3P3DS runtime for the 3DS, the code generator and the community CWCheat patch list; everything made from the game is generated on your PC. Measured clean builds on a 12-thread CPU: 4 min 23 s with 12 compiler jobs, 4 min 55 s with 7 (the builder picks the number from CPU cores and free memory).

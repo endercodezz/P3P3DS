@@ -5,6 +5,7 @@
 // [--jobs <n>] [--work <dir>]` runs the same build in a console.
 // Linux and other POSIX hosts: console only, same options (`--cli` optional).
 #include "pipeline.hpp"
+#include "update_check.hpp"
 
 #ifdef _WIN32
 #include "fun_facts.hpp"
@@ -16,6 +17,7 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <winhttp.h>
 #endif
 
 #include <chrono>
@@ -67,12 +69,12 @@ int run_console(const Settings &s) {
 namespace {
 
 constexpr int kWidth = 620, kHeight = 470, kHeader = 64;
-constexpr UINT WM_BUILD_PROGRESS = WM_APP + 1, WM_BUILD_LOG = WM_APP + 2, WM_BUILD_DONE = WM_APP + 3;
+constexpr UINT WM_BUILD_PROGRESS = WM_APP + 1, WM_BUILD_LOG = WM_APP + 2, WM_BUILD_DONE = WM_APP + 3, WM_UPDATE_FOUND = WM_APP + 4;
 constexpr UINT_PTR kFactTimer = 1;
 enum Id : int {
     IdBack = 100, IdNext, IdCancel,
     IdIso, IdIsoBrowse, IdIsoStatus, IdDkp, IdDkpBrowse, IdDkpStatus, IdDkpLink, IdOut, IdOutBrowse, IdSdCheck, IdSdDrive,
-    IdStep, IdBar, IdTime, IdFact, IdNextFact, IdLog, IdOpenFolder,
+    IdStep, IdBar, IdTime, IdFact, IdNextFact, IdLog, IdOpenFolder, IdUpdate, IdUpdateClose,
 };
 enum Page { Welcome, Setup, Build, Finish };
 
@@ -85,6 +87,8 @@ struct App {
     HWND back{}, next{}, cancel{};
     HWND iso{}, iso_status{}, dkp{}, dkp_status{}, out{}, sd_check{}, sd_drive{};
     HWND step{}, bar{}, time{}, fact{}, log{}, finish_text{}, open_folder{};
+    HWND update{}, update_close{};
+    std::wstring update_page;
     fs::path exe_dir;
     std::unique_ptr<Pipeline> pipeline;
     std::thread worker;
@@ -242,7 +246,8 @@ void create_controls() {
         L"This wizard builds P3P3DS - Persona 3 Portable running natively on the New Nintendo 3DS - "
         L"from your own copy of the game (ULUS-10512).\n\n"
         L"It reads the game's executable from your ISO, translates it to native 3DS code and packages "
-        L"p3p3ds.3dsx for the Homebrew Launcher. Nothing is downloaded.\n\n"
+        L"p3p3ds.3dsx for the Homebrew Launcher. Nothing is downloaded; the Builder only asks GitHub whether a newer "
+        L"version exists (start it with --no-update-check to turn that off).\n\n"
         L"You need: your Persona 3 Portable ISO, and devkitPro with the 3DS development tools installed. "
         L"The build takes about 5-15 minutes depending on your CPU.\n\n"
         L"The result contains code made from your game: it is for you only. Please do not share it.\n\n"
@@ -290,7 +295,13 @@ void create_controls() {
                                reinterpret_cast<HMENU>(IdNext), app.inst, nullptr);
     app.cancel = CreateWindowExW(0, L"BUTTON", L"Exit", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, kWidth - 108, kHeight - 44, 86, 28, app.wnd,
                                  reinterpret_cast<HMENU>(IdCancel), app.inst, nullptr);
-    for (HWND b : {app.back, app.next, app.cancel}) SendMessageW(b, WM_SETFONT, reinterpret_cast<WPARAM>(app.font), TRUE);
+    // Update banner (#67), hidden until a newer release is found.
+    app.update = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | BS_PUSHBUTTON, left, kHeight - 44, 230, 28, app.wnd,
+                                 reinterpret_cast<HMENU>(IdUpdate), app.inst, nullptr);
+    app.update_close = CreateWindowExW(0, L"BUTTON", L"x", WS_CHILD | BS_PUSHBUTTON, left + 234, kHeight - 44, 28, 28, app.wnd,
+                                       reinterpret_cast<HMENU>(IdUpdateClose), app.inst, nullptr);
+    for (HWND b : {app.back, app.next, app.cancel, app.update, app.update_close})
+        SendMessageW(b, WM_SETFONT, reinterpret_cast<WPARAM>(app.font), TRUE);
 
     // Defaults: the single ISO next to the builder, devkitPro guess, output folder next to the builder.
     for (const auto &e : fs::directory_iterator(app.exe_dir))
@@ -367,6 +378,11 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (!f.empty()) SetWindowTextW(app.out, f.c_str());
         } else if (id == IdDkpLink) {
             ShellExecuteW(h, L"open", L"https://devkitpro.org/wiki/Getting_Started", nullptr, nullptr, SW_SHOWNORMAL);
+        } else if (id == IdUpdate) {
+            ShellExecuteW(h, L"open", app.update_page.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        } else if (id == IdUpdateClose) {
+            ShowWindow(app.update, SW_HIDE);
+            ShowWindow(app.update_close, SW_HIDE);
         } else if (id == IdNextFact) {
             next_fact();
         } else if (id == IdOpenFolder) {
@@ -398,6 +414,15 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         const int n = GetWindowTextLengthW(app.log);
         SendMessageW(app.log, EM_SETSEL, n, n);
         SendMessageW(app.log, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(w.c_str()));
+        return 0;
+    }
+    case WM_UPDATE_FOUND: {
+        std::unique_ptr<Update> update(reinterpret_cast<Update *>(lp));
+        app.update_page = widen(update->page);
+        const std::wstring label = L"Update: Builder " + widen(version_string(update->version)) + L" is available";
+        SetWindowTextW(app.update, label.c_str());
+        ShowWindow(app.update, SW_SHOW);
+        ShowWindow(app.update_close, SW_SHOW);
         return 0;
     }
     case WM_BUILD_DONE: {
@@ -435,6 +460,62 @@ LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     }
 }
 
+// GET `url` with WinHTTP (system DLL; the Builder stays statically linked
+// against system DLLs only). Empty on any failure; 5 s timeouts; at most 1 MiB.
+std::string http_get(const std::wstring &url) {
+    wchar_t host[256], path[2048];
+    URL_COMPONENTS parts{};
+    parts.dwStructSize = sizeof parts;
+    parts.lpszHostName = host;
+    parts.dwHostNameLength = 256;
+    parts.lpszUrlPath = path;
+    parts.dwUrlPathLength = 2048;
+    if (!WinHttpCrackUrl(url.c_str(), 0, 0, &parts)) return {};
+    const std::wstring agent = L"P3P3DS-Builder/" + widen(version_string(builder_version()));
+    std::string body;
+    HINTERNET session = WinHttpOpen(agent.c_str(), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET connection = session ? WinHttpConnect(session, host, parts.nPort, 0) : nullptr;
+    HINTERNET request = connection ? WinHttpOpenRequest(connection, L"GET", path, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                        parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0)
+                                   : nullptr;
+    if (session) WinHttpSetTimeouts(session, 5000, 5000, 5000, 5000);
+    DWORD status = 0, size = sizeof status;
+    if (request && WinHttpSendRequest(request, L"Accept: application/vnd.github+json\r\n", static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+        WinHttpReceiveResponse(request, nullptr) &&
+        WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size,
+                            WINHTTP_NO_HEADER_INDEX) &&
+        status == 200) {
+        char buffer[8192];
+        DWORD read = 0;
+        while (body.size() < (1u << 20) && WinHttpReadData(request, buffer, sizeof buffer, &read) && read > 0) body.append(buffer, read);
+    }
+    if (request) WinHttpCloseHandle(request);
+    if (connection) WinHttpCloseHandle(connection);
+    if (session) WinHttpCloseHandle(session);
+    return body;
+}
+
+bool update_check_enabled(int argc, wchar_t **argv) {
+    for (int i = 1; i < argc; ++i)
+        if (std::wstring(argv[i]) == L"--no-update-check") return false;
+    const char *off = std::getenv(kNoUpdateCheckEnv);
+    return off == nullptr || off[0] == '\0' || std::string(off) == "0";
+}
+
+// Asks GitHub for the latest release on a detached thread (a slow network
+// must not hold up closing the window) and posts WM_UPDATE_FOUND if it is newer.
+void start_update_check(HWND wnd) {
+    const char *override_url = std::getenv(kUpdateUrlEnv);
+    const std::wstring url = widen(override_url && override_url[0] ? override_url : kLatestReleaseUrl);
+    std::thread([wnd, url] {
+        const std::string body = http_get(url);
+        if (auto update = newer_release(body, builder_version())) {
+            auto *message = new Update(std::move(*update));
+            if (!PostMessageW(wnd, WM_UPDATE_FOUND, 0, reinterpret_cast<LPARAM>(message))) delete message; // window already gone
+        }
+    }).detach();
+}
+
 int run_cli(int argc, wchar_t **argv) {
     // Keep a redirected stdout (file/pipe); otherwise write to the parent console.
     const HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -465,6 +546,27 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     for (int i = 1; i < argc; ++i)
         if (std::wstring(argv[i]) == L"--cli") return run_cli(argc, argv);
+    for (int i = 1; i < argc; ++i)
+        if (std::wstring(argv[i]) == L"--check-update") { // console: the wizard's check, printed
+            const HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (out == nullptr || out == INVALID_HANDLE_VALUE || GetFileType(out) == FILE_TYPE_UNKNOWN) {
+                if (!AttachConsole(ATTACH_PARENT_PROCESS)) AllocConsole();
+                std::freopen("CONOUT$", "w", stdout);
+            }
+            const char *override_url = std::getenv(kUpdateUrlEnv);
+            const std::string body = http_get(widen(override_url && override_url[0] ? override_url : kLatestReleaseUrl));
+            const auto tag = latest_release_tag(body);
+            const auto update = newer_release(body, builder_version());
+            std::printf("P3P3DS Builder %s; latest release: %s; %s\n", version_string(builder_version()).c_str(),
+                        tag ? tag->c_str() : "unknown (no answer)", update ? ("update available: " + update->page).c_str() : "no update");
+            return 0;
+        }
+    for (int i = 1; i < argc; ++i)
+        if (std::wstring(argv[i]) == L"--version") {
+            const std::wstring text = L"P3P3DS Builder " + widen(version_string(builder_version()));
+            MessageBoxW(nullptr, text.c_str(), L"P3P3DS Builder", MB_OK | MB_ICONINFORMATION);
+            return 0;
+        }
 
     SetProcessDPIAware();
     INITCOMMONCONTROLSEX icc{sizeof icc, ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES};
@@ -496,6 +598,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     create_controls();
     show_page(Welcome);
     ShowWindow(app.wnd, show);
+    if (update_check_enabled(argc, argv)) start_update_check(app.wnd);
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         if (!IsDialogMessageW(app.wnd, &msg)) {
@@ -518,6 +621,10 @@ int main(int argc, char **argv) {
         const std::string a = argv[i];
         const bool has_value = i + 1 < argc;
         if (a == "--cli") continue;
+        if (a == "--version") {
+            std::printf("P3P3DS Builder %s\n", version_string(builder_version()).c_str());
+            return 0;
+        }
         if (a == "--help" || a == "-h") {
             std::printf("usage: %s --iso <ULUS-10512.iso> [--devkitpro <dir>] [--out <file.3dsx>] [--jobs <n>] [--work <dir>]\n", argv[0]);
             return 0;
