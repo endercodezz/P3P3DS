@@ -1,0 +1,3 @@
+[build]
+# Build output stays in the workspace build/ tree (CLAUDE.md section 2).
+target-dir = "../../build/texpack"

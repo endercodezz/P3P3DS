@@ -114,3 +114,5 @@ profiles/p3p/input/local/
 /recomp/*
 !/recomp/PSPRecomp/
 /tools/*/
+# P3P3DS's own tool directories.
+!/tools/texpack/

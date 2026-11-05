@@ -1,0 +1,17 @@
+[package]
+name = "p3p-texpack"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Converts PPSSPP texture packs for P3P3DS (host tool)"
+publish = false
+
+[[bin]]
+name = "p3p-texpack"
+path = "src/main.rs"
+
+[dependencies]
+png = "0.17"
+
+[profile.release]
+panic = "abort"

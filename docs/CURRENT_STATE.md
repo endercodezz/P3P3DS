@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Texture pack converter prototype in Rust (#56, 2026-11-05)
+
+- [VERIFIED] Existing P3P texture packs are PPSSPP packs (`textures.ini`, `hash = xxh64`, `ignoreAddress = true`, PNG; 3x/6x upscales in the 2021 Community Expansion), from the PPSSPP forum threads linked in #56. The 3DS limits (1024x1024, no palettes, 6 MiB cache budget, 1,501 KiB linear memory free in battle) mean packs must be converted on the PC; the runtime lookup is #23.
+- `tools/texpack` (Rust 1.98.0 pinned, `png` crate, build output in `build/texpack`): `inspect` parses `textures.ini` by PPSSPP's documented behaviour (`references/ppsspp/GPU/Common/TextureReplacer.cpp`, behavioural reference only) and reports missing, unreadable, non-PNG and over-1024 files and `..` paths; `encode` writes PICA200 texture data for rgba8/rgb8/rgb565/rgba5551/rgba4.
+- [VERIFIED] `encode` is byte-identical to devkitPro `tex3ds -r -z none` for all 40 fixture cases (8 synthetic images: every 8-bit value per channel, alpha patterns, non-power-of-two 24x10 and 5x3, RGB, grey, grey+alpha; 5 formats). Found by the fixtures: tex3ds stores texels with alpha 0 as transparent black and truncates channels (`v >> (8 - bits)`). `cargo test --locked` 9/9, `cargo clippy -- -D warnings` clean. Malformed PNG (empty, truncated, not PNG) is rejected without a panic. CI regenerates the fixtures with the container's `tex3ds` and fails on a difference.
+- [UNVERIFIED] Not run on a real community pack (not downloaded). ETC1/ETC1A4, downscaling, the pack output format and PPSSPP-compatible keys in the runtime are open (#56, #23).
+
 ## Game preparation uses the Builder's C++ ISO -> ELF path (#33, 2026-11-05)
 
 - `platform/pc/builder/game_prep.{hpp,cpp}` (`prepare_executable`): PARAM.SFO identity, EBOOT.BIN decryption and the reference SHA-256 check, used by the Builder's `Pipeline::decrypt` and by the new host command `p3p_prepare_elf`. `tools/prepare_game.py` delegates identity and decryption to `build/p3p_prepare_elf` when it exists (`$P3P_PREPARE_ELF`, `--native-tool`), re-hashes the returned ELF itself, and keeps its Python implementation as the fallback (`--python-only`). Asset extraction stays in Python.

@@ -69,3 +69,21 @@ jobs:
         run: cmake -S platform/3ds -B build/3ds -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/3DS.cmake" -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build/3ds -j4
+      - name: texpack fixtures match this tex3ds
+        run: |
+          python3 tools/texpack/tests/fixtures/make_fixtures.py "$DEVKITPRO/tools/bin/tex3ds"
+          # Only the texture data: zlib builds may compress the PNGs differently.
+          git diff --exit-code -- 'tools/texpack/tests/fixtures/*.tex'
+
+  texpack:
+    name: texpack (Rust)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: tools/texpack
+    steps:
+      - uses: actions/checkout@v7
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --locked
