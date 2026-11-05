@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## New 3DS texture pack format: `p3p-texpack build` (#56, 2026-11-05)
+
+- [VERIFIED] In the Community Expansion 3x pack every replacement matched on the battle route is a uniform multiple of the full PSP texture (192 checked: 166 at 3x, 23 at 2x, 3 at 4.5x; same aspect ratio, not cropped to maxSeenV). So a replacement can be stored at any power-of-two size with that aspect ratio and sampled with the PSP texture's normalised coordinates.
+- `build` (`tools/texpack/src/build.rs`, format documented there): `index.bin` (magic `P3TXPACK`, version 1, ignoreAddress flag, 32-byte entries sorted by key: data offset/size, width, height, citro3d texture format) + `textures.bin` (PICA200 data, 128-byte aligned, rows bottom-up like the 3DS renderer's uploads, `tiled_row` in `platform/3ds/gpu_renderer.cpp`). Box downscale with premultiplied alpha to at most `--max-size` per side (default 512); RGB565 if opaque, RGBA5551 if alpha is only 0/255, else RGBA4.
+- [VERIFIED] The 3x pack converts in 52 s (max 512, 12 threads): 4,580 textures (10 skipped: files missing from the pack), 871,815,168 bytes; RGBA4 2,813, RGB565 1,673, RGBA5551 94. With `--max-size 256`: 301,750,272 bytes, 27 s. The ATLUS logo entry decodes back to the expected image (512x256 RGB565). `cargo test` 14/14 (sizes, box filter, alpha formats, index layout, alignment, row order).
+- Next: read the pack in the runtime and replace textures, first in the PC renderer (frame dumps), then on the 3DS (#23).
+
 ## PPSSPP-compatible texture keys find a real P3P pack (#23, 2026-11-05)
 
 - `core/src/ge/xxhash.cpp` (XXH32/XXH64 from the specification) and `core/src/ge/texture_replacement.cpp`: the texture key PPSSPP packs use, reproduced from PPSSPP's behaviour (`references/ppsspp/GPU/Common/TextureCacheCommon.cpp`, `TextureReplacer.cpp`; behavioural reference only). cachekey = (address << 32 | TEXSIZE & 0xF0F) ^ CLUT hash; CLUT hash = XXH32 of min(last load + start index bytes, largest load) palette bytes, seed 0xC0108888, xored with the CLUTFORMAT command word including its 0xC5 byte; data hash = low 32 bits of XXH64, seed 0xBACD7814, row-wise when the buffer is wider, maxSeenV rows for 512-tall textures; lookup order with zeroed-part fallbacks. PC runner: `--texture-keys <file>` (keys from `p3p-texpack keys`) and `--texture-keys-report <csv>` wrap the renderer and report matches; nothing is replaced yet.
