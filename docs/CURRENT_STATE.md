@@ -9,6 +9,11 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [VERIFIED] `tests/test_prepare_game.py` compares both paths on synthetic images (not an ISO, no PARAM.SFO, wrong DISC_ID, no EBOOT.BIN, override with a wrong hash, usage error) and, with the local ISO (`P3P_LOCAL_ISO`, set by CTest), compares the `--check-only` output line by line. `test_psp_eboot` checks that `prepare_executable` returns the same ELF as `decrypt_eboot` and the reference encrypted EBOOT.BIN SHA-256. CTest 27/27. [UNVERIFIED] Linux.
 - [VERIFIED] Builder CLI from a package built with this change: the `.3dsx` is byte-identical to the one built before it (SHA-256 `936c38ec78075c84...`, 47,193,444 bytes). That run chose 1 parallel job (low free RAM) and took 1,258 s, against 282 s with 7 jobs earlier the same day; see #47.
 
+## Host time audit: no measured case for Rust (2026-11-05)
+
+- [VERIFIED] Clean Builder run 282 s: devkitARM GCC 252.1 s (89.4 %), link 19.6 s, our decryption and generation 8.5 s together. CTest 27/27 in 57 s, 50 s of it `p3p_interpreter_differential`. 20M PC replay 52 s (29.5 s without rasterization), event SHA-256 unchanged (`1a5f5660...`). See the [verification record](VERIFICATION.md#host-time-audit-and-rust-candidates-50-2026-11-05).
+- [INFERRED] No host stage is limited by the language of P3P3DS code; host tooling stays in C++ and Python. Follow-ups: Builder compile time [#47](https://github.com/endercodezz/P3P3DS/issues/47), interpreter differential test [#48](https://github.com/endercodezz/P3P3DS/issues/48), PC runner host time [#49](https://github.com/endercodezz/P3P3DS/issues/49).
+
 ## Builder 0.3.2 release preparation (2026-11-05)
 
 - [VERIFIED] Windows Release built from the combined 0.3.2 fixes. The rebuilt Builder reports FileVersion and ProductVersion 0.3.2. `ctest --test-dir build -j6 --output-on-failure --no-tests=error` passed 27/27 (`.tmp/release-032/ctest.log`).
