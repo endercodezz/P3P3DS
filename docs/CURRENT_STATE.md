@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Host time audit: no measured case for Rust (2026-11-05)
+
+- [VERIFIED] Clean Builder run 282 s: devkitARM GCC 252.1 s (89.4 %), link 19.6 s, our decryption and generation 8.5 s together. CTest 27/27 in 57 s, 50 s of it `p3p_interpreter_differential`. 20M PC replay 52 s (29.5 s without rasterization), event SHA-256 unchanged (`1a5f5660...`). See the [verification record](VERIFICATION.md#host-time-audit-and-rust-candidates-50-2026-11-05).
+- [INFERRED] No host stage is limited by the language of P3P3DS code; host tooling stays in C++ and Python. Follow-ups: Builder compile time [#47](https://github.com/endercodezz/P3P3DS/issues/47), interpreter differential test [#48](https://github.com/endercodezz/P3P3DS/issues/48), PC runner host time [#49](https://github.com/endercodezz/P3P3DS/issues/49).
+
 ## Builder 0.3.2 release preparation (2026-11-05)
 
 - [VERIFIED] Windows Release built from the combined 0.3.2 fixes. The rebuilt Builder reports FileVersion and ProductVersion 0.3.2. `ctest --test-dir build -j6 --output-on-failure --no-tests=error` passed 27/27 (`.tmp/release-032/ctest.log`).
