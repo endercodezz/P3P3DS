@@ -317,6 +317,10 @@ target_link_libraries(test_modulemgr PRIVATE p3p3ds_core)
 add_test(NAME p3p_modulemgr COMMAND test_modulemgr)
 set_tests_properties(p3p_modulemgr PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" SKIP_RETURN_CODE 77)
 
+add_executable(test_texture_replacement tests/test_texture_replacement.cpp)
+target_link_libraries(test_texture_replacement PRIVATE p3p3ds_core)
+add_test(NAME p3p_texture_replacement COMMAND test_texture_replacement)
+
 add_executable(test_sascore tests/test_sascore.cpp)
 target_link_libraries(test_sascore PRIVATE p3p3ds_core)
 add_test(NAME p3p_sascore COMMAND test_sascore)
