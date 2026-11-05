@@ -2,11 +2,12 @@
 
 Updated 2026-11-05. What is done and measured lives in [`CURRENT_STATE.md`](CURRENT_STATE.md); this file only lists what comes next, in the maintainer's priority order. Every step names how it will be verified (CLAUDE.md section 3: measure first). Each step is tracked as a [GitHub issue](https://github.com/endercodezz/P3P3DS/issues) and lands through a pull request that closes it (CLAUDE.md section 16).
 
-## Where the project stands (0.3.2)
+## Where the project stands (0.3.3)
 
 - Whole `.text` statically recompiled, HLE kernel, VFS with the mod chain, GE executor, deterministic PC runner with scripted input; the PC route plays through the first battle (maintainer's save, local route).
 - New 3DS (0.3.0/0.3.1, New 2DS XL): PICA200 renderer with a vertex shader (transform, skinning, lighting), GE back end on core 2, real-time pacing, save/load menu on the bottom screen. Dorm 28-30 fps, dialogue mostly 30, battle 16-25 fps; a user's 0.3.1 run at 97-99 % speed; no sound, no opening movie.
 - 0.3.2 includes the startup logo fix (4d198db, verified in Azahar and reported working by the maintainer on console in [#5](https://github.com/endercodezz/P3P3DS/issues/5)).
+- 0.3.3: texture packs made for PPSSPP convert with `tools/texpack` and replace textures on the PC ([#62](https://github.com/endercodezz/P3P3DS/pull/62)); the New 3DS path (`sdmc:/p3p3ds/textures`) is in the build but not yet tested on Azahar or hardware ([#23](https://github.com/endercodezz/P3P3DS/issues/23)). The Builder shows when a newer release exists ([#67](https://github.com/endercodezz/P3P3DS/issues/67)).
 - P3P3DS Builder for Windows and Linux; releases built by GitHub Actions.
 
 ## 0. Check fades and transitions on hardware

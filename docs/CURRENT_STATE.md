@@ -2,6 +2,11 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Builder 0.3.3 release preparation (2026-11-05)
+
+- `platform/pc/builder/builder.rc` FileVersion and ProductVersion 0.3.3 ([#69](https://github.com/endercodezz/P3P3DS/issues/69)). Contents since 0.3.2: Builder update notice (#67), texture packs (texpack converter, PPSSPP-compatible keys, replacement on the PC and in the 3DS renderer), native game preparation (#33), host time audit docs (#50), Zig BinDiff tool.
+- [UNVERIFIED] Texture replacement on the New 3DS (Azahar or hardware): merged on the maintainer's decision without that check.
+
 ## Builder shows when a newer release exists (#67, 2026-11-05)
 
 - `platform/pc/builder/update_check.cpp` (version parsing, top-level `tag_name` of a GitHub releases/latest response, comparison; no network code) and the wizard (`builder_main.cpp`): on start a detached thread GETs `https://api.github.com/repos/endercodezz/P3P3DS/releases/latest` with WinHTTP (5 s timeouts, `User-Agent: P3P3DS-Builder/<version>`), and a newer tag shows a bottom-left button that opens `https://github.com/endercodezz/P3P3DS/releases/tag/<tag>`. The page URL is built from the validated tag, never taken from the response. Off with `--no-update-check` or `P3P3DS_NO_UPDATE_CHECK`; `--cli` never checks; `--check-update` prints the result; `P3P3DS_UPDATE_URL` overrides the URL for tests. The version comes from `builder.rc` FileVersion through CMake, so a release still bumps one place.
