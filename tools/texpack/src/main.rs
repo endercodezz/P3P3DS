@@ -2,21 +2,25 @@
 //!
 //!   p3p-texpack inspect <pack dir>
 //!   p3p-texpack keys <pack dir>
+//!   p3p-texpack build <pack dir> <out dir> [--max-size <n>] [--format auto|<fmt>]
 //!   p3p-texpack encode <image.png> --format <fmt> --out <file>
 //!
 //! `encode` writes PICA200 texture data (no header), the same bytes as
-//! `tex3ds -r -z none -f <fmt>` after its 4-byte header. Exit codes: 0 ok,
+//! `tex3ds -r -z none -f <fmt>` after its 4-byte header. `build` writes the
+//! New 3DS pack (build.rs: index.bin + textures.bin). Exit codes: 0 ok,
 //! 1 error, 2 usage.
 
+mod build;
 mod pack;
 mod pica;
+mod resample;
 
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: p3p-texpack inspect <pack dir>\n       p3p-texpack keys <pack dir>\n       p3p-texpack encode <image.png> --format <fmt> --out <file>\n\
+const USAGE: &str = "usage: p3p-texpack inspect <pack dir>\n       p3p-texpack keys <pack dir>\n       p3p-texpack build <pack dir> <out dir> [--max-size <n>] [--format auto|<fmt>]\n       p3p-texpack encode <image.png> --format <fmt> --out <file>\n\
                      formats: rgba8 rgb8 rgb565 rgba5551 rgba4";
 
 /// Largest source image accepted (packs ship upscales; the 3DS limit applies at encode).
@@ -37,7 +41,7 @@ fn png_info(path: &Path) -> Result<PngInfo, String> {
     Ok(PngInfo { width: info.width, height: info.height, color: info.color_type, depth: info.bit_depth })
 }
 
-fn load_png(path: &Path) -> Result<pica::Image, String> {
+pub(crate) fn load_png(path: &Path) -> Result<pica::Image, String> {
     let file = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut decoder = png::Decoder::new_with_limits(BufReader::new(file), png::Limits { bytes: MAX_SOURCE_BYTES });
     decoder.set_transformations(png::Transformations::normalize_to_color8());
@@ -120,6 +124,19 @@ fn keys(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn build_pack(dir: &Path, out: &Path, options: &build::Options) -> Result<(), String> {
+    let pack = pack::load(dir).map_err(|e| e.to_string())?;
+    let start = std::time::Instant::now();
+    let s = build::build(dir, &pack, out, options, &load_png)?;
+    for e in &s.skipped {
+        println!("skipped  {e}");
+    }
+    println!("entries={} keep_original={} skipped={} data_bytes={} rgba8={} rgba5551={} rgb565={} rgba4={} seconds={:.1}",
+             s.entries, s.keep_original, s.skipped.len(), s.data_bytes, s.by_format[0], s.by_format[2], s.by_format[3],
+             s.by_format[4], start.elapsed().as_secs_f64());
+    Ok(())
+}
+
 fn encode(input: &Path, format: pica::Format, out: &Path) -> Result<(), String> {
     let image = load_png(input)?;
     let data = pica::encode(&image, format).map_err(|e| format!("{}: {e}", input.display()))?;
@@ -133,6 +150,24 @@ fn run(args: &[String]) -> Result<Result<(), String>, ()> {
     match args {
         [cmd, dir] if cmd == "inspect" => Ok(inspect(Path::new(dir))),
         [cmd, dir] if cmd == "keys" => Ok(keys(Path::new(dir))),
+        [cmd, dir, out, rest @ ..] if cmd == "build" => {
+            let mut options = build::Options { max_size: 512, format: None };
+            let mut it = rest.iter();
+            while let Some(a) = it.next() {
+                match (a.as_str(), it.next()) {
+                    ("--max-size", Some(n)) => {
+                        options.max_size = n.parse().map_err(|_| ())?;
+                        if !(pica::MIN_SIZE..=pica::MAX_SIZE).contains(&options.max_size) {
+                            return Err(());
+                        }
+                    }
+                    ("--format", Some(f)) if f == "auto" => options.format = None,
+                    ("--format", Some(f)) => options.format = Some(pica::Format::parse(f).ok_or(())?),
+                    _ => return Err(()),
+                }
+            }
+            Ok(build_pack(Path::new(dir), Path::new(out), &options))
+        }
         [cmd, input, rest @ ..] if cmd == "encode" => {
             let (mut format, mut out) = (None, None);
             let mut it = rest.iter();
