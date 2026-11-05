@@ -14,3 +14,6 @@ references/azahar/dist/qt_themes/qdarkstyle_midnight_blue/LICENSE.rst conflict-m
 
 # p3p-texpack reference texture data (tex3ds output).
 tools/texpack/tests/fixtures/*.tex binary
+
+# Zig fmt requires LF, including on Windows checkouts with core.autocrlf=true.
+tools/bindiff/** text eol=lf
