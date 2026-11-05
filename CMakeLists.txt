@@ -334,8 +334,11 @@ if(P3P_CARGO)
                  COMMAND "${P3P_CARGO}" run --quiet --release --locked -- build
                          "${CMAKE_CURRENT_SOURCE_DIR}/tools/texpack/tests/fixtures" "${_texpack_out}/${_format}" --format ${_format})
         # From tools/texpack, so cargo finds its .cargo/config.toml and rust-toolchain.toml.
+        # One at a time: on a fresh runner both would install the pinned toolchain
+        # through rustup at once, and rustup's downloads race (CI failure on #64).
         set_tests_properties(p3p_texpack_build_${_format} PROPERTIES
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools/texpack" FIXTURES_SETUP texpack_roundtrip_packs)
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tools/texpack" FIXTURES_SETUP texpack_roundtrip_packs
+            RESOURCE_LOCK texpack_cargo)
     endforeach()
     add_test(NAME p3p_texpack_roundtrip COMMAND test_texture_pack_roundtrip "${_texpack_out}/rgba8" "${_texpack_out}/auto")
     set_tests_properties(p3p_texpack_roundtrip PROPERTIES FIXTURES_REQUIRED texpack_roundtrip_packs)
