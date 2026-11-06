@@ -6,6 +6,11 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## `p3p-cpk patch` (#83, 2026-11-06)
+
+- [VERIFIED] The Russian translation's EBOOT patch applies to the local decrypted EBOOT with a matching Adler-32 (one window). 47,707 bytes differ: `.rodata` 29,798, `.data` 17,907, `.text` 2.
+- [VERIFIED] `python tools/cpk/check.py`: 31/31 CLI tests, with synthetic ADD, COPY, RUN, overlapping copy, bad checksum, secondary compression, truncated input and 150 damaged patches (exit 0 or 2, never a panic). Unit test of the RFC 3284 code table landmarks.
+
 ## `p3p-cpk diff` (#76, 2026-11-06)
 
 Local ULUS-10512 ISO, Windows, Zig 0.17.1 `-Doptimize=safe`:

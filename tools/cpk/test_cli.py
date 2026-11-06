@@ -150,6 +150,34 @@ def fnv(data):
     return value
 
 
+def varint(value):
+    out = [value & 0x7F]
+    value >>= 7
+    while value:
+        out.insert(0, 0x80 | (value & 0x7F))
+        value >>= 7
+    return bytes(out)
+
+
+def adler32(data):
+    a, b = 1, 0
+    for byte in data:
+        a = (a + byte) % 65521
+        b = (b + a) % 65521
+    return b << 16 | a
+
+
+def vcdiff_window(source_size, target, data, instructions, addresses, checksum=None):
+    body = varint(len(target)) + b"\0" + varint(len(data)) + varint(len(instructions)) + varint(len(addresses))
+    body += struct.pack(">I", adler32(target) if checksum is None else checksum) + data + instructions + addresses
+    return bytes([1 | 4]) + varint(source_size) + varint(0) + varint(len(body)) + body
+
+
+def vcdiff(*windows, header=4):
+    app = b"new//old/"
+    return b"\xD6\xC3\xC4\0" + bytes([header]) + varint(len(app)) + app + b"".join(windows)
+
+
 def run(*args):
     # Names are printed as stored, and damaged ones are not valid text.
     return subprocess.run([EXE, *map(str, args)], capture_output=True, encoding="utf-8", errors="replace")
@@ -426,6 +454,65 @@ class Cli(unittest.TestCase):
             path.write_bytes(mutated)
             result = run("diff", path, base)
             self.assertIn(result.returncode, (0, 1, 2), (round_number, result.stderr[-400:]))
+
+    def patch_fixture(self):
+        source = b"0123456789"
+        # ADD "ab" (size in the opcode), COPY 4 from address 2 (mode 0, size 4),
+        # RUN 3 of "z", ADD+COPY pair: ADD "!" then COPY 4 from HERE-5, overlapping the output.
+        target = b"ab" + b"2345" + b"zzz" + b"!"
+        target += (bytes(source) + target)[len(source) + len(target) - 5:][:4]
+        instructions = bytes([3, 19 + 1, 0, 3, 163])
+        data = b"ab" + b"z" + b"!"
+        addresses = varint(2) + varint(0)
+        return source, target, data, instructions, addresses
+
+    def test_patch(self):
+        source, target, data, instructions, addresses = self.patch_fixture()
+        # The pair uses mode 0 here: an absolute address in source + target.
+        addresses = varint(2) + varint(len(source) + 5)
+        target = b"ab2345zzz!" + (source + b"ab2345zzz!")[len(source) + 5:][:4]
+        (self.dir / "source").write_bytes(source)
+        (self.dir / "patch").write_bytes(vcdiff(vcdiff_window(len(source), target, data, instructions, addresses)))
+        result = run("patch", self.dir / "source", self.dir / "patch", self.dir / "out")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.dir / "out").read_bytes(), target)
+        self.assertIn("1 windows", result.stdout)
+
+    def test_patch_refuses_bad_input(self):
+        source, target, data, instructions, addresses = self.patch_fixture()
+        addresses = varint(2) + varint(len(source) + 5)
+        target = b"ab2345zzz!" + (source + b"ab2345zzz!")[len(source) + 5:][:4]
+        window = vcdiff_window(len(source), target, data, instructions, addresses)
+        (self.dir / "source").write_bytes(source)
+        good = vcdiff(window)
+        cases = {
+            "checksum": vcdiff(vcdiff_window(len(source), target, data, instructions, addresses, checksum=1)),
+            "secondary": vcdiff(window, header=5),
+            "not vcdiff": b"nope" + good[4:],
+            "truncated": good[:-3],
+            "address past here": vcdiff(vcdiff_window(len(source), target, data, instructions, varint(2) + varint(500))),
+            "segment past source": vcdiff(vcdiff_window(len(source) + 1, target, data, instructions, addresses)),
+        }
+        for name, patch in cases.items():
+            with self.subTest(name):
+                (self.dir / "patch").write_bytes(patch)
+                self.assert_clean_error(run("patch", self.dir / "source", self.dir / "patch", self.dir / "out"))
+        self.assert_clean_error(run("patch", self.dir / "source"))
+
+    def test_patch_mutated_never_crashes(self):
+        source, target, data, instructions, addresses = self.patch_fixture()
+        addresses = varint(2) + varint(len(source) + 5)
+        target = b"ab2345zzz!" + (source + b"ab2345zzz!")[len(source) + 5:][:4]
+        good = vcdiff(vcdiff_window(len(source), target, data, instructions, addresses))
+        (self.dir / "source").write_bytes(source)
+        rng = random.Random(81)
+        for round_number in range(150):
+            mutated = bytearray(good)
+            for _ in range(rng.randrange(1, 5)):
+                mutated[rng.randrange(4, len(mutated))] = rng.randrange(256)
+            (self.dir / "patch").write_bytes(mutated)
+            result = run("patch", self.dir / "source", self.dir / "patch", self.dir / "out")
+            self.assertIn(result.returncode, (0, 2), (round_number, result.stderr[-400:]))
 
     def trace(self, rows):
         path = self.dir / "trace.csv"

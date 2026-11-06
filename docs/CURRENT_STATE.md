@@ -8,7 +8,9 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - `tools/cpk`: `diff` accepts a directory as the mod, and a file under a folder named after a game file is `in-container`, not `added`.
 - [VERIFIED] `diff` of the package against `umd0.cpk` and `umd1.cpk`: 1,369 `changed` (1,258 `.bf`, 98 `.abin`), 336 `in-container` (229 `.bf`, 72 `.tmx`, 20 `.bmd`, `data/init/font/font0.fnt` under `data/init.bin`), 128 `added` (the texture folder, `Package.xml`, `Preview.png`).
 - [INFERRED] The `in-container` files must first be built into their containers, which Aemulus does, so the package can't simply be copied to `mods/bind/`. Not yet checked against Aemulus or run.
-- [WRONG] A translation needs no EBOOT patch: the mod's description says the menu text is in the EBOOT. P3P3DS generates its AOT code from the EBOOT, so a patch that touches code has to reach the Builder. [UNVERIFIED] What it changes: not applied yet, no xdelta tool here.
+- [WRONG] A translation needs no EBOOT patch: the mod's description says the menu text is in the EBOOT.
+- `tools/cpk`: `patch` applies xdelta (VCDIFF) patches (#83).
+- [VERIFIED] `rus_eboot_patch_v0.8.2.xdelta` applies to `profiles/p3p/game/eboot.elf` with its Adler-32 matching, so this is its source. It changes 47,707 of 5,849,468 bytes in 611 ranges, size unchanged: 29,798 in `.rodata`, 17,907 in `.data`, 2 in `.text` (file offsets 0x154578: 0x2484E8C0 -> 0x2484E8BF; 0x154688: 0x2484E8B0 -> 0x2484E8AE). P3P3DS generates its AOT code from the EBOOT, so those 2 bytes need the generated code to change, or a profile patch. [UNVERIFIED] What the two instructions do.
 - [INFERRED] Cyrillic is drawn through a replaced font with Latin character codes: the patch holds `Kluwka dlq lakrossa` ("lacrosse stick" in Russian). One string only.
 
 ## `p3p-cpk diff`: what a mod changes in the game's archives (#76, 2026-11-06)
