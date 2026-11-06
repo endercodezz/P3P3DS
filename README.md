@@ -19,7 +19,7 @@ Every known issue is tracked on [GitHub Issues](https://github.com/endercodezz/P
 | ATLUS and CRIWARE startup logos were missing ([#5](https://github.com/endercodezz/P3P3DS/issues/5)) | first seconds after start, 0.2.8-0.3.1 | fixed in 0.3.2 by rebinding textures after presenting a frame. The fix was verified in Azahar, and the maintainer reported working logos on console. |
 | Scene transitions: one or more black frames instead of a fade ([#3](https://github.com/endercodezz/P3P3DS/issues/3)); garbage on hardware until 0.3.0 | cutscene and scene changes | since 0.3.1 black on hardware and in Azahar alike (new render targets are filled black); the missing fade itself is not fixed |
 | Light fringe around changed facial expressions in dialogue portraits ([#4](https://github.com/endercodezz/P3P3DS/issues/4)) | dialogue | [UNVERIFIED] linear filtering of the overlay sprite samples outside its rectangle |
-| 0.3.0 only: on a slow SD card the game stops for seconds every 5 s while it rewrites `report.txt` (one user: 36 % speed, `ui` about 60 %) | everywhere | fixed in 0.3.1, confirmed on hardware by the same user: 97-99 % speed, `ui 0.0`, while one rewrite still takes up to 2.6 s on that card (`sd max 2575 ms`) |
+| Up to 0.3.3: on a slow SD card the game freezes every 5 s while `report.txt` is rewritten (0.3.0: the game itself waited, 36 % speed; 0.3.1-0.3.3: the rewrite runs in the background but the game's reads can wait behind it, 64 % speed in one run) | everywhere | the report is no longer written during play unless you touch the bottom screen; not yet confirmed on hardware |
 | Battle: 16-25 fps, 63-86 % of real time (0.3.0, hardware; was 5-7.5 fps in 0.2.7) ([#16](https://github.com/endercodezz/P3P3DS/issues/16)) | battles | game targets 30 fps; the game's own code is now the largest share (`aot` 63-70 %) |
 | Dorm: 28-30 fps (0.3.0, hardware) ([#17](https://github.com/endercodezz/P3P3DS/issues/17)) | field | game targets 30 fps |
 | No sound ([#14](https://github.com/endercodezz/P3P3DS/issues/14)) | everywhere | not implemented on 3DS (the PC runner mixes it) |
@@ -53,7 +53,7 @@ On New 3DS (details in [`docs/3DS_PLATFORM.md`](docs/3DS_PLATFORM.md) sections 8
 | Saves | save and load at the dorm desk and from LOAD GAME, menu on the bottom screen |
 | First battle | starts since 0.2.5; transform, skinning and lighting on the GPU since 0.2.6; renders correctly since 0.2.7 (culling fix); slow (see Known issues) |
 | Memory | heap 71,220 KiB with 60,284 KiB in use (hardware, 2026-10-02; 12 MiB linear heap); about 10.7 MiB free |
-| Screens | top: the game; bottom: authorship and debug data (fps, speed, where the time went over the last 10 s, memory), also saved to `sdmc:/p3p3ds/report.txt` |
+| Screens | top: the game; bottom: authorship and debug data (fps, speed, where the time went over the last 10 s, memory), also saved to `sdmc:/p3p3ds/report.txt` at the start, on exit and when you touch the bottom screen |
 
 Measured on the PC runner (ULUS-10512, details and evidence in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)):
 
@@ -139,7 +139,7 @@ The builder package (about 2 MB zipped) contains no game data: only the prebuilt
    The runner creates `p3p3ds/ms0/` (memory stick), `p3p3ds/mods/` (mod chain, see below) and `p3p3ds/report.txt` itself.
 2. Start **P3P3DS** from the Homebrew Launcher.
 
-The top screen shows the game, the bottom screen authorship and a live debug report (fps, speed, memory, time split), also written to `sdmc:/p3p3ds/report.txt` every few seconds and on exit — please attach it to bug reports.
+The top screen shows the game, the bottom screen authorship and a live debug report (fps, speed, memory, time split), also written to `sdmc:/p3p3ds/report.txt` at the start, on exit (START+SELECT) and whenever you touch the bottom screen — please attach it to bug reports. An empty `sdmc:/p3p3ds/report_live.txt` also writes it every 5 s, for runs that crash before you can quit; on a slow SD card that can make the game freeze for a moment.
 
 | 3DS | PSP |
 |---|---|
