@@ -274,6 +274,15 @@ bool ThreadManager::exit_current_thread(std::int32_t exit_status, psprecomp::All
             if (t.status == InternalThreadState::Waiting && t.wait.type == WaitType::ThreadEnd &&
                 t.wait.object == cur->uid) enders.push_back(uid);
         for (auto uid : enders) wake(runtime, uid, exit_status);
+        // The kernel frees the mutexes of a thread that ends, and the next waiter
+        // gets them (pspautotests threads/mutex/lock). An lwmutex stays locked:
+        // its state is in the guest's workarea (threads/lwmutex/lock).
+        for (auto &[uid, mutex] : mutexes_) {
+            if (mutex.count == 0 || mutex.owner != cur->uid) continue;
+            mutex.count = 0;
+            mutex.owner = 0;
+            release_mutex_waiters(runtime, mutex);
+        }
     }
     const bool any_ready = best_ready() != nullptr;
     const bool any_waiting = std::any_of(threads_.begin(), threads_.end(), [](const auto &entry) {

@@ -232,6 +232,55 @@ void mutexes() {
     CHECK(env.k.threads().get_mutex(static_cast<std::int32_t>(m))->owner == env.b);
 }
 
+// references/pspautotests/tests/threads/mutex/lock.expected: "Woke up after
+// other thread exited."
+void mutex_released_when_owner_exits() {
+    Env env;
+    const auto m = env.tm(0xB7D098C6u, {kName, 0u, 0u, 0u});
+    env.b = env.spawn(20);                         // higher priority: B runs at once
+    CHECK(env.current() == env.b);
+    CHECK(env.tm(0xB011B11Fu, {m, 1u, 0u}) == 0u);
+    env.tm(0xCEADEB47u, {100u});                   // B delays -> A
+    CHECK(env.current() == env.a);
+    env.tm(0xB011B11Fu, {m, 1u, 0u});              // A blocks; B runs when its delay ends
+    CHECK(env.current() == env.b);
+    env.tm(0xAA73C935u, {0u});                     // B exits holding the mutex
+    CHECK(!env.rt.stopped());
+    CHECK(env.current() == env.a);
+    CHECK(env.rt.cpu().gpr[2] == 0u);
+    const auto *mutex = env.k.threads().get_mutex(static_cast<std::int32_t>(m));
+    CHECK(mutex->owner == env.a);
+    CHECK(mutex->count == 1);
+    CHECK(env.tm(0x6B30100Fu, {m, 1u}) == 0u);
+}
+
+void mutex_free_after_owner_exit_without_waiters() {
+    Env env;
+    const auto m = env.tm(0xB7D098C6u, {kName, 0x200u, 0u, 0u}); // recursive
+    env.b = env.spawn(20);
+    CHECK(env.tm(0xB011B11Fu, {m, 3u, 0u}) == 0u);
+    env.tm(0xAA73C935u, {0u});
+    CHECK(env.current() == env.a);
+    const auto *mutex = env.k.threads().get_mutex(static_cast<std::int32_t>(m));
+    CHECK(mutex->owner == 0);
+    CHECK(mutex->count == 0);
+    CHECK(env.tm(0xB011B11Fu, {m, 1u, 0u}) == 0u);
+}
+
+// references/pspautotests/tests/threads/lwmutex/lock.expected: "Did not wake on
+// thread exit: OK". The lock lives in the guest's workarea, not in the kernel.
+void lw_mutex_stays_locked_when_owner_exits() {
+    Env env;
+    const std::uint32_t wa = 0x08900200u;
+    CHECK(env.tm(0x19CFF145u, {wa, kName, 0u, 0u, 0u}) == 0u);
+    env.b = env.spawn(20);
+    CHECK(env.kl(0xBEA46419u, {wa, 1u, 0u}) == 0u);
+    env.tm(0xAA73C935u, {0u});
+    CHECK(env.current() == env.a);
+    CHECK(env.rt.memory().load32(wa + 0u) == 1u);
+    CHECK(env.rt.memory().load32(wa + 4u) == static_cast<std::uint32_t>(env.b));
+}
+
 void delays_sleep_and_thread_end() {
     Env env;
     env.b = env.spawn(40);
@@ -363,6 +412,9 @@ int main() {
     event_flag_timeouts();
     lw_mutexes();
     mutexes();
+    mutex_released_when_owner_exits();
+    mutex_free_after_owner_exit_without_waiters();
+    lw_mutex_stays_locked_when_owner_exits();
     delays_sleep_and_thread_end();
     thread_end_status();
     callbacks();

@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Mutexes are released when their owner exits; lwmutexes are not (#8, 2026-11-06)
+
+- [VERIFIED] PSP behaviour, `references/pspautotests/tests/threads`: `mutex/lock.expected` has "Woke up after other thread exited", `lwmutex/lock.expected` has "Did not wake on thread exit: OK". A mutex is freed by the kernel; an lwmutex stays locked, its state is in the guest's workarea.
+- `ThreadManager::exit_current_thread` frees the mutexes of the thread and hands each to its next waiter. Lwmutexes are unchanged. `sceKernelTerminateThread` is not implemented, and `delete_thread` only accepts ended threads, so exit is the only path.
+- [INFERRED] The waiter gets the mutex with result 0, as in an unlock: PPSSPP does this. The pspautotests case locks after the exit.
+- [VERIFIED] `test_threadman_sync`: 3 new cases, 5 failed checks before the fix, 0 after. CTest 32/32. `new_game.txt` to vblank 9000 before and after: identical event dumps, SHA-256 `0364bf64f29b9434...`, so that route never ends a thread holding a mutex.
+
 ## Mods run on the New 3DS build in Azahar (#23, 2026-11-06)
 
 - [VERIFIED] Azahar, the New 3DS build with no change: a `bind/` folder from `p3p-cpk bind` (1,552 files, 29 MB, the fan translation used as a test mod) in `sdmc:/p3p3ds/mods/bind/`, unattended run to vblank 9900. The first dialogue shows the mod's text.
@@ -285,7 +292,7 @@ Correctness (ranked by likely impact):
 - **Fixed** (section above). [VERIFIED] A retry wait is skipped when the thread is preempted right after being dispatched: `ThreadManager::resume_pc` treats "pc is an import stub" as "inside an HLE call, resume at `$ra`", but a thread woken from a retry wait also sits at the stub and must re-run the call. Repro: a priority-40 thread in `sceAudioOutputBlocking` resumes at `$ra` with a stale `$v0` when a priority-32 thread's `sceKernelDelayThread(0)` expires in the same post-import hook. Affects `sceAudioOutputBlocking`/`OutputPannedBlocking`, `sceIoWaitAsync` (stale result, op left pending), `sceCtrlRead*`, module start waits. Must be fixed before NDSP audio.
 - [INFERRED] Back-face culling: since `72bd103` through mode and transform mode use opposite rules (`software_renderer.cpp`, `gpu_renderer.cpp`); PPSSPP uses one screen-space rule from the CULL bit in both modes (`GPU/GLES/StateMappingGLES.cpp`, `GPU/Software/TransformUnit.cpp`). The split may compensate an unidentified Y flip. Test: count through-mode draws with CULL on in `--draw-log`, then compare frame hashes of the input scripts with one uniform rule.
 - [VERIFIED] SysMem and thread stacks: stacks bump down from `0x09FF0000` with no check against the SysMem heap growing up to `0x09FF0000` (repro: heap block `08ED0000..09FF0000` and a new stack `09FEC000..09FF0000` overlap); stacks are never reclaimed (255 create/delete cycles of 64 KiB stacks fail with `0x80020190`); `sceKernelStartModule` leaks a 256 KiB stack; `free_partition_memory` never reuses space; `Addr` allocations do not check overlap; `High` is allocated low. [UNVERIFIED] P3P's own peak and alloc/free pattern.
-- [VERIFIED] Mutexes (and lwmutexes) are not released when the owning thread exits (repro: deadlock); PPSSPP releases them.
+- [VERIFIED] Mutexes are not released when the owning thread exits (repro: deadlock); fixed in #8. [WRONG] for lwmutexes: on the PSP they stay locked.
 - [VERIFIED] Event flag `outBits`: not written on a real timeout and written on a zero timeout; hardware does the opposite (`pspautotests/tests/threads/events/wait/wait.expected`).
 - [VERIFIED] `sceIoOpenAsync` returns open errors synchronously; uOFW reports them through the async result (`iofilemgr.c`, `open_iob`).
 - [VERIFIED] GE: finish callbacks run inside `sceGeListEnQueue`/`UpdateStallAddr` instead of later; SIGNAL handlers are never called; `EnQueueHead` runs the list at once.
