@@ -2,7 +2,10 @@
 //
 // Top screen: the PSP framebuffer (480x272) scaled to 400x240 (nearest).
 // Bottom screen: authorship and live debug information; the same data is
-// written to sdmc:/p3p3ds/report.txt every few seconds and on exit.
+// written to sdmc:/p3p3ds/report.txt at the start, on exit and when the bottom
+// screen is touched. An empty sdmc:/p3p3ds/report_live.txt also writes it every
+// 5 s, for runs that may end without an exit (a crash, a killed emulator): the
+// writes can hold up the game's reads on a slow SD card.
 //
 // Game data: sdmc:/p3p3ds/*.iso (the user's ULUS-10512 image) mounted as
 // disc0:, sdmc:/p3p3ds/ms0 as ms0:, sdmc:/p3p3ds/mods as the profile's mod directory.
@@ -98,6 +101,8 @@ constexpr const char *kBase = "sdmc:/p3p3ds";
 
 struct Stats {
     u64 start_ms{}, last_report_ms{}, last_fps_ms{};
+    bool report_live{};                  // report_live.txt: report.txt every 5 s
+    std::uint32_t report_writes_shown{}; // `written` count on the bottom screen
     std::uint64_t frames{}, frames_at_last_fps{};
     // Game frames: changes of the displayed PSP framebuffer (the game swaps
     // buffers once per finished frame); vblanks run at 60/s at full speed.
@@ -189,8 +194,9 @@ std::deque<TimeSample> g_samples;
 // sdmc:/p3p3ds/profile_seconds.txt present: one CSV line per second with the
 // split of that second, to find short slowdowns the 10 s report averages out.
 FILE *g_seconds_log = nullptr;
-// Longest rewrite of report.txt so far (shown as `sd max`).
+// Longest rewrite of report.txt so far (shown as `sd max`) and rewrites so far.
 std::atomic<std::uint32_t> g_report_write_max_ms{};
+std::atomic<std::uint32_t> g_report_writes{};
 
 // 3DS buttons -> PSP buttons by position (PSP: Cross bottom, Circle right,
 // Square left, Triangle top).
@@ -611,7 +617,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "static recompilation port\n"
         "by %s\n"
         "build %s\n"
-        "\n"
+        "report : touch to save, %lu written\n"
         "status : %s\n"
         "fps    : %.1f game frames/s (%.0f vblank/s)\n"
         "speed  : %.0f%% of real time\n"
@@ -625,7 +631,7 @@ std::string report_text(const Stats &s, const psprecomp::Runtime &rt, p3p3ds::Ke
         "stop   : %s\n"
         "%s"
         "\nSTART+SELECT: quit\n",
-        kAuthor, P3P3DS_BUILD_ID, s.status.c_str(), s.fps, s.vblank_rate, wall > 0 ? 100.0 * guest / wall : 0.0, guest, wall,
+        kAuthor, P3P3DS_BUILD_ID, static_cast<unsigned long>(g_report_writes.load(std::memory_order_relaxed)), s.status.c_str(), s.fps, s.vblank_rate, wall > 0 ? 100.0 * guest / wall : 0.0, guest, wall,
         static_cast<unsigned long long>(s.frames), static_cast<unsigned long long>(k.threads().vblank_count()),
         static_cast<unsigned long>(s.buttons),
         static_cast<unsigned long>(osGetMemRegionFree(MEMREGION_APPLICATION) / 1024u),
@@ -644,12 +650,16 @@ void write_report(const std::string &text) {
     }
     const auto ms = static_cast<std::uint32_t>(osGetTime() - start);
     if (ms > g_report_write_max_ms.load(std::memory_order_relaxed)) g_report_write_max_ms.store(ms, std::memory_order_relaxed);
+    g_report_writes.fetch_add(1u, std::memory_order_relaxed);
 }
 
-// The periodic report.txt is written by a thread of its own on core 0 below
+// During play report.txt is written by a thread of its own on core 0 below
 // the game's priority: on a slow SD card one rewrite took about 3 s (user
 // report, 0.3.0: `ui` 60 % of the time, 36 % speed) and the game stood still
-// for it every 5 s. The writer's file-system request blocks only the writer.
+// for it every 5 s. The writer's file-system request blocks only the writer,
+// but the game's ISO reads still share the card with it (issue #71: freezes
+// every 5 s with `sd max 2656 ms`, none with 78 ms on the same card), so it
+// writes only on request unless report_live.txt asks for every 5 s.
 struct ReportWriter {
     LightLock lock;
     LightEvent wake;
@@ -891,6 +901,7 @@ int main() {
             std::fclose(f);
             if (stats.dump_every) std::filesystem::create_directories(std::string(kBase) + "/frames", ec);
         }
+        if (FILE *f = std::fopen("sdmc:/p3p3ds/report_live.txt", "r")) { stats.report_live = true; std::fclose(f); }
         if (FILE *f = std::fopen("sdmc:/p3p3ds/profile_seconds.txt", "r")) {
             std::fclose(f);
             g_seconds_log = std::fopen("sdmc:/p3p3ds/profile_seconds.csv", "w");
@@ -966,6 +977,11 @@ int main() {
                 rt.stop("Quit by user (START+SELECT)");
                 throw psprecomp::FrontierHalt{};
             }
+            if (hidKeysDown() & KEY_TOUCH) { // the PSP has no touch screen: free for the runner
+                const u64 ui_start = svcGetSystemTick();
+                post_report(report_text(stats, rt, kernel));
+                stats.ui_ticks += svcGetSystemTick() - ui_start;
+            }
             {
                 const double guest_us = static_cast<double>(kernel.threads().now());
                 const double wall_us = static_cast<double>(svcGetSystemTick() - stats.run_start_ticks) / ticks_per_us;
@@ -1009,19 +1025,23 @@ int main() {
                     log_second(g_samples[g_samples.size() - 2], g_samples.back(), rt);
                     stats.ui_ticks += svcGetSystemTick() - log_start;
                 }
-                // Report every 5 s (bottom screen and SD card): redrawing it each
-                // second cost 8 % of the time in battle on hardware.
-                if (now - stats.last_report_ms >= 5000u) {
+                // Bottom screen every 5 s: redrawing it each second cost 8 % of
+                // the time in battle on hardware. Sooner after a save by touch,
+                // to show the new count.
+                const std::uint32_t writes = g_report_writes.load(std::memory_order_relaxed);
+                if (now - stats.last_report_ms >= 5000u || writes != stats.report_writes_shown) {
                     const u64 ui_start = svcGetSystemTick();
                     const std::string text = report_text(stats, rt, kernel);
                     if (!save_menu.active) show(text);
-                    post_report(text);
+                    if (stats.report_live && now - stats.last_report_ms >= 5000u) post_report(text);
+                    stats.report_writes_shown = writes;
                     stats.last_report_ms = now;
                     stats.ui_ticks += svcGetSystemTick() - ui_start;
                 }
             }
         };
         stage = "run";
+        write_report(report_text(stats, rt, kernel)); // a run that crashes still leaves its build and `status : running`
         start_report_writer();
         std::printf("Starting game...\n");
         try { rt.run(entry, ~0ull); }

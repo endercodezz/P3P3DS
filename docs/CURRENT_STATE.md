@@ -2,6 +2,16 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## No report.txt writes during play on the New 3DS (#71, #66, 2026-11-06)
+
+- [VERIFIED] User reports on #66 (New 2DS XL, 0.3.2 build 2f91246, same Samsung EVO Plus 64 GB, attached report.txt and profile_seconds.csv): a run with freezes about 5 s apart had `sd max 2656 ms`, `io 36` (last 10 s), speed 64-74 %; a run without freezes had `sd max 78 ms`, `io 0`, speed 96-99 %.
+- [INFERRED] The card's write latency varies between sessions, and while a slow background rewrite runs, the game's ISO reads wait behind it. Not measured directly: no per-second CSV exists of a run with freezes.
+- `platform/3ds/main.cpp`: the bottom screen still updates every 5 s, but report.txt is written only at the start of the run (build and `status : running`, before the game reads anything), on exit, and when the bottom screen is touched (through the writer thread; the PSP has no touch screen, so the game never sees it). The new row `report : touch to save, N written` replaces the blank row 5 of the report, so the other rows stay where they were. An empty `sdmc:/p3p3ds/report_live.txt` restores the write every 5 s, for runs that end without an exit (a host crash, a killed emulator).
+- [VERIFIED] Azahar, unattended autotest of 1,500 vblanks, this branch: without `report_live.txt` report.txt changed only at the start and at the end (`2 written` in the final report: `booting` and the start write); with it, every 5-6 s (`6 written`). Same speed in both (83 %), so Azahar says nothing about the stall itself: its SD writes take 50 ms.
+- [UNVERIFIED] The tap itself was not exercised: a click posted to Azahar's windows did not reach the game (`2 written`). The write path it uses is the one `report_live.txt` ran above, and `hidKeysDown` reports the first frame of a touch [VERIFIED] `3ds/libctru/libctru/source/services/hid.c:199,204`.
+- [UNVERIFIED] Hardware with a slow card: no periodic freezes and speed near 97-99 % in the same scene. Needs the reporter's confirmation on the next release. A host crash now leaves only the start report unless `report_live.txt` is present.
+- `profile_seconds.csv` (opt-in) still writes every second on the game's thread, so it can disturb a slow card itself.
+
 ## Builder 0.3.3 release preparation (2026-11-05)
 
 - `platform/pc/builder/builder.rc` FileVersion and ProductVersion 0.3.3 ([#69](https://github.com/endercodezz/P3P3DS/issues/69)). Contents since 0.3.2: Builder update notice (#67), texture packs (texpack converter, PPSSPP-compatible keys, replacement on the PC and in the 3DS renderer), native game preparation (#33), host time audit docs (#50), Zig BinDiff tool.
