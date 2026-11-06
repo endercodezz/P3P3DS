@@ -135,7 +135,7 @@ In **P3P3DS**, the HLE `IoFileMgr` subsystem will intercept all game file reques
 ```
 
 ### 6.2. Russification & Font Handling
-Russian fan translations for Persona 3 Portable (such as the translation by The Miracle / DniweTamp):
+Russian fan translations for Persona 3 Portable (such as the translation by Kotone Team, measured in `docs/CURRENT_STATE.md`):
 1. **Text Encoding:** `[UNVERIFIED]` expected to map Cyrillic onto a custom 1-byte table used by the replaced font; the real translation package has not been examined.
 2. **Font Textures:** `[INFERRED]` modifies the game font; `umd0.cpk` contains exactly one `.fnt` file (CPK listing via `experiments/cpk-check`).
 3. **Dialogue Scripts:** `[INFERRED]` modified `.bf` (1,272 in `umd0.cpk`, flow scripts with embedded messages) and `.bmd` files.

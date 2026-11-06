@@ -2,6 +2,15 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## First real translation compared: Russian v0.8.3 (#80, #23, 2026-11-06)
+
+- [VERIFIED] [P3P Russian Translation (PSP Version)](https://gamebanana.com/mods/449730) v0.8.3 by Kotone Team, MD5 `5fc0fa81f932311d0988ec4385c0b3b6`: an Aemulus package (`Package.xml`, 1,705 files under `data/`), `texture_override/ULUS10512` (126 files) and an EBOOT patch (`rus_eboot_patch_v0.8.2.xdelta`, source `EBOOT_DEC.BIN`). Not a `mod.cpk`. Game data, kept under `.tmp/` only.
+- `tools/cpk`: `diff` accepts a directory as the mod, and a file under a folder named after a game file is `in-container`, not `added`.
+- [VERIFIED] `diff` of the package against `umd0.cpk` and `umd1.cpk`: 1,369 `changed` (1,258 `.bf`, 98 `.abin`), 336 `in-container` (229 `.bf`, 72 `.tmx`, 20 `.bmd`, `data/init/font/font0.fnt` under `data/init.bin`), 128 `added` (the texture folder, `Package.xml`, `Preview.png`).
+- [INFERRED] The `in-container` files must first be built into their containers, which Aemulus does, so the package can't simply be copied to `mods/bind/`. Not yet checked against Aemulus or run.
+- [WRONG] A translation needs no EBOOT patch: the mod's description says the menu text is in the EBOOT. P3P3DS generates its AOT code from the EBOOT, so a patch that touches code has to reach the Builder. [UNVERIFIED] What it changes: not applied yet, no xdelta tool here.
+- [INFERRED] Cyrillic is drawn through a replaced font with Latin character codes: the patch holds `Kluwka dlq lakrossa` ("lacrosse stick" in Russian). One string only.
+
 ## `p3p-cpk diff`: what a mod changes in the game's archives (#76, 2026-11-06)
 
 - `tools/cpk`: `diff <mod.cpk> <base.cpk>` or `diff <mod.cpk> <image.iso> <cpk path>...` reports each file of the mod as `added`, `changed` or `same` by extracted content. It is the first step of #23: which files a fan translation replaces.

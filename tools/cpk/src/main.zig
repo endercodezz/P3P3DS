@@ -8,8 +8,8 @@ const usage =
     \\       p3p-cpk list    <file.cpk> [substring]
     \\       p3p-cpk extract <image.iso> <cpk path on image> [substring] <out dir>
     \\       p3p-cpk extract <file.cpk> [substring] <out dir>
-    \\       p3p-cpk diff    <mod.cpk> <base.cpk>
-    \\       p3p-cpk diff    <mod.cpk> <image.iso> <cpk path on image>...
+    \\       p3p-cpk diff    <mod.cpk|mod dir> <base.cpk>
+    \\       p3p-cpk diff    <mod.cpk|mod dir> <image.iso> <cpk path on image>...
     \\       p3p-cpk check-trace <image.iso> <io-trace.csv> [prefix=hostdir ...]
     \\       p3p-cpk --help | --version
     \\list prints every file: dir/name, offset, stored and extracted size, compressed.
@@ -18,14 +18,17 @@ const usage =
     \\paths and names unsafe on Windows are refused. Bytes above ASCII become %XX.
     \\diff prints what a mod does to the base archives, for each of its files: added,
     \\changed or same, comparing extracted content, so a stored and a compressed copy
-    \\of the same bytes are the same. Names match without regard to case; a match
-    \\that differs in case is marked case-differs. With several base archives the
-    \\first that has a file wins.
+    \\of the same bytes are the same. A mod dir holds paths like data/init.bin, as a
+    \\bind/ folder does. A file missing from the base but under a folder named after
+    \\a base file without its extension (data/init/a.tmx, data/init.bin) is
+    \\in-container: a mod manager has to build it into that file. Names match without
+    \\regard to case; a match that differs in case is marked case-differs. With
+    \\several base archives the first that has a file wins.
     \\check-trace verifies the reads of p3p_pc_bootstrap --io-trace: each read of a
     \\.cpk must be metadata or lie in one file with the same FNV-1a 64. prefix=hostdir
     \\maps traced paths to host files, e.g. ms0:/PSP/P3P=.tmp/mods.
-    \\Exit: 0 success, 1 check-trace or diff found differences (for diff: a file added
-    \\or changed), 2 usage/input/output error.
+    \\Exit: 0 success, 1 check-trace or diff found differences (for diff: anything but
+    \\same), 2 usage/input/output error.
     \\
 ;
 
@@ -239,14 +242,106 @@ fn sameContent(allocator: std.mem.Allocator, mod_source: cpk.Source, mod: cpk.Fi
     return std.mem.eql(u8, left, right);
 }
 
+const Diff = struct {
+    base_files: *const std.StringHashMapUnmanaged(BaseFile),
+    /// Lower-case base paths without their extension -> the base file's path.
+    stems: *const std.StringHashMapUnmanaged([]const u8),
+    files: u64 = 0,
+    added: u64 = 0,
+    in_container: u64 = 0,
+    changed: u64 = 0,
+    same: u64 = 0,
+    case_differs: u64 = 0,
+
+    /// The deepest folder of `key` that is named after a base file.
+    fn container(self: *const Diff, key: []const u8) ?[]const u8 {
+        var end = key.len;
+        while (std.mem.lastIndexOfScalar(u8, key[0..end], '/')) |slash| {
+            if (slash == 0) return null;
+            if (self.stems.get(key[0..slash])) |found| return found;
+            end = slash;
+        }
+        return null;
+    }
+
+    fn compare(self: *Diff, allocator: std.mem.Allocator, writer: *std.Io.Writer, source: cpk.Source, file: cpk.File) !void {
+        self.files += 1;
+        const key = try lowerKey(allocator, file);
+        defer allocator.free(key);
+        const found = self.base_files.get(key) orelse {
+            if (self.container(key)) |container_path| {
+                self.in_container += 1;
+                try writer.print("in-container {s}/{s} container={s}\n", .{ file.dir, file.name, container_path });
+            } else {
+                self.added += 1;
+                try writer.print("added {s}/{s} extract=0x{X}\n", .{ file.dir, file.name, file.extract_size });
+            }
+            return;
+        };
+        const exact = std.mem.eql(u8, file.dir, found.file.dir) and std.mem.eql(u8, file.name, found.file.name);
+        const mark: []const u8 = if (exact) "" else " case-differs";
+        if (!exact) self.case_differs += 1;
+        if (try sameContent(allocator, source, file, found)) {
+            self.same += 1;
+            try writer.print("same {s}/{s}{s}\n", .{ file.dir, file.name, mark });
+        } else {
+            self.changed += 1;
+            try writer.print("changed {s}/{s} extract=0x{X} -> 0x{X}{s}\n", .{ file.dir, file.name, found.file.extract_size, file.extract_size, mark });
+        }
+    }
+};
+
+fn pathLessThan(_: void, a: []u8, b: []u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+fn diffDirectory(init: std.process.Init, writer: *std.Io.Writer, diff: *Diff, dir: std.Io.Dir) !void {
+    const allocator = init.gpa;
+    const io = init.io;
+    var arena_state: std.heap.ArenaAllocator = .init(allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    var paths: std.ArrayList([]u8) = .empty;
+    var walker = try dir.walk(allocator);
+    defer walker.deinit();
+    while (try walker.next(io)) |entry| {
+        if (entry.kind != .file) continue;
+        const path = try arena.dupe(u8, entry.path);
+        std.mem.replaceScalar(u8, path, '\\', '/');
+        try paths.append(arena, path);
+    }
+    // The order of a directory listing differs between systems.
+    std.mem.sort([]u8, paths.items, {}, pathLessThan);
+    for (paths.items) |path| {
+        const file = try dir.openFile(io, path, .{});
+        defer file.close(io);
+        const view: View = .{ .io = io, .file = file, .base = 0 };
+        const source = view.source(try file.length(io));
+        const split = std.mem.lastIndexOfScalar(u8, path, '/');
+        const parent = if (split) |slash| path[0..slash] else "";
+        const name = if (split) |slash| path[slash + 1 ..] else path;
+        try diff.compare(allocator, writer, source, try cpk.looseFile(source, parent, name));
+    }
+}
+
 fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !u8 {
     const allocator = init.gpa;
     const io = init.io;
     if (args.len < 2) return error.ExpectedModAndBase;
+    const mod_dir: ?std.Io.Dir = std.Io.Dir.cwd().openDir(io, args[0], .{ .iterate = true }) catch |err| switch (err) {
+        error.NotDir => null,
+        else => return err,
+    };
+    defer if (mod_dir) |dir| dir.close(io);
     var mod: Container = undefined;
-    try mod.open(io, args[0]);
-    defer mod.file.close(io);
-    if (!mod.is_cpk) return error.ModIsNotCpk;
+    if (mod_dir == null) {
+        try mod.open(io, args[0]);
+        if (!mod.is_cpk) {
+            mod.file.close(io);
+            return error.ModIsNotCpk;
+        }
+    }
+    defer if (mod_dir == null) mod.file.close(io);
     var base: Container = undefined;
     try base.open(io, args[1]);
     defer base.file.close(io);
@@ -263,6 +358,8 @@ fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []c
     defer for (archives[0..opened]) |archive| archive.deinit(allocator);
     var base_files: std.StringHashMapUnmanaged(BaseFile) = .empty;
     defer base_files.deinit(allocator);
+    var stems: std.StringHashMapUnmanaged([]const u8) = .empty;
+    defer stems.deinit(allocator);
     for (views, archives, 0..) |*view, *archive, index| {
         view.* = base.view;
         var size = base.size;
@@ -277,39 +374,27 @@ fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []c
         archive.* = try cpk.Archive.open(allocator, source);
         opened += 1;
         for (archive.files) |file| {
-            const slot = try base_files.getOrPut(allocator, try lowerKey(arena, file));
+            const key = try lowerKey(arena, file);
+            const slot = try base_files.getOrPut(allocator, key);
             if (!slot.found_existing) slot.value_ptr.* = .{ .file = file, .source = source };
+            const dot = std.mem.lastIndexOfScalar(u8, key, '.') orelse continue;
+            if (dot <= file.dir.len + 1) continue; // no extension, or a name like `.hidden`
+            const stem = try stems.getOrPut(allocator, key[0..dot]);
+            if (!stem.found_existing) stem.value_ptr.* = try std.fmt.allocPrint(arena, "{s}/{s}", .{ file.dir, file.name });
         }
     }
 
-    const mod_source = mod.view.source(mod.size);
-    const archive = try cpk.Archive.open(allocator, mod_source);
-    defer archive.deinit(allocator);
-    var added: u64 = 0;
-    var changed: u64 = 0;
-    var same: u64 = 0;
-    var case_differs: u64 = 0;
-    for (archive.files) |file| {
-        const key = try lowerKey(allocator, file);
-        defer allocator.free(key);
-        const found = base_files.get(key) orelse {
-            added += 1;
-            try writer.print("added {s}/{s} extract=0x{X}\n", .{ file.dir, file.name, file.extract_size });
-            continue;
-        };
-        const exact = std.mem.eql(u8, file.dir, found.file.dir) and std.mem.eql(u8, file.name, found.file.name);
-        const mark: []const u8 = if (exact) "" else " case-differs";
-        if (!exact) case_differs += 1;
-        if (try sameContent(allocator, mod_source, file, found)) {
-            same += 1;
-            try writer.print("same {s}/{s}{s}\n", .{ file.dir, file.name, mark });
-        } else {
-            changed += 1;
-            try writer.print("changed {s}/{s} extract=0x{X} -> 0x{X}{s}\n", .{ file.dir, file.name, found.file.extract_size, file.extract_size, mark });
-        }
+    var diff: Diff = .{ .base_files = &base_files, .stems = &stems };
+    if (mod_dir) |dir| {
+        try diffDirectory(init, writer, &diff, dir);
+    } else {
+        const mod_source = mod.view.source(mod.size);
+        const archive = try cpk.Archive.open(allocator, mod_source);
+        defer archive.deinit(allocator);
+        for (archive.files) |file| try diff.compare(allocator, writer, mod_source, file);
     }
-    try writer.print("mod files={d} added={d} changed={d} same={d} case_differs={d} base files={d}\n", .{ archive.files.len, added, changed, same, case_differs, base_files.count() });
-    return if (added == 0 and changed == 0) 0 else 1;
+    try writer.print("mod files={d} added={d} in_container={d} changed={d} same={d} case_differs={d} base files={d}\n", .{ diff.files, diff.added, diff.in_container, diff.changed, diff.same, diff.case_differs, base_files.count() });
+    return if (diff.added == 0 and diff.in_container == 0 and diff.changed == 0) 0 else 1;
 }
 
 const TracedCpk = struct {
