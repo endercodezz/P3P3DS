@@ -6,6 +6,15 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## `p3p-cpk diff` (#76, 2026-11-06)
+
+Local ULUS-10512 ISO, Windows, Zig 0.17.1 `-Doptimize=safe`:
+
+- [VERIFIED] All of `umd0.cpk` as the mod, against the image's `umd0.cpk` and `umd1.cpk`: `mod files=5860 added=0 changed=0 same=5860 case_differs=0 base files=6198`, exit 0, 6 s. Each file is extracted from both sides.
+- [VERIFIED] A mod built from real game files, compared with both archives: `AICALC.TBL` stored uncompressed is `same` (compressed in the game); `battle_pack2.bin` with one byte flipped, same size, is `changed`; `v100001.afs` from `umd1.cpk` is `same`; a lower-case name is `same ... case-differs`; a new file is `added`. Exit 1. Against `umd0.cpk` alone the `umd1.cpk` file is `added`.
+- [VERIFIED] The CriFsV2Lib sample CPK, written by another tool: 3 files `added`, exit 1.
+- [VERIFIED] `python tools/cpk/check.py`: 24/24 CLI tests, including 150 damaged mods through `diff` (exit 0, 1 or 2, never a panic).
+
 ## CPK host CLI (#65, 2026-11-06)
 
 Local ULUS-10512 ISO, Windows, Zig 0.17.1 `-Doptimize=safe`, oracle `experiments/cpk-check` (CriFsV2Lib):

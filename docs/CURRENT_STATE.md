@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## `p3p-cpk diff`: what a mod changes in the game's archives (#76, 2026-11-06)
+
+- `tools/cpk`: `diff <mod.cpk> <base.cpk>` or `diff <mod.cpk> <image.iso> <cpk path>...` reports each file of the mod as `added`, `changed` or `same` by extracted content. It is the first step of #23: which files a fan translation replaces.
+- [VERIFIED] `umd0.cpk` and `umd1.cpk` share no file name and have no names that differ only in case, so a mod can be compared with both at once. The numbers are in `docs/VERIFICATION.md`.
+- [UNVERIFIED] How the game's CRI library matches names: the game reads CPK contents itself, not `core/src/vfs.cpp`. `diff` matches without regard to case and marks `case-differs`, so such a file may not load in the game.
+- [UNVERIFIED] No real fan translation was compared yet: none is available locally.
+
 ## CPK tool in Zig without .NET: `tools/cpk` (#65, 2026-11-06)
 
 - `tools/cpk` (Zig 0.17.1, host only, one 1.0 MiB executable on Windows): `list`, `extract` and `check-trace` for a CPK on the ISO or a loose `.cpk`. `experiments/cpk-check` stays as the independent oracle. The numbers are in `docs/VERIFICATION.md`.

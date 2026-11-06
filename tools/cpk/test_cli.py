@@ -313,6 +313,74 @@ class Cli(unittest.TestCase):
         self.assertEqual(run("--help").returncode, 0)
         self.assertIn("0.1.0", run("--version").stdout)
 
+    def diff_fixture(self, entries, name="mod.cpk"):
+        path = self.dir / name
+        path.write_bytes(cpk(entries))
+        return path
+
+    def test_diff_kinds(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        changed = PLAIN[:-1] + b"X"
+        mod = self.diff_fixture([
+            ("data/a", "plain.bin", changed, len(changed)),  # same size, other bytes
+            ("data/a", "root2.txt", b"new", 3),
+            ("", "root.txt", b"hello!", 6),  # size differs: no need to read
+            ("data/b", "packed.bin", ORIGINAL, len(ORIGINAL)),  # stored copy of a compressed file
+        ])
+        result = run("diff", mod, base)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], "changed data/a/plain.bin extract=0x300 -> 0x300")
+        self.assertEqual(lines[1], "added data/a/root2.txt extract=0x3")
+        self.assertEqual(lines[2], "changed /root.txt extract=0x5 -> 0x6")
+        self.assertEqual(lines[3], "same data/b/packed.bin")
+        self.assertEqual(lines[4], "mod files=4 added=1 changed=2 same=1 case_differs=0 base files=4")
+
+    def test_diff_nothing_changed(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        mod = self.diff_fixture([("data/b", "packed.bin", COMPRESSED, len(ORIGINAL))])
+        result = run("diff", mod, base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_diff_case_is_marked(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        mod = self.diff_fixture([("DATA/a", "PLAIN.bin", PLAIN, len(PLAIN))])
+        result = run("diff", mod, base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("same DATA/a/PLAIN.bin case-differs", result.stdout)
+        self.assertIn("case_differs=1", result.stdout)
+
+    def test_diff_against_an_image_with_several_archives(self):
+        image = self.dir / "game.iso"
+        image.write_bytes(iso(cpk(ENTRIES)))
+        mod = self.diff_fixture([("data/a", "plain.bin", PLAIN, len(PLAIN))])
+        result = run("diff", mod, image, "/PSP_GAME/GAME.CPK", "/PSP_GAME/GAME.CPK")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("base files=4", result.stdout)
+
+    def test_diff_usage(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        image = self.dir / "game.iso"
+        image.write_bytes(iso(cpk(ENTRIES)))
+        self.assert_clean_error(run("diff", base))
+        self.assert_clean_error(run("diff", image, base))
+        self.assert_clean_error(run("diff", base, base, "/x"))
+        self.assert_clean_error(run("diff", base, image))
+        self.assert_clean_error(run("diff", base, image, "/PSP_GAME/NOPE.CPK"))
+
+    def test_diff_mutated_mod_never_crashes(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        data = cpk(ENTRIES)
+        rng = random.Random(66)
+        path = self.dir / "mutated.cpk"
+        for round_number in range(150):
+            mutated = bytearray(data)
+            for _ in range(rng.randrange(1, 9)):
+                mutated[rng.randrange(4, len(mutated))] = rng.choice((0, 1, 0x7F, 0x80, 0xFF, rng.randrange(256)))
+            path.write_bytes(mutated)
+            result = run("diff", path, base)
+            self.assertIn(result.returncode, (0, 1, 2), (round_number, result.stderr[-400:]))
+
     def trace(self, rows):
         path = self.dir / "trace.csv"
         path.write_text("path,offset,size,fnv1a64,time_us\n" + "".join(f"{p},{o},{s},0x{h:016X},0\n" for p, o, s, h in rows))
