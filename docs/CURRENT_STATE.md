@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Mods run on the New 3DS build in Azahar (#23, 2026-11-06)
+
+- [VERIFIED] Azahar, the New 3DS build with no change: a `bind/` folder from `p3p-cpk bind` (1,552 files, 29 MB, the fan translation used as a test mod) in `sdmc:/p3p3ds/mods/bind/`, unattended run to vblank 9900. The first dialogue shows the mod's text.
+- [VERIFIED] No slowdown from the mod files in that window: last 12 seconds at 92-100 % speed, `io` 0-1 %, whole run 94 %, `linear free` 3,253 KiB. Azahar's SD says nothing about a real card.
+- [VERIFIED] `profiles/p3p/input/new_game.txt` does not reach NEW GAME on the 3DS build: the title accepts a button only from about vblank 8300 there, so its START at 7900 is lost. Input that worked: `8600 CROSS 6`, `8950 UP 6`, `9050 CROSS 6`.
+- [UNVERIFIED] Hardware: `sceIoGetstat` on `bind/` paths cost 83 ms per call on a real card (2026-10-04 entry), and this mod adds 1,552 files.
+
 ## Russian translation runs on the PC runner, without Aemulus (#87, #23, 2026-11-06)
 
 - `tools/cpk`: `bind <out dir> <mod> <base...>` writes a `bind/` folder: changed files, and the game's containers (nested ones too) with the mod's files put in. `tools/cpk/src/pak.zig` reads and rebuilds the two PAK layouts of the game.

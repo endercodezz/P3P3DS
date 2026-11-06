@@ -44,7 +44,7 @@ Reproduced in unit tests or confirmed in code, not yet seen to change P3P's beha
 - **Saves**: compatibility with PSP/PPSSPP saves ([#20](https://github.com/endercodezz/P3P3DS/issues/20)).
 - **Opening movie**: H.264 + ATRAC3plus decoding ([#19](https://github.com/endercodezz/P3P3DS/issues/19), plan below); until then the movie is skipped.
 - **`.cia` packaging** from the Builder ([#21](https://github.com/endercodezz/P3P3DS/issues/21)).
-- **Mods**: fan translations on the 3DS and texture replacement ([#23](https://github.com/endercodezz/P3P3DS/issues/23)); a 60 fps patch only as a separate mod (the game paces itself with `WaitVblankStartMultiCB(2)` and its logic is per frame [INFERRED]).
+- **Mods**: mods from `p3p-cpk bind` run in Azahar; still open are a hardware test, `.spr` files, EBOOT patches in the Builder and texture replacement ([#23](https://github.com/endercodezz/P3P3DS/issues/23)); a 60 fps patch only as a separate mod (the game paces itself with `WaitVblankStartMultiCB(2)` and its logic is per frame [INFERRED]).
 - Builder: detection of devkitPro installs in other places ([#22](https://github.com/endercodezz/P3P3DS/issues/22)).
 
 ## Planned, but not soon: Old 3DS / 2DS — [#24](https://github.com/endercodezz/P3P3DS/issues/24)
