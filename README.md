@@ -375,16 +375,18 @@ build/cpk/bin/p3p-cpk list mods/mod.cpk
 build/cpk/bin/p3p-cpk extract game.iso /PSP_GAME/USRDIR/umd0.cpk data/battle .tmp/extract
 build/cpk/bin/p3p-cpk diff mods/mod.cpk game.iso /PSP_GAME/USRDIR/umd0.cpk /PSP_GAME/USRDIR/umd1.cpk
 build/cpk/bin/p3p-cpk diff mods/bind game.iso /PSP_GAME/USRDIR/umd0.cpk /PSP_GAME/USRDIR/umd1.cpk
+build/cpk/bin/p3p-cpk bind mods/bind my-mod game.iso /PSP_GAME/USRDIR/umd0.cpk /PSP_GAME/USRDIR/umd1.cpk
 build/cpk/bin/p3p-cpk check-trace game.iso .tmp/io-trace.csv ms0:/PSP/P3P=.tmp/mods
 ```
 
 - `list` prints directory and name, offset, stored and extracted size, and whether the file is CRILAYLA-compressed; the optional last argument is a case-insensitive substring of `dir/name`. An archive it can't read fully is an error, which makes it a quick check of a community `mod.cpk`.
 - `extract` writes files under their CPK directories and decompresses them. All output paths are checked before the first write: `..`, absolute paths and names that are unsafe on Windows stop the extraction.
 - `diff` shows what a `mod.cpk`, a `bind/` folder or an Aemulus package does to the game's archives: each file is `added`, `changed` or `same`, by extracted content, so a stored copy of a compressed file counts as the same. A file under a folder named after a game file, such as `data/init/a.tmx` for `data/init.bin`, is `in-container`: a mod manager has to build it into that file first. Names match without regard to case, and a match that differs in case is marked `case-differs`.
+- `bind` makes a mod usable without Aemulus: it writes a `bind/` folder with the changed files and rebuilds the game's containers around the `in-container` files. A file it can't place, such as one inside an `.spr`, is listed as `unresolved`, and the exit code is 1.
 - `patch <source> <patch.xdelta> <output>` applies the VCDIFF patches that mods ship, such as an EBOOT patch, and checks their checksums; `p3p-bindiff --elf` then shows what changed.
 - `check-trace` verifies `p3p_pc_bootstrap --io-trace`: each read of a `.cpk` must be metadata or lie inside one file with the same FNV-1a 64.
 
-Exit codes: **0** success, **1** `check-trace` found differences or `diff` found anything but `same`, **2** usage/input/output error. On Windows use `p3p-cpk.exe`. Keep game files and extracts under `.tmp/`.
+Exit codes: **0** success, **1** `check-trace` found differences, `diff` found anything but `same`, or `bind` left files `unresolved`, **2** usage/input/output error. On Windows use `p3p-cpk.exe`. Keep game files and extracts under `.tmp/`.
 
 ### Continuous integration and releases (GitHub Actions)
 

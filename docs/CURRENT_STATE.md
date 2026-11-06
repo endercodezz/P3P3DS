@@ -2,16 +2,27 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## Russian translation runs on the PC runner, without Aemulus (#87, #23, 2026-11-06)
+
+- `tools/cpk`: `bind <out dir> <mod> <base...>` writes a `bind/` folder: changed files, and the game's containers (nested ones too) with the mod's files put in. `tools/cpk/src/pak.zig` reads and rebuilds the two PAK layouts of the game.
+- [VERIFIED] Containers: 252-byte names, data padded to 64 bytes, zero tail; or a 32-bit count, 32-byte names, unpadded. The padding is not always zeros (`data/init_2.bin`). Game files can share a name with another extension (`f021_000.fpc`, `f021_000.pac`), and a folder belongs to the one that holds the file.
+- [VERIFIED] The folder rule of `in-container` is Aemulus' own: `Utilities/BinMerging/BinMerger.cs`, `Path.ChangeExtension(file, null)`.
+- [VERIFIED] Round trip: 185 of 185 real containers rebuild byte for byte when a file's own data is put back.
+- [VERIFIED] Translation v0.8.3: 1,369 changed files and 183 containers written, 266 of 336 in-container files placed. The other 70 are `.tmx` inside `.spr` (interface graphics): `bind` lists them as `unresolved`, and `.spr` is not supported yet.
+- [VERIFIED] PC runner, `--mods` with that folder, `profiles/p3p/input/new_game.txt`, stopped at vblank 9600: the game reads `ms0:/PSP/P3P/bind/data/init.bin`, `init_free.bin` and `title/sex_select.bin`, and the first dialogue shows in Russian in Cyrillic, with no runtime change and the original EBOOT.
+- [VERIFIED] The two `.text` words of the EBOOT patch are `addiu a0,a0,imm` with another immediate, which fits a moved string. [INFERRED] Not logic.
+- [UNVERIFIED] Menus with the patched EBOOT, and anything past the first dialogue. New 3DS: not run.
+
 ## First real translation compared: Russian v0.8.3 (#80, #23, 2026-11-06)
 
 - [VERIFIED] [P3P Russian Translation (PSP Version)](https://gamebanana.com/mods/449730) v0.8.3 by Kotone Team, MD5 `5fc0fa81f932311d0988ec4385c0b3b6`: an Aemulus package (`Package.xml`, 1,705 files under `data/`), `texture_override/ULUS10512` (126 files) and an EBOOT patch (`rus_eboot_patch_v0.8.2.xdelta`, source `EBOOT_DEC.BIN`). Not a `mod.cpk`. Game data, kept under `.tmp/` only.
 - `tools/cpk`: `diff` accepts a directory as the mod, and a file under a folder named after a game file is `in-container`, not `added`.
 - [VERIFIED] `diff` of the package against `umd0.cpk` and `umd1.cpk`: 1,369 `changed` (1,258 `.bf`, 98 `.abin`), 336 `in-container` (229 `.bf`, 72 `.tmx`, 20 `.bmd`, `data/init/font/font0.fnt` under `data/init.bin`), 128 `added` (the texture folder, `Package.xml`, `Preview.png`).
-- [INFERRED] The `in-container` files must first be built into their containers, which Aemulus does, so the package can't simply be copied to `mods/bind/`. Not yet checked against Aemulus or run.
+- [VERIFIED] The `in-container` files must first be built into their containers (`p3p-cpk bind`), so the package can't simply be copied to `mods/bind/`.
 - [WRONG] A translation needs no EBOOT patch: the mod's description says the menu text is in the EBOOT.
 - `tools/cpk`: `patch` applies xdelta (VCDIFF) patches (#83).
-- [VERIFIED] `rus_eboot_patch_v0.8.2.xdelta` applies to `profiles/p3p/game/eboot.elf` with its Adler-32 matching, so this is its source. It changes 47,707 of 5,849,468 bytes in 611 ranges, size unchanged: 29,798 in `.rodata`, 17,907 in `.data`, 2 in `.text` (file offsets 0x154578: 0x2484E8C0 -> 0x2484E8BF; 0x154688: 0x2484E8B0 -> 0x2484E8AE). P3P3DS generates its AOT code from the EBOOT, so those 2 bytes need the generated code to change, or a profile patch. [UNVERIFIED] What the two instructions do.
-- [INFERRED] Cyrillic is drawn through a replaced font with Latin character codes: the patch holds `Kluwka dlq lakrossa` ("lacrosse stick" in Russian). One string only.
+- [VERIFIED] `rus_eboot_patch_v0.8.2.xdelta` applies to `profiles/p3p/game/eboot.elf` with its Adler-32 matching, so this is its source. It changes 47,707 of 5,849,468 bytes in 611 ranges, size unchanged: 29,798 in `.rodata`, 17,907 in `.data`, 2 in `.text` (file offsets 0x154578: 0x2484E8C0 -> 0x2484E8BF; 0x154688: 0x2484E8B0 -> 0x2484E8AE). P3P3DS generates its AOT code from the EBOOT, so those 2 bytes need the generated code to change, or a profile patch.
+- [INFERRED] Cyrillic comes from a replaced font on Latin character codes: the patch holds `Kluwka dlq lakrossa` ("lacrosse stick" in Russian). One string only.
 
 ## `p3p-cpk diff`: what a mod changes in the game's archives (#76, 2026-11-06)
 

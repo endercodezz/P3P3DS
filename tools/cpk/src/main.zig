@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const cpk = @import("cpk.zig");
 const iso = @import("iso.zig");
+const pak = @import("pak.zig");
 const vcdiff = @import("vcdiff.zig");
 
 const usage =
@@ -11,6 +12,8 @@ const usage =
     \\       p3p-cpk extract <file.cpk> [substring] <out dir>
     \\       p3p-cpk diff    <mod.cpk|mod dir> <base.cpk>
     \\       p3p-cpk diff    <mod.cpk|mod dir> <image.iso> <cpk path on image>...
+    \\       p3p-cpk bind    <out dir> <mod.cpk|mod dir> <base.cpk>
+    \\       p3p-cpk bind    <out dir> <mod.cpk|mod dir> <image.iso> <cpk path on image>...
     \\       p3p-cpk patch   <source> <patch.xdelta> <output>
     \\       p3p-cpk check-trace <image.iso> <io-trace.csv> [prefix=hostdir ...]
     \\       p3p-cpk --help | --version
@@ -26,6 +29,9 @@ const usage =
     \\in-container: a mod manager has to build it into that file. Names match without
     \\regard to case; a match that differs in case is marked case-differs. With
     \\several base archives the first that has a file wins.
+    \\bind runs diff and writes a folder for the mod chain's bind/: changed files, and
+    \\the base containers (nested ones too) with in-container files put in. A file it
+    \\can't put in, such as one inside an .spr, is listed as unresolved, and exit is 1.
     \\patch applies a VCDIFF patch as xdelta3 writes it, checking its checksums; patches
     \\with secondary compression are refused. Compare with p3p-bindiff --elf.
     \\check-trace verifies the reads of p3p_pc_bootstrap --io-trace: each read of a
@@ -149,7 +155,11 @@ fn dispatch(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
     const rest = args[2..];
     if (std.mem.eql(u8, command, "list")) return archiveCommand(init, writer, rest, false);
     if (std.mem.eql(u8, command, "extract")) return archiveCommand(init, writer, rest, true);
-    if (std.mem.eql(u8, command, "diff")) return diffCommand(init, writer, rest);
+    if (std.mem.eql(u8, command, "diff")) return diffCommand(init, writer, rest, null);
+    if (std.mem.eql(u8, command, "bind")) {
+        if (rest.len < 3) return error.ExpectedOutputModAndBase;
+        return diffCommand(init, writer, rest[1..], rest[0]);
+    }
     if (std.mem.eql(u8, command, "patch")) return patchCommand(init, writer, rest);
     if (std.mem.eql(u8, command, "check-trace")) return checkTrace(init, writer, rest);
     return error.UnknownCommand;
@@ -247,7 +257,106 @@ fn sameContent(allocator: std.mem.Allocator, mod_source: cpk.Source, mod: cpk.Fi
     return std.mem.eql(u8, left, right);
 }
 
+const Inner = struct {
+    /// Lower-case path of the base container, and of the file inside it.
+    container: []const u8,
+    path: []const u8,
+    /// `dir/name` as the mod has it, for the report.
+    shown: []const u8,
+    data: []const u8,
+};
+
+fn innerLessThan(_: void, a: Inner, b: Inner) bool {
+    return std.mem.lessThan(u8, a.container, b.container);
+}
+
+fn writeBound(io: std.Io, out: std.Io.Dir, path: []const u8, data: []const u8) !void {
+    if (std.fs.path.dirnamePosix(path)) |parent| try out.createDirPath(io, parent);
+    try out.writeFile(io, .{ .sub_path = path, .data = data });
+}
+
+const Bind = struct {
+    io: std.Io,
+    out: std.Io.Dir,
+    arena: std.mem.Allocator,
+    inner: std.ArrayList(Inner) = .empty,
+    written: u64 = 0,
+    containers: u64 = 0,
+    unresolved: u64 = 0,
+
+    /// A changed container of the mod comes first, then the base's.
+    fn loadContainer(self: *Bind, allocator: std.mem.Allocator, diff: *const Diff, key: []const u8, path: []const u8) ![]u8 {
+        return self.out.readFileAlloc(self.io, path, allocator, .limited(cpk.max_file_size)) catch |err| switch (err) {
+            error.FileNotFound => {
+                const found = diff.base_files.get(key) orelse return error.ContainerNotFound;
+                return cpk.extract(allocator, found.source, found.file);
+            },
+            else => return err,
+        };
+    }
+
+    fn accepts(self: *Bind, allocator: std.mem.Allocator, diff: *const Diff, key: []const u8, item: Inner) !bool {
+        const found = diff.base_files.get(key) orelse return false;
+        const path = try cpk.safePath(allocator, found.file.dir, found.file.name);
+        defer allocator.free(path);
+        const bytes = try self.loadContainer(allocator, diff, key, path);
+        defer allocator.free(bytes);
+        const rebuilt = try pak.replace(allocator, bytes, item.path, item.data) orelse return false;
+        allocator.free(rebuilt);
+        return true;
+    }
+
+    /// Game files can share a name and differ in extension, like f021_000.fpc and
+    /// f021_000.pac: the folder belongs to the one that holds the file.
+    fn pickContainer(self: *Bind, allocator: std.mem.Allocator, diff: *const Diff, item: *Inner) !void {
+        if (try self.accepts(allocator, diff, item.container, item.*)) return;
+        const stem = item.container[0 .. std.mem.lastIndexOfScalar(u8, item.container, '.') orelse return];
+        for ([_][]const u8{ ".pac", ".fpc", ".bin", ".abin", ".pak", ".arc" }) |extension| {
+            const key = try std.fmt.allocPrint(self.arena, "{s}{s}", .{ stem, extension });
+            if (std.mem.eql(u8, key, item.container)) continue;
+            if (try self.accepts(allocator, diff, key, item.*)) {
+                item.container = key;
+                return;
+            }
+        }
+    }
+
+    fn finish(self: *Bind, allocator: std.mem.Allocator, writer: *std.Io.Writer, diff: *const Diff) !void {
+        for (self.inner.items) |*item| try self.pickContainer(allocator, diff, item);
+        std.mem.sort(Inner, self.inner.items, {}, innerLessThan);
+        var start: usize = 0;
+        while (start < self.inner.items.len) {
+            const key = self.inner.items[start].container;
+            var end = start;
+            while (end < self.inner.items.len and std.mem.eql(u8, self.inner.items[end].container, key)) end += 1;
+            const found = diff.base_files.get(key) orelse return error.ContainerNotFound;
+            const path = try cpk.safePath(allocator, found.file.dir, found.file.name);
+            defer allocator.free(path);
+            var bytes = try self.loadContainer(allocator, diff, key, path);
+            defer allocator.free(bytes);
+            var changed = false;
+            for (self.inner.items[start..end]) |item| {
+                if (try pak.replace(allocator, bytes, item.path, item.data)) |next| {
+                    allocator.free(bytes);
+                    bytes = next;
+                    changed = true;
+                } else {
+                    self.unresolved += 1;
+                    try writer.print("unresolved {s} container={s}\n", .{ item.shown, path });
+                }
+            }
+            if (changed) {
+                try writeBound(self.io, self.out, path, bytes);
+                self.containers += 1;
+            }
+            start = end;
+        }
+        try writer.print("bind files={d} containers={d} unresolved={d}\n", .{ self.written, self.containers, self.unresolved });
+    }
+};
+
 const Diff = struct {
+    bind: ?*Bind = null,
     base_files: *const std.StringHashMapUnmanaged(BaseFile),
     /// Lower-case base paths without their extension -> the base file's path.
     stems: *const std.StringHashMapUnmanaged([]const u8),
@@ -258,12 +367,13 @@ const Diff = struct {
     same: u64 = 0,
     case_differs: u64 = 0,
 
-    /// The deepest folder of `key` that is named after a base file.
-    fn container(self: *const Diff, key: []const u8) ?[]const u8 {
+    /// The deepest folder of `key` that is named after a base file: that file,
+    /// and where in `key` the path inside it starts.
+    fn container(self: *const Diff, key: []const u8) ?struct { path: []const u8, inner: usize } {
         var end = key.len;
         while (std.mem.lastIndexOfScalar(u8, key[0..end], '/')) |slash| {
             if (slash == 0) return null;
-            if (self.stems.get(key[0..slash])) |found| return found;
+            if (self.stems.get(key[0..slash])) |found| return .{ .path = found, .inner = slash + 1 };
             end = slash;
         }
         return null;
@@ -274,9 +384,18 @@ const Diff = struct {
         const key = try lowerKey(allocator, file);
         defer allocator.free(key);
         const found = self.base_files.get(key) orelse {
-            if (self.container(key)) |container_path| {
+            if (self.container(key)) |found_container| {
                 self.in_container += 1;
-                try writer.print("in-container {s}/{s} container={s}\n", .{ file.dir, file.name, container_path });
+                try writer.print("in-container {s}/{s} container={s}\n", .{ file.dir, file.name, found_container.path });
+                if (self.bind) |bind| {
+                    const data = try cpk.extract(bind.arena, source, file);
+                    try bind.inner.append(bind.arena, .{
+                        .container = try std.ascii.allocLowerString(bind.arena, found_container.path),
+                        .path = try bind.arena.dupe(u8, key[found_container.inner..]),
+                        .shown = try std.fmt.allocPrint(bind.arena, "{s}/{s}", .{ file.dir, file.name }),
+                        .data = data,
+                    });
+                }
             } else {
                 self.added += 1;
                 try writer.print("added {s}/{s} extract=0x{X}\n", .{ file.dir, file.name, file.extract_size });
@@ -292,6 +411,15 @@ const Diff = struct {
         } else {
             self.changed += 1;
             try writer.print("changed {s}/{s} extract=0x{X} -> 0x{X}{s}\n", .{ file.dir, file.name, found.file.extract_size, file.extract_size, mark });
+            if (self.bind) |bind| {
+                // Under the base's name: that is the one the game asks for.
+                const path = try cpk.safePath(allocator, found.file.dir, found.file.name);
+                defer allocator.free(path);
+                const data = try cpk.extract(allocator, source, file);
+                defer allocator.free(data);
+                try writeBound(bind.io, bind.out, path, data);
+                bind.written += 1;
+            }
         }
     }
 };
@@ -329,7 +457,7 @@ fn diffDirectory(init: std.process.Init, writer: *std.Io.Writer, diff: *Diff, di
     }
 }
 
-fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !u8 {
+fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8, bind_dir: ?[]const u8) !u8 {
     const allocator = init.gpa;
     const io = init.io;
     if (args.len < 2) return error.ExpectedModAndBase;
@@ -390,6 +518,15 @@ fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []c
     }
 
     var diff: Diff = .{ .base_files = &base_files, .stems = &stems };
+    var bind: Bind = undefined;
+    var bind_out: ?std.Io.Dir = null;
+    defer if (bind_out) |dir| dir.close(io);
+    if (bind_dir) |path| {
+        try std.Io.Dir.cwd().createDirPath(io, path);
+        bind_out = try std.Io.Dir.cwd().openDir(io, path, .{});
+        bind = .{ .io = io, .out = bind_out.?, .arena = arena };
+        diff.bind = &bind;
+    }
     if (mod_dir) |dir| {
         try diffDirectory(init, writer, &diff, dir);
     } else {
@@ -399,6 +536,10 @@ fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []c
         for (archive.files) |file| try diff.compare(allocator, writer, mod_source, file);
     }
     try writer.print("mod files={d} added={d} in_container={d} changed={d} same={d} case_differs={d} base files={d}\n", .{ diff.files, diff.added, diff.in_container, diff.changed, diff.same, diff.case_differs, base_files.count() });
+    if (diff.bind) |active| {
+        try active.finish(allocator, writer, &diff);
+        return if (active.unresolved == 0) 0 else 1;
+    }
     return if (diff.added == 0 and diff.in_container == 0 and diff.changed == 0) 0 else 1;
 }
 
