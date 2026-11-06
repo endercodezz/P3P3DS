@@ -8,16 +8,24 @@ const usage =
     \\       p3p-cpk list    <file.cpk> [substring]
     \\       p3p-cpk extract <image.iso> <cpk path on image> [substring] <out dir>
     \\       p3p-cpk extract <file.cpk> [substring] <out dir>
+    \\       p3p-cpk diff    <mod.cpk> <base.cpk>
+    \\       p3p-cpk diff    <mod.cpk> <image.iso> <cpk path on image>...
     \\       p3p-cpk check-trace <image.iso> <io-trace.csv> [prefix=hostdir ...]
     \\       p3p-cpk --help | --version
     \\list prints every file: dir/name, offset, stored and extracted size, compressed.
     \\extract writes files under their CPK directories, decompressing CRILAYLA.
     \\Every output path is checked before anything is written; `..`, absolute
     \\paths and names unsafe on Windows are refused. Bytes above ASCII become %XX.
+    \\diff prints what a mod does to the base archives, for each of its files: added,
+    \\changed or same, comparing extracted content, so a stored and a compressed copy
+    \\of the same bytes are the same. Names match without regard to case; a match
+    \\that differs in case is marked case-differs. With several base archives the
+    \\first that has a file wins.
     \\check-trace verifies the reads of p3p_pc_bootstrap --io-trace: each read of a
     \\.cpk must be metadata or lie in one file with the same FNV-1a 64. prefix=hostdir
     \\maps traced paths to host files, e.g. ms0:/PSP/P3P=.tmp/mods.
-    \\Exit: 0 success, 1 check-trace found differences, 2 usage/input/output error.
+    \\Exit: 0 success, 1 check-trace or diff found differences (for diff: a file added
+    \\or changed), 2 usage/input/output error.
     \\
 ;
 
@@ -134,6 +142,7 @@ fn dispatch(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
     const rest = args[2..];
     if (std.mem.eql(u8, command, "list")) return archiveCommand(init, writer, rest, false);
     if (std.mem.eql(u8, command, "extract")) return archiveCommand(init, writer, rest, true);
+    if (std.mem.eql(u8, command, "diff")) return diffCommand(init, writer, rest);
     if (std.mem.eql(u8, command, "check-trace")) return checkTrace(init, writer, rest);
     return error.UnknownCommand;
 }
@@ -207,6 +216,100 @@ fn extractFiles(init: std.process.Init, writer: *std.Io.Writer, source: cpk.Sour
     }
     try writer.print("extracted {d} files\n", .{selected.items.len});
     return 0;
+}
+
+const BaseFile = struct {
+    file: cpk.File,
+    source: cpk.Source,
+};
+
+fn lowerKey(allocator: std.mem.Allocator, file: cpk.File) ![]u8 {
+    const key = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ file.dir, file.name });
+    for (key) |*byte| byte.* = std.ascii.toLower(byte.*);
+    return key;
+}
+
+fn sameContent(allocator: std.mem.Allocator, mod_source: cpk.Source, mod: cpk.File, base: BaseFile) !bool {
+    // A size of 0 is a TOC without ExtractSize: only the data can tell.
+    if (mod.extract_size != 0 and base.file.extract_size != 0 and mod.extract_size != base.file.extract_size) return false;
+    const left = try cpk.extract(allocator, mod_source, mod);
+    defer allocator.free(left);
+    const right = try cpk.extract(allocator, base.source, base.file);
+    defer allocator.free(right);
+    return std.mem.eql(u8, left, right);
+}
+
+fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !u8 {
+    const allocator = init.gpa;
+    const io = init.io;
+    if (args.len < 2) return error.ExpectedModAndBase;
+    var mod: Container = undefined;
+    try mod.open(io, args[0]);
+    defer mod.file.close(io);
+    if (!mod.is_cpk) return error.ModIsNotCpk;
+    var base: Container = undefined;
+    try base.open(io, args[1]);
+    defer base.file.close(io);
+    const paths = args[2..];
+    if (base.is_cpk and paths.len != 0) return error.TooManyArguments;
+    if (!base.is_cpk and paths.len == 0) return error.ExpectedCpkPathOnImage;
+
+    var arena_state: std.heap.ArenaAllocator = .init(allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const views = try arena.alloc(View, @max(paths.len, 1));
+    const archives = try arena.alloc(cpk.Archive, views.len);
+    var opened: usize = 0;
+    defer for (archives[0..opened]) |archive| archive.deinit(allocator);
+    var base_files: std.StringHashMapUnmanaged(BaseFile) = .empty;
+    defer base_files.deinit(allocator);
+    for (views, archives, 0..) |*view, *archive, index| {
+        view.* = base.view;
+        var size = base.size;
+        if (!base.is_cpk) {
+            const extent = try iso.find(allocator, base.view.source(base.size), paths[index]);
+            const end = std.math.add(u64, extent.offset, extent.size) catch return error.OutOfBounds;
+            if (end > base.size) return error.OutOfBounds;
+            view.base = extent.offset;
+            size = extent.size;
+        }
+        const source = view.source(size);
+        archive.* = try cpk.Archive.open(allocator, source);
+        opened += 1;
+        for (archive.files) |file| {
+            const slot = try base_files.getOrPut(allocator, try lowerKey(arena, file));
+            if (!slot.found_existing) slot.value_ptr.* = .{ .file = file, .source = source };
+        }
+    }
+
+    const mod_source = mod.view.source(mod.size);
+    const archive = try cpk.Archive.open(allocator, mod_source);
+    defer archive.deinit(allocator);
+    var added: u64 = 0;
+    var changed: u64 = 0;
+    var same: u64 = 0;
+    var case_differs: u64 = 0;
+    for (archive.files) |file| {
+        const key = try lowerKey(allocator, file);
+        defer allocator.free(key);
+        const found = base_files.get(key) orelse {
+            added += 1;
+            try writer.print("added {s}/{s} extract=0x{X}\n", .{ file.dir, file.name, file.extract_size });
+            continue;
+        };
+        const exact = std.mem.eql(u8, file.dir, found.file.dir) and std.mem.eql(u8, file.name, found.file.name);
+        const mark: []const u8 = if (exact) "" else " case-differs";
+        if (!exact) case_differs += 1;
+        if (try sameContent(allocator, mod_source, file, found)) {
+            same += 1;
+            try writer.print("same {s}/{s}{s}\n", .{ file.dir, file.name, mark });
+        } else {
+            changed += 1;
+            try writer.print("changed {s}/{s} extract=0x{X} -> 0x{X}{s}\n", .{ file.dir, file.name, found.file.extract_size, file.extract_size, mark });
+        }
+    }
+    try writer.print("mod files={d} added={d} changed={d} same={d} case_differs={d} base files={d}\n", .{ archive.files.len, added, changed, same, case_differs, base_files.count() });
+    return if (added == 0 and changed == 0) 0 else 1;
 }
 
 const TracedCpk = struct {
