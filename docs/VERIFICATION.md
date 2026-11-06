@@ -6,6 +6,20 @@ Current execution and coverage measurements: [CURRENT_STATE.md](CURRENT_STATE.md
 
 ---
 
+## CPK host CLI (#65, 2026-11-06)
+
+Local ULUS-10512 ISO, Windows, Zig 0.17.1 `-Doptimize=safe`, oracle `experiments/cpk-check` (CriFsV2Lib):
+
+- [VERIFIED] `list`: `umd0.cpk` (5,860 files) and `umd1.cpk` (338) match the oracle's listing line for line in name, offset, stored and extracted size.
+- [VERIFIED] `extract`: all 6,198 files are byte-identical to the oracle's extraction, one oracle process per file and `cmp`; 5,018 of them are CRILAYLA-compressed.
+- [VERIFIED] `check-trace` on an `--io-trace` from the 20M replay: both print `cpk reads=40 header/toc=4 file_matched=36 mismatched=0 unclassified=0 non_cpk=2493`, exit 0. With the hash of one file read changed, both print the same `MISMATCH` line and `mismatched=1`, exit 1.
+- [VERIFIED] `list` flags a file as compressed from the TOC (`ExtractSize` differs from `FileSize`), the same 5,018 files as reading each file's `CRILAYLA` magic. `extract` still decides by the magic.
+- [INFERRED] Reading the magic of every file made a first `list` take 33.2 s, against 0.13-0.14 s when repeated: 5,860 reads across the image on a cold disk. Only that one cold run was seen.
+- [VERIFIED] Warm file cache, final build: `list umd0.cpk` 46-67 ms against the oracle's 89-142 ms (5 runs each); `check-trace` 47-56 ms against 217-865 ms (3 runs each). Both are mostly process startup. What matters here is that the tool needs no .NET SDK or NuGet restore.
+- [VERIFIED] `python tools/cpk/check.py`: format check, Debug and safe unit tests, 18/18 CLI tests on synthetic fixtures: stored and CRILAYLA files, masked tables, an ISO, path traversal, truncated tables, 250 randomly damaged archives through `list` and `extract` (exit 0 or 2, never a panic).
+- [VERIFIED] The build before the stdout fix exits with code 3 (panic) in `test_output_to_a_full_asynchronous_pipe`, so the test detects the bug. The pipes of Python's `subprocess` are synchronous and never showed it.
+- [VERIFIED] CI job `CPK tool` passes on `ubuntu-24.04` and `windows-2022`, including the CLI tests. On Linux the asynchronous pipe test is skipped.
+
 ## BinDiff host CLI (#59, 2026-11-05)
 
 - [VERIFIED] `tools/bindiff/src/diff.zig::parseElf` checks ELF32/LE/MIPS, table and payload bounds, load sizes, address overflow and section-name termination. It accepts PSP PRX type `0xFFA0` as in `recomp/PSPRecomp/include/psprecomp/elf32.hpp::kElfTypePspPrx`. It deliberately reads metadata only; PSP loading, relocations, imports and Allegrex analysis remain in PSPRecomp. `compareElf` pairs entries by index and compares file payloads; NOBITS has no file payload.

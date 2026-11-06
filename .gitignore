@@ -117,6 +117,7 @@ profiles/p3p/input/local/
 # P3P3DS's own tool directories.
 !/tools/texpack/
 !/tools/bindiff/
+!/tools/cpk/
 
 # Optional Zig host tools (including accidental default build locations).
 .zig-cache/
