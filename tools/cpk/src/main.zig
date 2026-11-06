@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const cpk = @import("cpk.zig");
 const iso = @import("iso.zig");
+const vcdiff = @import("vcdiff.zig");
 
 const usage =
     \\Usage: p3p-cpk list    <image.iso> <cpk path on image> [substring]
@@ -10,6 +11,7 @@ const usage =
     \\       p3p-cpk extract <file.cpk> [substring] <out dir>
     \\       p3p-cpk diff    <mod.cpk|mod dir> <base.cpk>
     \\       p3p-cpk diff    <mod.cpk|mod dir> <image.iso> <cpk path on image>...
+    \\       p3p-cpk patch   <source> <patch.xdelta> <output>
     \\       p3p-cpk check-trace <image.iso> <io-trace.csv> [prefix=hostdir ...]
     \\       p3p-cpk --help | --version
     \\list prints every file: dir/name, offset, stored and extracted size, compressed.
@@ -24,6 +26,8 @@ const usage =
     \\in-container: a mod manager has to build it into that file. Names match without
     \\regard to case; a match that differs in case is marked case-differs. With
     \\several base archives the first that has a file wins.
+    \\patch applies a VCDIFF patch as xdelta3 writes it, checking its checksums; patches
+    \\with secondary compression are refused. Compare with p3p-bindiff --elf.
     \\check-trace verifies the reads of p3p_pc_bootstrap --io-trace: each read of a
     \\.cpk must be metadata or lie in one file with the same FNV-1a 64. prefix=hostdir
     \\maps traced paths to host files, e.g. ms0:/PSP/P3P=.tmp/mods.
@@ -146,6 +150,7 @@ fn dispatch(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
     if (std.mem.eql(u8, command, "list")) return archiveCommand(init, writer, rest, false);
     if (std.mem.eql(u8, command, "extract")) return archiveCommand(init, writer, rest, true);
     if (std.mem.eql(u8, command, "diff")) return diffCommand(init, writer, rest);
+    if (std.mem.eql(u8, command, "patch")) return patchCommand(init, writer, rest);
     if (std.mem.eql(u8, command, "check-trace")) return checkTrace(init, writer, rest);
     return error.UnknownCommand;
 }
@@ -395,6 +400,22 @@ fn diffCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []c
     }
     try writer.print("mod files={d} added={d} in_container={d} changed={d} same={d} case_differs={d} base files={d}\n", .{ diff.files, diff.added, diff.in_container, diff.changed, diff.same, diff.case_differs, base_files.count() });
     return if (diff.added == 0 and diff.in_container == 0 and diff.changed == 0) 0 else 1;
+}
+
+fn patchCommand(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !u8 {
+    const allocator = init.gpa;
+    const io = init.io;
+    if (args.len != 3) return error.ExpectedSourcePatchOutput;
+    const cwd = std.Io.Dir.cwd();
+    const source = try cwd.readFileAlloc(io, args[0], allocator, .limited(vcdiff.max_output_size));
+    defer allocator.free(source);
+    const patch_data = try cwd.readFileAlloc(io, args[1], allocator, .limited(vcdiff.max_output_size));
+    defer allocator.free(patch_data);
+    const result = try vcdiff.apply(allocator, source, patch_data);
+    defer allocator.free(result.output);
+    try cwd.writeFile(io, .{ .sub_path = args[2], .data = result.output });
+    try writer.print("patched {d} -> {d} bytes, {d} windows\n", .{ source.len, result.output.len, result.windows });
+    return 0;
 }
 
 const TracedCpk = struct {

@@ -422,6 +422,10 @@ pub fn safePath(allocator: std.mem.Allocator, dir: []const u8, name: []const u8)
 
 const testing = std.testing;
 
+test {
+    _ = @import("vcdiff.zig");
+}
+
 test "literal and copy blocks decompress from the end" {
     // Written backwards: literals 'c', 'b', 'a', then 3 bytes copied from
     // distance 3, which gives "abcabc" after the prefix.
