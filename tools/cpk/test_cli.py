@@ -514,6 +514,82 @@ class Cli(unittest.TestCase):
             result = run("patch", self.dir / "source", self.dir / "patch", self.dir / "out")
             self.assertIn(result.returncode, (0, 2), (round_number, result.stderr[-400:]))
 
+    def pak_entry(self, name, data):
+        padded = data + bytes(-(256 + len(data)) % 64)
+        return name.encode().ljust(252, b"\0") + struct.pack("<I", len(data)) + padded
+
+    def bind_fixture(self):
+        inner = struct.pack("<I", 2) + b"x.bmd".ljust(32, b"\0") + struct.pack("<I", 2) + b"xx" + b"y.bmd".ljust(32, b"\0") + struct.pack("<I", 2) + b"yy"
+        container = self.pak_entry("a.bf", b"first") + self.pak_entry("panel.bin", inner) + bytes(256)
+        base = self.diff_fixture([("data", "pack.bin", container, len(container)), ("data", "plain.bin", b"old", 3), ("data", "image.spr", b"\1\0\0\0not a pak", 12)], "base.cpk")
+        return base, container
+
+    def test_bind(self):
+        base, container = self.bind_fixture()
+        root = self.mod_directory({
+            "data/plain.bin": b"new",
+            "data/pack/a.bf": b"first, translated",
+            "data/pack/panel/y.bmd": b"yy translated",
+            "Package.xml": b"<x/>",
+        })
+        out = self.dir / "out"
+        result = run("bind", out, root, base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("bind files=1 containers=1 unresolved=0", result.stdout)
+        self.assertEqual((out / "data/plain.bin").read_bytes(), b"new")
+        built = (out / "data/pack.bin").read_bytes()
+        self.assertIn(b"first, translated", built)
+        self.assertIn(b"yy translated", built)
+        self.assertIn(b"xx", built)
+        self.assertEqual(sorted(p.name for p in out.rglob("*") if p.is_file()), ["pack.bin", "plain.bin"])
+
+    def test_bind_with_the_same_data_rebuilds_the_same_container(self):
+        base, container = self.bind_fixture()
+        root = self.mod_directory({"data/pack/a.bf": b"first", "data/pack/panel/x.bmd": b"xx"})
+        out = self.dir / "out"
+        self.assertEqual(run("bind", out, root, base).returncode, 0)
+        self.assertEqual((out / "data/pack.bin").read_bytes(), container)
+
+    def test_bind_keeps_padding_that_is_not_zero(self):
+        container = bytearray(self.pak_entry("a.bf", b"first") + self.pak_entry("b.bf", b"second"))
+        container[256 + 5:320] = b"\xAB" * (320 - 256 - 5)
+        base = self.diff_fixture([("data", "pack.bin", bytes(container), len(container))], "base.cpk")
+        out = self.dir / "out"
+        self.assertEqual(run("bind", out, self.mod_directory({"data/pack/a.bf": b"FIRST"}), base).returncode, 0)
+        container[256:261] = b"FIRST"
+        self.assertEqual((out / "data/pack.bin").read_bytes(), bytes(container))
+
+    def test_bind_finds_the_file_among_containers_of_the_same_name(self):
+        fpc = self.pak_entry("model.gmo", b"model")
+        pac = self.pak_entry("script.bf", b"script")
+        base = self.diff_fixture([("data", "f021.fpc", fpc, len(fpc)), ("data", "f021.pac", pac, len(pac))], "base.cpk")
+        out = self.dir / "out"
+        result = run("bind", out, self.mod_directory({"data/f021/script.bf": b"translated"}), base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(b"translated", (out / "data/f021.pac").read_bytes())
+        self.assertFalse((out / "data/f021.fpc").exists())
+
+    def test_bind_names_what_it_cannot_put_in(self):
+        base, _ = self.bind_fixture()
+        root = self.mod_directory({"data/image/a.tmx": b"tmx", "data/pack/missing.bf": b"x"})
+        result = run("bind", self.dir / "out", root, base)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("unresolved data/image/a.tmx container=data/image.spr", result.stdout)
+        self.assertIn("unresolved data/pack/missing.bf container=data/pack.bin", result.stdout)
+        self.assertIn("unresolved=2", result.stdout)
+
+    def test_bind_mutated_container_never_crashes(self):
+        _, container = self.bind_fixture()
+        root = self.mod_directory({"data/pack/panel/y.bmd": b"new"})
+        rng = random.Random(84)
+        for round_number in range(150):
+            mutated = bytearray(container)
+            for _ in range(rng.randrange(1, 6)):
+                mutated[rng.randrange(len(mutated))] = rng.choice((0, 0x7F, 0x80, 0xFF, rng.randrange(256)))
+            base = self.diff_fixture([("data", "pack.bin", bytes(mutated), len(mutated))], "base.cpk")
+            result = run("bind", self.dir / "out", root, base)
+            self.assertIn(result.returncode, (0, 1, 2), (round_number, result.stderr[-400:]))
+
     def trace(self, rows):
         path = self.dir / "trace.csv"
         path.write_text("path,offset,size,fnv1a64,time_us\n" + "".join(f"{p},{o},{s},0x{h:016X},0\n" for p, o, s, h in rows))

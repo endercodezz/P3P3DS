@@ -424,6 +424,7 @@ const testing = std.testing;
 
 test {
     _ = @import("vcdiff.zig");
+    _ = @import("pak.zig");
 }
 
 test "literal and copy blocks decompress from the end" {

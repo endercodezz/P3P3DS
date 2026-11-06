@@ -31,7 +31,7 @@ Do **not** assume all mods are purely asset replacements. For every modification
 
 - `p3p/p3p-patches/ULUS10512.ini` — Verified memory offsets for intro skip and mod loader string pointers.
 - `p3p/Persona-3-Portable-Mod-Menu/` — Field script hooks (`.flow` / `.bf`) and menu initialization.
-- `tools/cpk/` — Our Zig CLI: lists and extracts a CPK from the ISO or a loose `mod.cpk`, which also checks that the archive is readable, and `diff` shows which game files a mod, a `bind/` folder or an Aemulus package replaces (`build/cpk/bin/p3p-cpk --help`).
+- `tools/cpk/` — Our Zig CLI: lists and extracts a CPK from the ISO or a loose `mod.cpk`, which also checks that the archive is readable, `diff` shows which game files a mod, a `bind/` folder or an Aemulus package replaces, `bind` builds a `bind/` folder from such a package, and `patch` applies an EBOOT xdelta (`build/cpk/bin/p3p-cpk --help`).
 - `tools/CriFsV2Lib/` — Modern C# library for reading and parsing CriWare CPK archives.
 - `tools/CriPakTools/` — C# CLI tool for unpacking and repacking CPK files with CRILAYLA compression.
 - `tools/AtlusFileSystemLibrary/` — Comprehensive library for Atlus PAC, BIN, GIM, and TMX containers.
