@@ -33,7 +33,6 @@ Defects found in the code review of 2026-10-08, not fixed yet (evidence and test
 |---|---|---|
 | Back-face culling uses opposite rules for 2D and 3D draws (PPSSPP uses one rule) ([#6](https://github.com/endercodezz/P3P3DS/issues/6)) | may hide another orientation bug; risk for scenes not yet seen | suspected |
 | Thread stacks and the PSP heap can overlap; stacks and freed heap memory are never reused ([#7](https://github.com/endercodezz/P3P3DS/issues/7)) | memory corruption or out-of-memory in long sessions | reproduced in a unit test; P3P's own peak not measured |
-| Mutexes are not released when their owner thread exits ([#8](https://github.com/endercodezz/P3P3DS/issues/8)); event-flag result bits differ from the PSP on timeouts ([#9](https://github.com/endercodezz/P3P3DS/issues/9)) | possible deadlock or wrong wake-up | reproduced in a unit test |
 | `sceIoOpenAsync` returns open errors at once instead of through the async result ([#10](https://github.com/endercodezz/P3P3DS/issues/10)) | a game waiting for the async result may misread a failed open | confirmed in code |
 | GE finish callbacks run too early, SIGNAL handlers are never called ([#11](https://github.com/endercodezz/P3P3DS/issues/11)) | timing differs from the PSP | confirmed in code |
 | FPU/VFPU edge cases (`vsin`/`vcos`, `divu` by zero, NaN signs) differ from hardware ([#12](https://github.com/endercodezz/P3P3DS/issues/12)) | small numeric differences | confirmed by pspautotests and host demos |

@@ -34,7 +34,7 @@ The PC mixer already produces correct game audio (`sceAudio`, `sceSasCore`, main
 
 Reproduced in unit tests or confirmed in code, not yet seen to change P3P's behaviour; fix one per pull request, each with a regression test and an unchanged replay:
 
-- HLE: thread stacks vs heap and memory reuse ([#7](https://github.com/endercodezz/P3P3DS/issues/7)), mutexes on owner exit ([#8](https://github.com/endercodezz/P3P3DS/issues/8)), event-flag `outBits` ([#9](https://github.com/endercodezz/P3P3DS/issues/9)), `sceIoOpenAsync` errors ([#10](https://github.com/endercodezz/P3P3DS/issues/10)), save-name validation ([#13](https://github.com/endercodezz/P3P3DS/issues/13)).
+- HLE: thread stacks vs heap and memory reuse ([#7](https://github.com/endercodezz/P3P3DS/issues/7)), event-flag `outBits` ([#9](https://github.com/endercodezz/P3P3DS/issues/9)), `sceIoOpenAsync` errors ([#10](https://github.com/endercodezz/P3P3DS/issues/10)), save-name validation ([#13](https://github.com/endercodezz/P3P3DS/issues/13)).
 - GE: culling rules ([#6](https://github.com/endercodezz/P3P3DS/issues/6)), callback and signal timing ([#11](https://github.com/endercodezz/P3P3DS/issues/11)); portrait fringe ([#4](https://github.com/endercodezz/P3P3DS/issues/4)).
 - Recompiler: FPU/VFPU edge cases ([#12](https://github.com/endercodezz/P3P3DS/issues/12)).
 - CI and tests: release without tests ([#25](https://github.com/endercodezz/P3P3DS/issues/25)), partial skips reported as passed ([#26](https://github.com/endercodezz/P3P3DS/issues/26)), game-specific values outside the profile ([#27](https://github.com/endercodezz/P3P3DS/issues/27)).
