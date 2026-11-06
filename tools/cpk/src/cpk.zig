@@ -276,6 +276,17 @@ fn isCompressed(source: Source, file: File) !bool {
     return std.mem.eql(u8, &magic, "CRILAYLA");
 }
 
+/// A file outside any archive, such as one in a `bind/` folder: all of `source`.
+pub fn looseFile(source: Source, dir: []const u8, name: []const u8) !File {
+    var file: File = .{ .dir = dir, .name = name, .offset = 0, .size = source.size, .extract_size = source.size };
+    if (try isCompressed(source, file)) {
+        var header: [layla_header]u8 = undefined;
+        try source.read(0, &header);
+        file.extract_size = @as(u64, std.mem.readInt(u32, header[8..12], .little)) + layla_prefix;
+    }
+    return file;
+}
+
 /// The file's content, decompressed when it is CRILAYLA. Caller frees.
 pub fn extract(allocator: std.mem.Allocator, source: Source, file: File) ![]u8 {
     if (file.size == 0) return allocator.alloc(u8, 0);

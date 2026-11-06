@@ -334,7 +334,53 @@ class Cli(unittest.TestCase):
         self.assertEqual(lines[1], "added data/a/root2.txt extract=0x3")
         self.assertEqual(lines[2], "changed /root.txt extract=0x5 -> 0x6")
         self.assertEqual(lines[3], "same data/b/packed.bin")
-        self.assertEqual(lines[4], "mod files=4 added=1 changed=2 same=1 case_differs=0 base files=4")
+        self.assertEqual(lines[4], "mod files=4 added=1 in_container=0 changed=2 same=1 case_differs=0 base files=4")
+
+    def mod_directory(self, files):
+        root = self.dir / "bind"
+        for path, data in files.items():
+            (root / path).parent.mkdir(parents=True, exist_ok=True)
+            (root / path).write_bytes(data)
+        return root
+
+    def test_diff_directory(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        root = self.mod_directory({
+            "data/a/plain.bin": PLAIN,
+            "data/b/packed.bin": COMPRESSED,  # a compressed loose file is compared by content
+            "root.txt": b"HELLO",
+            "data/a/plain/inner/tex.tmx": b"inside plain.bin",
+            "data/new/file.bin": b"new",
+        })
+        result = run("diff", root, base)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "same data/a/plain.bin",
+            "in-container data/a/plain/inner/tex.tmx container=data/a/plain.bin",
+            "same data/b/packed.bin",
+            f"added data/new/file.bin extract=0x3",
+            "changed /root.txt extract=0x5 -> 0x5",
+            "mod files=5 added=1 in_container=1 changed=1 same=2 case_differs=0 base files=4",
+        ])
+
+    def test_diff_directory_without_changes(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        result = run("diff", self.mod_directory({"data/a/plain.bin": PLAIN}), base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_diff_empty_directory(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        (self.dir / "empty").mkdir()
+        result = run("diff", self.dir / "empty", base)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("mod files=0", result.stdout)
+
+    def test_diff_in_container_from_a_cpk_counts_as_a_difference(self):
+        base = self.diff_fixture(ENTRIES, "base.cpk")
+        mod = self.diff_fixture([("DATA/A/PLAIN", "x.bin", b"x", 1)])
+        result = run("diff", mod, base)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("in-container DATA/A/PLAIN/x.bin container=data/a/plain.bin", result.stdout)
 
     def test_diff_nothing_changed(self):
         base = self.diff_fixture(ENTRIES, "base.cpk")
