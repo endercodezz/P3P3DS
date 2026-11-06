@@ -151,7 +151,8 @@ def fnv(data):
 
 
 def run(*args):
-    return subprocess.run([EXE, *map(str, args)], capture_output=True, text=True)
+    # Names are printed as stored, and damaged ones are not valid text.
+    return subprocess.run([EXE, *map(str, args)], capture_output=True, encoding="utf-8", errors="replace")
 
 
 PLAIN = bytes(range(256)) * 3

@@ -17,3 +17,4 @@ tools/texpack/tests/fixtures/*.tex binary
 
 # Zig fmt requires LF, including on Windows checkouts with core.autocrlf=true.
 tools/bindiff/** text eol=lf
+tools/cpk/** text eol=lf
