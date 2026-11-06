@@ -12,6 +12,13 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 - [UNVERIFIED] Hardware with a slow card: no periodic freezes and speed near 97-99 % in the same scene. Needs the reporter's confirmation on the next release. A host crash now leaves only the start report unless `report_live.txt` is present.
 - `profile_seconds.csv` (opt-in) still writes every second on the game's thread, so it can disturb a slow card itself.
 
+## BinDiff no longer panics on a full Git Bash pipe (#74, 2026-11-06)
+
+- [VERIFIED] Zig 0.17.1 panics when stdout is an asynchronous pipe that fills up (`.PENDING => unreachable`, `lib/std/Io/Threaded.zig`); pipes of Git Bash/MSYS are asynchronous. `p3p-bindiff --elf` with 3,000 changed sections stopped at about 73 KB with exit 3.
+- `tools/bindiff/src/main.zig`: the report is built in memory and written once, through `WriteFile` on Windows. Exit codes are unchanged, also with a closed stdout (exit 2).
+- [VERIFIED] The same case through `| cat` now gives the 1,083,473 bytes of the output to a file, exit 1. The new test fails with exit 3 on the build before the fix. `python tools/bindiff/check.py` passes, 15/15 CLI tests; the `x86_64-linux-musl` cross-build passes.
+- [VERIFIED] Normal use was rarely affected: at most about 6.3 KB in byte mode, 919 bytes for `--elf --json` of the real EBOOT against itself.
+
 ## Builder 0.3.3 release preparation (2026-11-05)
 
 - `platform/pc/builder/builder.rc` FileVersion and ProductVersion 0.3.3 ([#69](https://github.com/endercodezz/P3P3DS/issues/69)). Contents since 0.3.2: Builder update notice (#67), texture packs (texpack converter, PPSSPP-compatible keys, replacement on the PC and in the 3DS renderer), native game preparation (#33), host time audit docs (#50), Zig BinDiff tool.

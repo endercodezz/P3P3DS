@@ -30,6 +30,20 @@ def elf_fixture(prx=True):
     return b
 
 
+def many_sections_elf(address, count):
+    """A section header table only: NULL, .shstrtab and `count` NOBITS sections."""
+    names = b"\x00.s\x00"
+    table = (52 + len(names) + 3) & ~3
+    b = bytearray(table + (count + 2) * 40)
+    b[:16] = b"\x7fELF\x01\x01\x01" + bytes(9)
+    struct.pack_into("<HHIIIIIHHHHHH", b, 16, 2, 8, 1, 0x1000, 0, table, 0, 52, 32, 0, 40, count + 2, 1)
+    b[52:52 + len(names)] = names
+    struct.pack_into("<10I", b, table + 40, 1, 3, 0, 0, 52, len(names), 0, 0, 1, 0)
+    for index in range(count):
+        struct.pack_into("<10I", b, table + (index + 2) * 40, 1, 8, 3, address + index * 4, 0x100, 4, 0, 0, 4, 0)
+    return b
+
+
 class CliTests(unittest.TestCase):
     def setUp(self):
         root = ROOT / ".tmp/bindiff-tests"
@@ -199,6 +213,37 @@ class CliTests(unittest.TestCase):
         (self.dir / "left").write_bytes(good)
         (self.dir / "right").write_bytes(b"~PSP")
         self.run_cli("--elf", "--json", "left", "right", code=2)
+
+    @unittest.skipUnless(os.name == "nt", "Windows pipes")
+    def test_output_to_a_full_asynchronous_pipe(self):
+        # Git Bash gives programs pipes like this one; the pipes of subprocess are synchronous.
+        import ctypes
+        from ctypes import wintypes
+        import msvcrt
+
+        (self.dir / "left").write_bytes(many_sections_elf(0x1000, 3000))
+        (self.dir / "right").write_bytes(many_sections_elf(0x9000, 3000))
+        expected = self.run_cli("--elf", "left", "right", code=1).stdout
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateNamedPipeW.restype = wintypes.HANDLE
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        name = rf"\\.\pipe\p3p-bindiff-test-{os.getpid()}"
+        inbound, overlapped, generic_write, open_existing = 1, 0x40000000, 0x40000000, 3
+        server = kernel32.CreateNamedPipeW(name, inbound, 0, 1, 4096, 4096, 0, None)
+        client = kernel32.CreateFileW(name, generic_write, 0, None, open_existing, overlapped, None)
+        self.assertNotIn(wintypes.HANDLE(-1).value, (server, client))
+        descriptor = msvcrt.open_osfhandle(client, 0)
+        process = subprocess.Popen([str(EXE), "--elf", "left", "right"], cwd=self.dir, stdout=descriptor, stderr=subprocess.PIPE)
+        os.close(descriptor)
+        received = bytearray()
+        chunk = ctypes.create_string_buffer(65536)
+        count = wintypes.DWORD()
+        while kernel32.ReadFile(wintypes.HANDLE(server), chunk, len(chunk), ctypes.byref(count), None):
+            received += chunk.raw[:count.value]
+        kernel32.CloseHandle(wintypes.HANDLE(server))
+        stderr = process.communicate()[1]
+        self.assertEqual(process.returncode, 1, stderr[-400:])
+        self.assertEqual(bytes(received), expected)
 
     def test_output_error(self):
         (self.dir / "left").write_bytes(bytes(600))

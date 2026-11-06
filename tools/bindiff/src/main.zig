@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const diff = @import("diff.zig");
 
 const usage =
@@ -25,6 +26,30 @@ pub fn main(init: std.process.Init) void {
 }
 
 fn run(init: std.process.Init) !u8 {
+    var output: std.Io.Writer.Allocating = .init(init.gpa);
+    defer output.deinit();
+    const code = try report(init, &output.writer);
+    try writeStdout(init.io, output.written());
+    return code;
+}
+
+extern "kernel32" fn WriteFile(file: std.os.windows.HANDLE, buffer: [*]const u8, size: u32, written: *u32, overlapped: ?*anyopaque) callconv(.winapi) c_int;
+
+/// Pipes of Git Bash/MSYS are asynchronous, and the Zig 0.17.1 file writers panic
+/// when such a pipe fills up (`.PENDING => unreachable`); WriteFile waits instead.
+fn writeStdout(io: std.Io, bytes: []const u8) !void {
+    const stdout = std.Io.File.stdout();
+    if (builtin.os.tag != .windows) return stdout.writeStreamingAll(io, bytes);
+    var rest = bytes;
+    while (rest.len != 0) {
+        var written: u32 = 0;
+        const count: u32 = @intCast(@min(rest.len, 1 << 20));
+        if (WriteFile(stdout.handle, rest.ptr, count, &written, null) == 0) return error.WriteFailed;
+        rest = rest[written..];
+    }
+}
+
+fn report(init: std.process.Init, writer: *std.Io.Writer) !u8 {
     const allocator = init.gpa;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     var elf_mode = false;
@@ -32,17 +57,12 @@ fn run(init: std.process.Init) !u8 {
     var literal = false;
     var paths: [2][]const u8 = undefined;
     var count: usize = 0;
-    var buffer: [8192]u8 = undefined;
-    var stdout: std.Io.File.Writer = .init(.stdout(), init.io, &buffer);
-    const writer = &stdout.interface;
     if (args.len == 2 and std.mem.eql(u8, args[1], "--help")) {
         try writer.writeAll(usage);
-        try writer.flush();
         return 0;
     }
     if (args.len == 2 and std.mem.eql(u8, args[1], "--version")) {
         try writer.writeAll("p3p-bindiff 0.1.0 (Zig 0.17.1)\n");
-        try writer.flush();
         return 0;
     }
     for (args[1..]) |arg| {
@@ -130,7 +150,6 @@ fn run(init: std.process.Init) !u8 {
             try textEntries(diff.Section, writer, "section", d.sections.items);
         }
     }
-    try writer.flush();
     return if (bytes.equal()) 0 else 1;
 }
 
