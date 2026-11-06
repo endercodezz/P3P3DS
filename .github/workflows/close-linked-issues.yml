@@ -1,0 +1,33 @@
+# Closes the issues of merged pull requests (`Closes #n`). GitHub does not do it
+# here: auto-merge runs as github-actions with GITHUB_TOKEN, and such a merge
+# neither processes closing keywords nor starts a workflow on pull_request closed,
+# so this runs on a schedule. An issue reopened by hand stays open.
+name: Close linked issues
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close:
+    name: Close issues of merged pull requests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: gh issue close
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr list -R "$REPO" --state merged --limit 50 --json number,closingIssuesReferences \
+            --jq '.[] | .number as $pr | .closingIssuesReferences[] | "\(.number) \($pr)"' |
+          while read -r issue pr; do
+            state=$(gh api "repos/$REPO/issues/$issue" --jq '"\(.state) \(.state_reason)"')
+            if [ "$state" = "open null" ]; then
+              gh issue close "$issue" -R "$REPO" --comment "Closed by #$pr."
+            fi
+          done
