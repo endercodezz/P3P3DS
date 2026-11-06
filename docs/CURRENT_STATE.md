@@ -6,7 +6,7 @@ This is the current source of truth, newest entries first. Evidence concerns ULU
 
 - `tools/cpk` (Zig 0.17.1, host only, one 1.0 MiB executable on Windows): `list`, `extract` and `check-trace` for a CPK on the ISO or a loose `.cpk`. `experiments/cpk-check` stays as the independent oracle. The numbers are in `docs/VERIFICATION.md`.
 - [VERIFIED] Same results as CriFsV2Lib on ULUS-10512: all 6,198 listed files, all 6,198 extracted files byte for byte, and the `check-trace` verdict.
-- [VERIFIED] Zig 0.17.1 panics when stdout is an asynchronous pipe that fills up (Git Bash/MSYS): `.PENDING => unreachable` in `std/Io/Threaded.zig`, positional and streaming writers alike. `tools/cpk` writes stdout through `WriteFile` on Windows. [UNVERIFIED] `tools/bindiff` uses the same writers; whether its output can fill a pipe was not checked.
+- [VERIFIED] Zig 0.17.1 panics when stdout is an asynchronous pipe that fills up (Git Bash/MSYS): `.PENDING => unreachable` in `std/Io/Threaded.zig`, positional and streaming writers alike. `tools/cpk` writes stdout through `WriteFile` on Windows. `tools/bindiff` had the same panic: #74.
 - [UNVERIFIED] Community `mod.cpk` files and fan translation archives: only the game's two archives and synthetic fixtures were read so far (#23).
 
 ## No report.txt writes during play on the New 3DS (#71, #66, 2026-11-06)

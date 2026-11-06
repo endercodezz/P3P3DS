@@ -18,7 +18,7 @@ Local ULUS-10512 ISO, Windows, Zig 0.17.1 `-Doptimize=safe`, oracle `experiments
 - [VERIFIED] Warm file cache, final build: `list umd0.cpk` 46-67 ms against the oracle's 89-142 ms (5 runs each); `check-trace` 47-56 ms against 217-865 ms (3 runs each). Both are mostly process startup. What matters here is that the tool needs no .NET SDK or NuGet restore.
 - [VERIFIED] `python tools/cpk/check.py`: format check, Debug and safe unit tests, 18/18 CLI tests on synthetic fixtures: stored and CRILAYLA files, masked tables, an ISO, path traversal, truncated tables, 250 randomly damaged archives through `list` and `extract` (exit 0 or 2, never a panic).
 - [VERIFIED] The build before the stdout fix exits with code 3 (panic) in `test_output_to_a_full_asynchronous_pipe`, so the test detects the bug. The pipes of Python's `subprocess` are synchronous and never showed it.
-- [VERIFIED] Builds for `x86_64-linux-musl` from Windows. [UNVERIFIED] Running on Linux: CI job `CPK tool`.
+- [VERIFIED] CI job `CPK tool` passes on `ubuntu-24.04` and `windows-2022`, including the CLI tests. On Linux the asynchronous pipe test is skipped.
 
 ## BinDiff host CLI (#59, 2026-11-05)
 
