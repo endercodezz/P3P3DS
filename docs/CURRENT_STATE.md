@@ -2,6 +2,13 @@
 
 This is the current source of truth, newest entries first. Evidence concerns ULUS-10512; each section says whether it was measured on the PC runner, in Azahar or on a real New 3DS.
 
+## CPK tool in Zig without .NET: `tools/cpk` (#65, 2026-11-06)
+
+- `tools/cpk` (Zig 0.17.1, host only, one 1.0 MiB executable on Windows): `list`, `extract` and `check-trace` for a CPK on the ISO or a loose `.cpk`. `experiments/cpk-check` stays as the independent oracle. The numbers are in `docs/VERIFICATION.md`.
+- [VERIFIED] Same results as CriFsV2Lib on ULUS-10512: all 6,198 listed files, all 6,198 extracted files byte for byte, and the `check-trace` verdict.
+- [VERIFIED] Zig 0.17.1 panics when stdout is an asynchronous pipe that fills up (Git Bash/MSYS): `.PENDING => unreachable` in `std/Io/Threaded.zig`, positional and streaming writers alike. `tools/cpk` writes stdout through `WriteFile` on Windows. [UNVERIFIED] `tools/bindiff` uses the same writers; whether its output can fill a pipe was not checked.
+- [UNVERIFIED] Community `mod.cpk` files and fan translation archives: only the game's two archives and synthetic fixtures were read so far (#23).
+
 ## No report.txt writes during play on the New 3DS (#71, #66, 2026-11-06)
 
 - [VERIFIED] User reports on #66 (New 2DS XL, 0.3.2 build 2f91246, same Samsung EVO Plus 64 GB, attached report.txt and profile_seconds.csv): a run with freezes about 5 s apart had `sd max 2656 ms`, `io 36` (last 10 s), speed 64-74 %; a run without freezes had `sd max 78 ms`, `io 0`, speed 96-99 %.

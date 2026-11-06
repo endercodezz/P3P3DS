@@ -31,6 +31,21 @@ jobs:
       - name: Download verified Zig 0.17.1, build and test
         run: python tools/bindiff/check.py --download
 
+  cpk:
+    name: CPK tool (Zig 0.17.1, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Download verified Zig 0.17.1, build and test
+        run: python tools/cpk/check.py --download
+
   linux:
     name: Linux host build + tests
     runs-on: ubuntu-24.04

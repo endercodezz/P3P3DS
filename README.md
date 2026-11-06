@@ -278,7 +278,7 @@ To build the PC runner and development tools:
 - **C++20 Compiler** (measured with GCC 16.1 / MinGW-w64; other compilers are untested)
 - **Python 3.10+** (code generation helpers, analysis and verification scripts)
 - About **5 GB of RAM** and ~11 minutes on a 12-thread CPU for a clean build of the 237 generated units (`-j10`)
-- Optional: .NET SDK for `experiments/cpk-check` (CPK inspection)
+- Optional: **Zig 0.17.1** for `tools/bindiff` and `tools/cpk` (CPK inspection); .NET SDK only for `experiments/cpk-check`, the independent check of `tools/cpk`
 - For the New 3DS build: [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the `3ds-dev` packages (devkitARM, libctru, citro3d, picasso, 3dsxtool)
 
 ---
@@ -363,12 +363,31 @@ Exit codes: **0** byte-identical, **1** different, **2** usage/input/output erro
 
 JSON schema version 1 includes `mode`, input paths, byte equality, `bytes` totals/ranges, and an optional `elf` object with both headers and explicit header/segment/section changes. ELF entries are paired by table index. Added/removed entries have a null side; modified entries include both versions, with file offsets and ELF virtual addresses (no runtime load base added). `content_equal` compares file payloads and is null for missing entries or NOBITS. Section names are UTF-8 strings, or byte arrays when not valid UTF-8. Unsupported ELF class/endianness/machine, extended numbering, encrypted `~PSP`, PBP containers and malformed metadata are rejected with code 2; byte mode can still compare their raw bytes.
 
+### CPK tool (Zig 0.17.1)
+
+`tools/cpk` is an optional host-only CLI that reads CPK archives straight from the ISO, or a loose `.cpk` such as a `mod.cpk`, without the .NET SDK. Build and test it from the repository root, with Python 3.12+ and **Zig 0.17.1**:
+
+```bash
+python tools/cpk/check.py                     # format check, Debug/safe unit tests, safe build, CLI tests
+python tools/cpk/check.py --download          # alternatively download the pinned official Zig, verify SHA-256, then check
+build/cpk/bin/p3p-cpk list game.iso /PSP_GAME/USRDIR/umd0.cpk .bmd
+build/cpk/bin/p3p-cpk list mods/mod.cpk
+build/cpk/bin/p3p-cpk extract game.iso /PSP_GAME/USRDIR/umd0.cpk data/battle .tmp/extract
+build/cpk/bin/p3p-cpk check-trace game.iso .tmp/io-trace.csv ms0:/PSP/P3P=.tmp/mods
+```
+
+- `list` prints directory and name, offset, stored and extracted size, and whether the file is CRILAYLA-compressed; the optional last argument is a case-insensitive substring of `dir/name`. An archive it can't read fully is an error, which makes it a quick check of a community `mod.cpk`.
+- `extract` writes files under their CPK directories and decompresses them. All output paths are checked before the first write: `..`, absolute paths and names that are unsafe on Windows stop the extraction.
+- `check-trace` verifies `p3p_pc_bootstrap --io-trace`: each read of a `.cpk` must be metadata or lie inside one file with the same FNV-1a 64.
+
+Exit codes: **0** success, **1** `check-trace` found differences, **2** usage/input/output error. On Windows use `p3p-cpk.exe`. Keep game files and extracts under `.tmp/`.
+
 ### Continuous integration and releases (GitHub Actions)
 
 Without the game files (no `profiles/p3p/game/eboot.elf`) both CMake projects build everything that does not come from the game: the host runtime, tools, P3P3DS Builder and tests (the AOT code, the PC runner and the tests that run game code are left out), and the New 3DS runtime the Builder ships (no `.3dsx`). GitHub Actions uses this:
 
 - `.github/workflows/ci.yml`, on every push to `master` and every pull request: Linux (GCC 14) and Windows (MSYS2 UCRT64 GCC) host build + CTest, New 3DS runtime in the `devkitpro/devkitarm` container (which also regenerates the `tools/texpack` fixtures with its `tex3ds` and fails on any difference), and `tools/texpack` clippy + tests with the pinned Rust toolchain.
-- The same workflow independently builds/tests BinDiff on Windows/Linux using SHA-256-verified Zig 0.17.1 archives and synthetic fixtures; it requires no game data.
+- The same workflow independently builds/tests BinDiff and the CPK tool on Windows/Linux using SHA-256-verified Zig 0.17.1 archives and synthetic fixtures; it requires no game data.
 - `.github/workflows/automerge.yml`: a pull request opened by the maintainer (not a draft) is merged automatically, with a merge commit, once the three CI jobs pass; `master` requires them and takes changes only through pull requests.
 - `.github/workflows/release.yml`: pushing a tag `v<version>` that matches `FileVersion` in `platform/pc/builder/builder.rc` builds the New 3DS runtime (debug info stripped), the Windows and Linux Builder packages with `make_release.py`, and publishes them as a GitHub release (an existing release of that tag gets the files replaced). Started by hand (Actions -> Release -> Run workflow, with a branch or commit) it only builds the packages as workflow artifacts, for a dry run.
 
@@ -395,7 +414,7 @@ The runner prints the stop reason and a summary; `--dump-events` writes a JSON t
 | `--profile` | wall-time split between HLE, GE rendering and interpreter |
 | `--frames-dir <dir>` `--frame-every <n>` | write displayed frames as BMP |
 | `--wav <file>` | mix all game audio on the virtual clock into a 44.1 kHz stereo WAV |
-| `--dump-events <json>` / `--io-trace <csv>` | execution trace / file reads (for `experiments/cpk-check`) |
+| `--dump-events <json>` / `--io-trace <csv>` | execution trace / file reads (for `p3p-cpk check-trace`) |
 | `--no-interpreter` | stop at PCs without AOT code instead of interpreting |
 | `--verify-bootstrap` | fixed early-boot checkpoint used by CTest |
 
